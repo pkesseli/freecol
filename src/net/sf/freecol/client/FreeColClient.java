@@ -42,6 +42,7 @@ import net.sf.freecol.client.control.SoundController;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.SplashScreen;
 import net.sf.freecol.client.gui.SwingGUI;
+import net.sf.freecol.client.gui.classic.ClassicGUI;
 import net.sf.freecol.client.gui.action.ActionManager;
 import net.sf.freecol.client.networking.UserServerAPI;
 import net.sf.freecol.common.debug.FreeColDebugger;
@@ -240,6 +241,7 @@ public final class FreeColClient {
          */
 
         gui = (FreeCol.getHeadless()) ? new GUI(this)
+                : (FreeCol.getClassic()) ? new ClassicGUI(this)
                 : new SwingGUI(this);
         
         // Swing system and look-and-feel initialization.

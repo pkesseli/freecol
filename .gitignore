@@ -7,6 +7,13 @@
 
 ### Exising Entries
 
+# Classic UI: locally-generated original-Colonization asset pack (copyrighted
+# art extracted from the user's OWN install -- never commit) and its work dir.
+/data/mods/classic_original/
+/build/classic-assets/
+# Classic UI: console-capture log from the test-loop one-liner (see plan).
+/classic_run.txt
+
 *.classpath
 *.project
 *.settings

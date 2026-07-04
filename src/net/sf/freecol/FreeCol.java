@@ -178,6 +178,7 @@ public final class FreeCol {
     // Cli values.  Often set to null so the default can be applied in
     // the accessor function.
     private static boolean checkIntegrity = false,
+                           classic = false,
                            consoleLogging = false,
                            debugStart = false,
                            fastStart = false,
@@ -633,6 +634,7 @@ public final class FreeCol {
         { "a", "advantages", getAdvantagesDescription(), "cli.arg.advantages" },
         { null,  "check-savegame", "cli.check-savegame", argFile },
         { "O", "clientOptions", "cli.clientOptions", "cli.arg.clientOptions" },
+        { null, "classic", "Use the classic original-Colonization-style UI (experimental)", null },
         { null, "debug", getDebugDescription(), "cli.arg.debug" },
         { "R", "debug-run", "cli.debug-run", "cli.arg.debugRun" },
         { "S", "debug-start", "cli.debug-start", null },
@@ -793,6 +795,10 @@ public final class FreeCol {
 
             if (line.hasOption("headless")) {
                 headless = true;
+            }
+
+            if (line.hasOption("classic")) {
+                classic = true;
             }
 
             if (line.hasOption("load-savegame")) {
@@ -1011,6 +1017,15 @@ public final class FreeCol {
      */
     public static boolean getHeadless() {
         return headless;
+    }
+
+    /**
+     * Should the classic (original-Colonization-style) UI be used?
+     *
+     * @return True if the {@code --classic} option was given.
+     */
+    public static boolean getClassic() {
+        return classic;
     }
 
     /**
