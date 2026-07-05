@@ -331,11 +331,21 @@ Asset track — bring-your-own original install (see "Asset strategy"):
       venv+Pillow, pinned `mpskit`, unpack→PNG, git-ignored `data/mods/classic_original/`). BUILD SUCCESSFUL:
       **1723 SS frames + 34 PIK screens** extracted. Pipeline (conda-python→venv→mpskit) validated.
       Pins learned: **Pillow&lt;10** (mpskit uses removed `ImagePalette(size=)`) ⇒ conversion needs **Python 3.9–3.11**.
-- [ ] A1.1 — DECODE FIDELITY follow-ups (images decode structurally but not yet usable):
-      1. **Palette/brightness** — extracted images are ~too dark / wrong colours; likely a 6-bit VGA
-         palette (0–63) not scaled to 8-bit, or mpskit's palette-attach on Pillow 9. Investigate.
-      2. **Transparency** — sprites render a cyan key colour instead of PNG alpha; apply the transparency index.
-      3. **COLONY.PIK skipped** — 2-part (palette-less) PIK; mpskit asserts 3 parts. Apply `VICEROY.PAL`.
+      (Windows base interpreter for this install = the `colonization` conda env, Py 3.11; pass
+      `-Dpython.bin=…\envs\colonization\python.exe` when `python` isn't on PATH.)
+- [x] A1.1 — DECODE FIDELITY **fixed & re-run** (BUILD SUCCESSFUL: **1723 SS + 35 PIK**, all usable).
+      **Single root cause** (not the three symptoms first guessed): mpskit's `attach_palette` builds the
+      palette *planar* and hands it to `ImagePalette(mode='RGB', size=…)`, which **Pillow 9 scrambles** —
+      pixel indices decode fine, the stored RGB is wrong. Grayscale art (cursor) hid it; terrain/screens
+      looked like colour noise. The 6-bit→8-bit scaling was already correct (`vga_color_trans`).
+      Fixes, kept in **committed** `tools/classic_assets/run_mpskit.py` (a wrapper that monkeypatches the
+      git-ignored, re-fetched mpskit — `build.xml` now drives mpskit through it via `MPSKIT_DIR`/`VICEROY_PAL`):
+      1. **Palette** — replace `attach_palette` with canonical `Image.putpalette(interleaved_rgb)`.
+         Fixes every SS frame + PIK screen at once.
+      2. **Transparency** — was a *symptom* of #1 (index 253 mapped to a wrong colour); the palette fix
+         plus mpskit's existing `transparency=253` tRNS resolves it (verified alpha extrema `(0,255)`).
+      3. **COLONY.PIK** — 2-part palette-less PIK (320×72 band); `read_pik` now falls back to `VICEROY.PAL`.
+         VICEROY.PAL layout **cracked**: 1024 B = a 768-B **256×3 six-bit-VGA** palette + a 256-B trailer (ignored).
 - [ ] A2 — key-mapping table: FreeCol keys → `image.classic_original.*` via committed
       `tools/classic_assets/aliases.properties` (appended into the pack automatically)
 - [ ] A3 — `--classic-assets` option / `classic_original` pack loader in `ClassicGUI`, fallback to FreeCol art

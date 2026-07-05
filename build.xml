@@ -1112,6 +1112,8 @@
         <property name="classic.assets.mpskit"    value="${classic.assets.work}/mpskit-${mpskit.ref}"/>
         <property name="classic.assets.stage.ss"  value="${classic.assets.work}/stage/ss"/>
         <property name="classic.assets.stage.pik" value="${classic.assets.work}/stage/pik"/>
+        <property name="classic.assets.viceroy"   value="${classic.assets.work}/stage/VICEROY.PAL"/>
+        <property name="classic.assets.wrapper"   value="${basedir}/tools/classic_assets/run_mpskit.py"/>
         <property name="classic.assets.pack"      value="${freecol.data.dir}/mods/classic_original"/>
 
         <!-- ***** Windows/Linux branch (from the get-go) *****
@@ -1142,6 +1144,12 @@
         <copy todir="${classic.assets.stage.pik}" flatten="true">
             <fileset dir="${col.install}" casesensitive="false" includes="*.PIK"/>
         </copy>
+        <!-- VICEROY.PAL is the master gameplay palette; run_mpskit.py uses it to
+             decode palette-less PIK screens (COLONY.PIK).  Copy it (case-insensitive)
+             to a stable staging path so the target name is predictable cross-platform. -->
+        <copy tofile="${classic.assets.viceroy}" failonerror="true">
+            <fileset dir="${col.install}" casesensitive="false" includes="VICEROY.PAL"/>
+        </copy>
 
         <!-- Provision a venv + Pillow (mpskit's only library dependency). -->
         <mkdir dir="${classic.assets.work}"/>
@@ -1165,24 +1173,28 @@
 
         <!-- Unpack to PNG.  No shell => no globbing; <apply> feeds the fileset
              (parallel=one invocation with all files).  CWD = staging so any
-             relative output lands there; main.py is passed by absolute path
-             (Python puts the script's own dir on sys.path, satisfying mpskit's
-             flat imports). -->
+             relative output lands there.  We drive mpskit through the committed
+             wrapper tools/classic_assets/run_mpskit.py (not main.py directly): it
+             monkeypatches two decode-fidelity fixes into the freshly-fetched,
+             git-ignored mpskit: a corrected palette attach (mpskit's scrambles
+             the palette on Pillow 9) and a VICEROY.PAL fallback for palette-less
+             PIK screens.  The wrapper locates mpskit via the MPSKIT_DIR env var
+             (it can't rely on being run from mpskit's own dir for sys.path). -->
         <apply executable="${venv.python}" dir="${classic.assets.stage.ss}"
                parallel="true" force="true" failonerror="true">
-            <arg file="${classic.assets.mpskit}/main.py"/>
+            <env key="MPSKIT_DIR" file="${classic.assets.mpskit}"/>
+            <arg file="${classic.assets.wrapper}"/>
             <arg value="ss"/><arg value="unpack"/>
             <fileset dir="${classic.assets.stage.ss}" casesensitive="false" includes="*.SS"/>
         </apply>
-        <!-- Per-file and tolerant: some .PIK screens (e.g. COLONY.PIK) have only
-             two MADSPACK parts (no embedded palette) and mpskit's read_pik asserts
-             three, so it fails on those.  Run one file per invocation with
-             failonerror="false" so palette-less screens are skipped (logged) rather
-             than aborting the whole batch.  build_pack.py reports the resulting
-             count; handling palette-less PIKs (apply VICEROY.PAL) is a follow-up. -->
+        <!-- PIK screens.  VICEROY_PAL lets the wrapper decode palette-less screens
+             (COLONY.PIK) that mpskit alone skips, so the whole set now decodes and
+             this stays parallel + failonerror to catch regressions. -->
         <apply executable="${venv.python}" dir="${classic.assets.stage.pik}"
-               parallel="false" force="true" failonerror="false">
-            <arg file="${classic.assets.mpskit}/main.py"/>
+               parallel="true" force="true" failonerror="true">
+            <env key="MPSKIT_DIR" file="${classic.assets.mpskit}"/>
+            <env key="VICEROY_PAL" file="${classic.assets.viceroy}"/>
+            <arg file="${classic.assets.wrapper}"/>
             <arg value="pik"/><arg value="unpack"/>
             <fileset dir="${classic.assets.stage.pik}" casesensitive="false" includes="*.PIK"/>
         </apply>
