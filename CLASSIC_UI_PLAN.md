@@ -354,10 +354,33 @@ priority). Track these as their own backlog; they do not block UI phases 0–3 a
 [Civ wiki — FreeCol divergences from Colonization](https://civilization.fandom.com/wiki/FreeCol_1.0.0/Divergences_from_Colonization),
 and this repo's `data/rules/classic/specification.xml`.
 
+## Immediate next steps (as of the native-Java asset decoder landing)
+
+Assets now extract cleanly, but **nothing renders them yet**: the `classic_original` pack is
+produced (A1) but not loaded (A3), unmapped (A2), and the classic UI has only its Phase-0 placeholder
+window. The classic UI runs on **fallback FreeCol art** until A3+A2 land — asset availability does
+*not* gate the UI phases. Recommended order:
+
+1. **Phase 0 live start-up test** *(gate; independent of the new assets).* Code is complete
+   (`--classic` flag, `FreeColClient` selector, `ClassicGUI` placeholder + image libraries). Actually
+   run it — `ant compile` then `java --classic`, start a new game — and confirm the window boots
+   without an exception storm. Fix any boot crash. Then check Phase 0 done.
+2. **A3 — pack loader** *(small; makes A1's output usable).* Load `data/mods/classic_original/` into
+   the `ResourceManager` when it exists (and when `--classic`), with graceful fallback to base/default
+   art. Open question to settle here: does our minimal `mod.xml` satisfy `FreeColModFile`, or do we
+   overlay resources more directly? Verify one `image.classic_original.*` key resolves in the running
+   client.
+3. **A2 (seed) — a few aliases** to prove end-to-end that original art appears (e.g. one screen/tile),
+   then grow the mapping alongside each UI phase.
+4. **Phase 1 — the map** — the first real screen and the first place the extracted terrain/unit
+   sprites visibly pay off. Proceeds on fallback art if A2 lags.
+
 ## Status
 
 UI track:
-- [ ] Phase 0 — scaffold & launch (icon-loading NPE fixed; `ImageLibrary` wired into `ClassicGUI`)
+- [~] Phase 0 — scaffold & launch: **code-complete** (`--classic` flag, selector, `ClassicGUI`
+      placeholder window, image libraries wired; icon-loading NPE fixed). **Remaining: live start-up
+      test** (run a game with `--classic`).
 - [ ] Phase 1 — map
 - [ ] Phase 2 — HUD & core screens
 - [ ] Phase 3 — dialogs & polish
