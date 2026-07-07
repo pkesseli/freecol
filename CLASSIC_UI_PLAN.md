@@ -203,9 +203,13 @@ incrementally. Each base method's Javadoc names its callers.
 
 ## Phased plan (each slice independently demoable)
 
-- **Phase 0 — Scaffold & launch.** New `client/gui/classic/ClassicGUI extends GUI`; `--classic`
-  flag; selector `headless ? GUI : classic ? ClassicGUI : SwingGUI`. Bring up a bare window; boot
-  the client with `ClassicGUI` without crashing. *(Proves the seam.)*
+- **Phase 0 — Scaffold & launch. ✅ DONE (verified live 2026-07-07).** New
+  `client/gui/classic/ClassicGUI extends GUI`; `--classic` flag; selector
+  `headless ? GUI : classic ? ClassicGUI : SwingGUI`. Bare window boots and a **new
+  single-player game runs** with `ClassicGUI` — 0 SEVERE, only the benign `options.xml`
+  warning. *(Proves the seam.)* One override was needed to reach the in-game view:
+  `showStartGamePanel` auto-launches single-player (base `GUI` no-ops the lobby, which
+  otherwise stalls a new game at login — see below).
 - **Phase 1 — The map.** `ClassicMapViewer` with rectangular projection (reuse `ImageLibrary`
   lookups). Terrain/units/colonies/cursor/minimap. Wire mouse/keyboard → controllers. Override
   `changeView`, active-unit state, `refresh`/`refreshTile`, scrolling. *(First real demo.)*
@@ -361,10 +365,11 @@ produced (A1) but not loaded (A3), unmapped (A2), and the classic UI has only it
 window. The classic UI runs on **fallback FreeCol art** until A3+A2 land — asset availability does
 *not* gate the UI phases. Recommended order:
 
-1. **Phase 0 live start-up test** *(gate; independent of the new assets).* Code is complete
-   (`--classic` flag, `FreeColClient` selector, `ClassicGUI` placeholder + image libraries). Actually
-   run it — `ant compile` then `java --classic`, start a new game — and confirm the window boots
-   without an exception storm. Fix any boot crash. Then check Phase 0 done.
+1. **Phase 0 live start-up test** *(gate; independent of the new assets).* ✅ **DONE 2026-07-07.**
+   `ant compile` then `java -cp "build;jars/*" net.sf.freecol.FreeCol --classic --fast --no-intro`
+   boots a new single-player game (map generated, in-game view reached) with 0 SEVERE and only the
+   benign `options.xml` warning. Fix applied: `ClassicGUI.showStartGamePanel` auto-launches
+   single-player (base lobby is a no-op, otherwise the new game stalls at login).
 2. **A3 — pack loader** *(small; makes A1's output usable).* Load `data/mods/classic_original/` into
    the `ResourceManager` when it exists (and when `--classic`), with graceful fallback to base/default
    art. Open question to settle here: does our minimal `mod.xml` satisfy `FreeColModFile`, or do we
@@ -378,9 +383,14 @@ window. The classic UI runs on **fallback FreeCol art** until A3+A2 land — ass
 ## Status
 
 UI track:
-- [~] Phase 0 — scaffold & launch: **code-complete** (`--classic` flag, selector, `ClassicGUI`
-      placeholder window, image libraries wired; icon-loading NPE fixed). **Remaining: live start-up
-      test** (run a game with `--classic`).
+- [x] Phase 0 — scaffold & launch: **DONE — verified live 2026-07-07.** `--classic` flag,
+      selector, `ClassicGUI` placeholder window, image libraries wired; icon-loading NPE fixed.
+      Live start-up test passed: `java --classic --fast --no-intro` boots a **new single-player
+      game** (map generated, in-game view reached) with **0 SEVERE** and only the benign
+      `options.xml` warning. Needed one override — `showStartGamePanel` auto-launches single-player
+      (the base `GUI` no-ops the lobby panel, so `ConnectController.login` otherwise stalls a new
+      game at login; auto-launch mirrors `StartGamePanel`'s Start button). Test recipe:
+      `--fast --no-intro` avoids needing GUI clicks to start a game.
 - [ ] Phase 1 — map
 - [ ] Phase 2 — HUD & core screens
 - [ ] Phase 3 — dialogs & polish

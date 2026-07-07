@@ -32,6 +32,9 @@ import javax.swing.WindowConstants;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.common.model.Game;
+import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.resources.ImageCache;
 
 
@@ -111,6 +114,31 @@ public class ClassicGUI extends GUI {
             logger.info("ClassicGUI window shown.");
         });
         logger.info("ClassicGUI started.");
+    }
+
+    // Pre-game lobby
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 0 has no pre-game lobby panel.  The base {@code GUI} no-ops this,
+     * which leaves a new single-player game stalled at login (see
+     * {@code ConnectController.login}: with no map yet, control passes here
+     * instead of {@code requestLaunch}).  Until a real lobby exists, auto-launch
+     * single-player games so the classic UI can actually reach the in-game view;
+     * this mirrors the "Start Game" button of {@code StartGamePanel}.  For
+     * multiplayer there is nothing sensible to do headlessly, so we no-op.
+     */
+    @Override
+    public FreeColPanel showStartGamePanel(Game game, Player player,
+                                           boolean singlePlayerMode) {
+        if (singlePlayerMode && player != null) {
+            logger.info("ClassicGUI: auto-launching single-player game "
+                + "(no lobby panel in Phase 0).");
+            player.setReady(true);
+            getFreeColClient().getPreGameController().requestLaunch();
+        }
+        return null;
     }
 
     // Image libraries
