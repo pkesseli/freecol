@@ -90,6 +90,10 @@ Prefer one-time *conversion* over runtime format parsing:
 2. The classic UI loads that pack if present (like any other mod); otherwise base/default art is used.
 3. Nothing copyrighted is committed — the generated pack is local-only (add to `.gitignore`).
 
+**The converter is pure Java** (`net.sf.freecol.tools.classicassets`), part of the FreeCol source
+tree and driven by `ant classic-assets`. There is **no Python / venv / Pillow / external tool** in
+the pipeline any more — see "Decoder" below for why and how we got here.
+
 ### Original formats & tooling — VERIFIED against this user's GOG install (A0 done)
 Install path (GOG): `C:\Program Files (x86)\GOG Galaxy\Games\Colonization`; assets live in
 `MPS\COLONIZE\` (290 files). Confirmed by magic bytes (`MADSPACK 2.0` header on every graphic):
@@ -97,13 +101,50 @@ Install path (GOG): `C:\Program Files (x86)\GOG Galaxy\Games\Colonization`; asse
   that was for *other* MicroProse titles). Two graphic kinds:
   - **`.PIK`** (35 files) — full-screen 320×200 pictures = the game's *screens* & chrome (see manifest below).
   - **`.SS`** (206 files) — sprite/"shape" sets, multiple frames per file (units, terrain, buildings, icons).
-- **Palette:** `VICEROY.PAL` (1024 bytes = 256 entries × 4, 6-bit VGA DAC values) is the master
-  256-colour palette. *(`ASOUND/GSOUND/PSOUND/RSOUND.COL` are sound-driver configs, NOT palettes.)*
-- **Decoder to build on:** [`institution/mpskit`](https://github.com/institution/mpskit) — a MADSPACK
-  decoder/encoder that **explicitly supports Colonization** (Python). A1 should wrap/port this.
-  Open sub-question for A1: mpskit handles the MADSPACK layer; confirm it also resolves the inner
-  sprite-frame/picture layout (dimensions, frame table) or whether we add that on top.
-- **Format reference:** [`eb4x/viceroy`](https://github.com/eb4x/viceroy) / re:Colonization (DOS-game RE).
+- **Palette:** `VICEROY.PAL` (1024 bytes = a 768-byte 256×3 six-bit-VGA RGB palette + a 256-byte
+  trailer we ignore) is the master 256-colour gameplay palette, used to decode the palette-less PIK
+  screens (`COLONY.PIK`). *(`ASOUND/GSOUND/PSOUND/RSOUND.COL` are sound-driver configs, NOT palettes.)*
+- **Format reference:** [`eb4x/viceroy`](https://github.com/eb4x/viceroy) / re:Colonization and the
+  format notes in [`institution/mpskit`](https://github.com/institution/mpskit).
+
+### Decoder — native Java, clean-room from the format spec (A1 done)
+The whole read path is a small, self-contained slice of the MADSPACK format, so we **reimplemented
+it directly in Java** rather than depend on an external tool:
+- **`MadsPack`** — MADSPACK 2.0 container: 12-byte magic, `uint16` part count at offset 14, a 0xA0
+  header block of `(uint16 flag, uint32 size, uint32 csize)` entries, then the parts. Per-part
+  bit-0 flag selects FAB compression.
+- **`Fab`** — the one non-trivial algorithm: an LZ-style bit-stream decompressor (literal / copy
+  commands, LSB-first bit reader with the 16-bit refill quirk).
+- **`Palette`** — 6-bit VGA → 8-bit (`v*255/63`); reads both the embedded `.SS`/`.PIK` palettes and
+  the master `VICEROY.PAL`.
+- **`SsDecoder`** — `.SS` sprite sets: per-sprite header table + the linemode/`FE`/`FD`/`FF`/`FC`
+  RLE, decoded straight into `TYPE_INT_ARGB` `BufferedImage`s (palette index `0xFD` → transparent).
+- **`PikDecoder`** — `.PIK` full screens: raw 8-bit indexed blit, embedded palette or `VICEROY.PAL`.
+- **`ClassicAssetConverter`** — the `main`: walks the install dir, decodes every `.SS`/`.PIK`, writes
+  the PNGs + `resources.properties` + `mod.xml` + messages, appending `aliases.properties` (A2).
+
+**Why Java, not the earlier Python/mpskit route.** We first wrapped `mpskit` (AGPLv3, Python) and
+hit its Pillow-9 `ImagePalette` palette-scrambling bug plus a palette-less-`COLONY.PIK` gap, patched
+around both with a monkeypatch wrapper — brittle, and it dragged in a venv + pinned `Pillow<10`
+(⇒ Python 3.9–3.11 only) + a network fetch. Decoding into a `BufferedImage` ourselves makes those
+bugs structurally impossible (we never touch an indexed-PNG palette), removes every non-Java
+dependency, and — decisively — is a **prerequisite for runtime extraction** (below). Written
+clean-room from the format documentation, so it is our own code under FreeCol's **GPLv2+** (an
+AGPLv3 line-by-line port would have been license-incompatible with upstream).
+
+### Runtime extraction — future direction (A5, not yet built)
+Today extraction is build-time (`ant classic-assets`). The intended end state is **in-game**: the
+user points the game at their Colonization install in settings and the classic art is decoded on
+demand. The Java decoder above is exactly what unblocks this — the same classes run in-process, so
+A5 is mostly UI plumbing on top:
+- a settings field + directory picker (validate by MADSPACK magic bytes, as A0 did);
+- on confirm, run the decoder → write the **same** git-ignored `classic_original` pack, then load it
+  as a mod (reuses all of A2/A3's plumbing unchanged); later, decode straight into `ResourceManager`
+  to skip the disk pack.
+- ⚠️ **Switching the *UI* at runtime ≠ switching *assets*.** The GUI is chosen once at
+  `FreeColClient` construction, so "switch to classic UI in settings" is realistically a
+  **preference + restart** (an in-place `SwingGUI`↔`ClassicGUI` swap is a much larger job). Scope A5
+  as restart-to-apply. FreeCol art remains the fallback skin when no install is configured.
 
 ### Original-game screen manifest (from the 35 `.PIK` files) — drives UI phasing & the expert's shot list
 `COLONY` (colony screen), `EUROPE` (Europe), `REPORT1`–`REPORT9` (the nine reports), `NATIONS`
@@ -115,11 +156,14 @@ expert a complete screenshot checklist.
 
 ### Asset backlog (own track; UI phases 0–2 proceed on fallback art meanwhile)
 - **A0** — locate the PIC/MADSPACK assets in a Steam/GOG "Classic" install; confirm layout & format.
-- **A1** — stand up the converter (wrap/port a tool above) → PNGs.
+- **A1** — stand up the converter → PNGs. **Native-Java** MADSPACK/FAB/SS/PIK decoder (no external tool).
 - **A2** — author the **key-mapping table**: FreeCol keys (terrain, units, goods, UI chrome, order
-  buttons, fonts) → original frames. This curation is the bulk of the work.
+  buttons, fonts) → original frames, in the committed `tools/classic_assets/aliases.properties`.
+  This curation is the bulk of the work.
 - **A3** — wire a `--classic-assets <dir>` option (or client option) + `classic_original` pack
   loader, with graceful fallback to FreeCol art.
+- **A5** — runtime extraction: in-game install picker → decode on demand (see "Runtime extraction"
+  above). Reuses the A1 decoder in-process; scope the UI switch as restart-to-apply.
 
 ## Architecture findings (why this is feasible)
 
@@ -326,26 +370,18 @@ Rules-fidelity track (see "Gameplay fidelity" §D):
 
 Asset track — bring-your-own original install (see "Asset strategy"):
 - [x] A0 — assets located & format confirmed: GOG `…\Colonization\MPS\COLONIZE\`, all MADSPACK 2.0
-      (`.PIK` screens, `.SS` sprite sets, `VICEROY.PAL` palette); decoder = `mpskit`
-- [x] A1 — converter IMPLEMENTED & RUN end-to-end (Ant `classic-assets` + `tools/classic_assets/build_pack.py`;
-      venv+Pillow, pinned `mpskit`, unpack→PNG, git-ignored `data/mods/classic_original/`). BUILD SUCCESSFUL:
-      **1723 SS frames + 34 PIK screens** extracted. Pipeline (conda-python→venv→mpskit) validated.
-      Pins learned: **Pillow&lt;10** (mpskit uses removed `ImagePalette(size=)`) ⇒ conversion needs **Python 3.9–3.11**.
-      (Windows base interpreter for this install = the `colonization` conda env, Py 3.11; pass
-      `-Dpython.bin=…\envs\colonization\python.exe` when `python` isn't on PATH.)
-- [x] A1.1 — DECODE FIDELITY **fixed & re-run** (BUILD SUCCESSFUL: **1723 SS + 35 PIK**, all usable).
-      **Single root cause** (not the three symptoms first guessed): mpskit's `attach_palette` builds the
-      palette *planar* and hands it to `ImagePalette(mode='RGB', size=…)`, which **Pillow 9 scrambles** —
-      pixel indices decode fine, the stored RGB is wrong. Grayscale art (cursor) hid it; terrain/screens
-      looked like colour noise. The 6-bit→8-bit scaling was already correct (`vga_color_trans`).
-      Fixes, kept in **committed** `tools/classic_assets/run_mpskit.py` (a wrapper that monkeypatches the
-      git-ignored, re-fetched mpskit — `build.xml` now drives mpskit through it via `MPSKIT_DIR`/`VICEROY_PAL`):
-      1. **Palette** — replace `attach_palette` with canonical `Image.putpalette(interleaved_rgb)`.
-         Fixes every SS frame + PIK screen at once.
-      2. **Transparency** — was a *symptom* of #1 (index 253 mapped to a wrong colour); the palette fix
-         plus mpskit's existing `transparency=253` tRNS resolves it (verified alpha extrema `(0,255)`).
-      3. **COLONY.PIK** — 2-part palette-less PIK (320×72 band); `read_pik` now falls back to `VICEROY.PAL`.
-         VICEROY.PAL layout **cracked**: 1024 B = a 768-B **256×3 six-bit-VGA** palette + a 256-B trailer (ignored).
+      (`.PIK` screens, `.SS` sprite sets, `VICEROY.PAL` palette).
+- [x] A1 — converter IMPLEMENTED & RUN end-to-end as a **native-Java** tool
+      (`net.sf.freecol.tools.classicassets`, driven by `ant classic-assets`; unpack→PNG,
+      git-ignored `data/mods/classic_original/`). BUILD SUCCESSFUL: **1723 SS frames + 35 PIK
+      screens** extracted, all usable. No Python / venv / Pillow / mpskit in the pipeline.
+      - History: originally wrapped `mpskit` (Python/AGPLv3) with a monkeypatch for its Pillow-9
+        palette-scrambling bug + palette-less-`COLONY.PIK` gap. That whole route was **removed** and
+        replaced by the clean-room Java decoder — structurally free of the palette bug (decodes into
+        `BufferedImage`), dependency-free, GPLv2+-compatible, and reusable in-process for runtime
+        extraction (A5). VICEROY.PAL layout cracked earlier still holds: 1024 B = 768-B 256×3
+        six-bit-VGA palette + 256-B trailer (ignored).
 - [ ] A2 — key-mapping table: FreeCol keys → `image.classic_original.*` via committed
       `tools/classic_assets/aliases.properties` (appended into the pack automatically)
 - [ ] A3 — `--classic-assets` option / `classic_original` pack loader in `ClassicGUI`, fallback to FreeCol art
+- [ ] A5 — runtime (in-game) extraction: install picker + on-demand decode, restart-to-apply UI switch
