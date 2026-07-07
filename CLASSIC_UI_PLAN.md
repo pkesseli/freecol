@@ -275,6 +275,52 @@ incrementally. Each base method's Javadoc names its callers.
 **Expert player drives:** screen priority, validating each rebuilt screen vs. the real
 Colonization layout/interaction, sign-off per slice.
 
+### Phase 1 — implementation notes (kickoff)
+
+Concrete starting points (verified in-source 2026-07-07), so the map slice can start without
+re-deriving the seam:
+
+**`GUI` methods to override** (all no-ops in the base class; each Javadoc names its callers):
+- `changeView(Tile)` — TERRAIN view mode, a tile is selected. `changeView(Unit, boolean force)` —
+  MOVE_UNITS mode, sets the active unit (usually centre on it). `changeView()` — END_TURN mode,
+  clears active unit/selected tile. `changeView(MapTransform)` — map-editor only, ignore for now.
+- `refresh()` — repaint the whole map. `refreshTile(Tile)` — repaint one tile.
+- `setFocus(Tile)` / `getFocus()` / `getFocusMapPoint()` / `setFocusMapPoint(Point)` — the map
+  centre/focus tile; `ClassicMapViewer` owns this state.
+- Model access: `getFreeColClient().getGame().getMap()` for tiles, `getMyPlayer()` for the POV,
+  and the active unit from `changeView(Unit,…)`. `SwingGUI`'s pattern is
+  `changeViewMode(mode) + changeSelectedTile(...) + changeActiveUnit(...) + changeDone(change)` —
+  mirror that state (viewMode, selectedTile, activeUnit, focusTile) in our own viewer.
+
+**Image lookups to reuse** (from `ImageLibrary`; keep the *selection* logic, swap the projection):
+- Terrain: `getScaledTerrainImage(TileType, x, y)`, `getTerrainImage(TileType, x, y, size)`,
+  `getTileImageWithOverlayAndForest(...)`. Units/settlements have matching `get…Image` methods.
+- `client/gui/mapviewer/` (5210 lines) is the reference: reuse its per-tile image selection, but
+  **replace the isometric projection** (`TileBounds`/`MapViewerBounds`) with a rectangular one:
+  `screenX = (tileX - originX) * tileW`, `screenY = (tileY - originY) * tileH`, origin derived
+  from the focus tile so it centres.
+
+**First slice (minimal demoable):**
+1. `ClassicMapViewer extends JPanel` in `client/gui/classic/`, holding `FreeColClient` +
+   `ImageLibrary`; paints explored terrain tiles in a rectangular grid centred on the focus tile.
+2. `ClassicGUI`: build the viewer and swap it into the frame content when a game is in progress
+   (keep the title-screen placeholder for pre-game); override the methods above to update state +
+   `repaint()`.
+3. Add units + colonies on top; then a selected-tile cursor.
+4. Later slices: mouse click → `InGameController` (select/move), keyboard + edge scrolling, minimap.
+
+**Open questions to settle early:**
+- ⚠️ **Isometric fallback art vs. rectangular classic tiles.** FreeCol's base terrain images are
+  isometric diamonds (≈128×64); laid in a rectangular grid they leave gaps/overlap and look wrong.
+  The original `TERRAIN.SS` sprites are proper *rectangular* tiles — so a good-looking classic map
+  really wants a handful of **A2 terrain aliases** mapped early (grow the mapping here). Decide:
+  start the projection on whatever renders to prove the pipeline, then swap in classic terrain
+  sprites quickly — don't polish isometric-in-a-grid.
+- Pick a base tile pixel size (match the classic `TERRAIN.SS` native size); decide how to draw
+  unexplored/fog tiles.
+- `mapview.png` (contributor screenshot #1) tunes proportions/HUD placement but does **not** gate
+  starting the skeleton.
+
 ## Gameplay fidelity: classic ruleset vs. original Colonization (Col1)
 
 FreeCol's `classic` ruleset is the team's **best-effort emulation of the original 1994 game**
