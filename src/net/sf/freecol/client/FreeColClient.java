@@ -49,6 +49,7 @@ import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColDataFile;
 import net.sf.freecol.common.io.FreeColDirectories;
+import net.sf.freecol.common.io.FreeColModFile;
 import net.sf.freecol.common.io.FreeColSavegameFile;
 import net.sf.freecol.common.io.FreeColTcFile;
 import net.sf.freecol.common.model.Game;
@@ -230,7 +231,13 @@ public final class FreeColClient {
         this.clientOptions.fixClientOptions();
 
         // Reset the mod resources as a result of the client option update.
-        ResourceManager.setMods(this.clientOptions.getActiveMods());
+        // Under the classic UI, additionally overlay the original-Colonization
+        // art pack (if the user has generated it) so it wins over fallback art.
+        List<FreeColModFile> activeMods = this.clientOptions.getActiveMods();
+        if (FreeCol.getClassic()) {
+            activeMods = withClassicOriginalPack(activeMods);
+        }
+        ResourceManager.setMods(activeMods);
         
         if (this.clientOptions.getRange(ClientOptions.GRAPHICS_QUALITY) == ClientOptions.GRAPHICS_QUALITY_LOWEST) {
             ImageResource.forceLowestQuality(true);
@@ -344,6 +351,43 @@ public final class FreeColClient {
                 gui.showMainPanel(userMsg);
             }
         });
+    }
+
+    /** The id of the git-ignored original-Colonization art pack (plan item A3). */
+    private static final String CLASSIC_ORIGINAL_MOD_ID = "classic_original";
+
+    /**
+     * Overlay the classic-original art pack on the active mods, if present.
+     *
+     * When running the classic UI ({@code --classic}) and the user has generated
+     * the git-ignored {@code data/mods/classic_original/} pack (via
+     * {@code ant classic-assets}), load it as the highest-priority mod so its
+     * original-Colonization art overrides the FreeCol fallback art.  Absent the
+     * pack this is a no-op and the classic UI runs on FreeCol's own art (see
+     * CLASSIC_UI_PLAN.md, asset strategy A3).
+     *
+     * @param mods The active mods from the client options.
+     * @return The mod list with the classic-original pack appended (last = wins
+     *     in {@link ResourceManager#prepare}), or the input list unchanged if the
+     *     pack is absent or already active.
+     */
+    private List<FreeColModFile> withClassicOriginalPack(List<FreeColModFile> mods) {
+        final FreeColModFile pack
+            = FreeColModFile.getFreeColModFile(CLASSIC_ORIGINAL_MOD_ID);
+        if (pack == null) {
+            logger.info("Classic UI: no '" + CLASSIC_ORIGINAL_MOD_ID
+                + "' art pack found; using FreeCol fallback art.");
+            return mods;
+        }
+        if (mods.stream().anyMatch(m ->
+                CLASSIC_ORIGINAL_MOD_ID.equals(m.getId()))) {
+            return mods; // already active via the user's mod options
+        }
+        final List<FreeColModFile> ret = new ArrayList<>(mods);
+        ret.add(pack); // appended last -> overrides earlier mappings
+        logger.info("Classic UI: overlaying '" + CLASSIC_ORIGINAL_MOD_ID
+            + "' original-art pack (" + ret.size() + " active mods).");
+        return ret;
     }
 
     /**

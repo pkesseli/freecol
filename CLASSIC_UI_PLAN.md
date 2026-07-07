@@ -416,5 +416,13 @@ Asset track — bring-your-own original install (see "Asset strategy"):
         six-bit-VGA palette + 256-B trailer (ignored).
 - [ ] A2 — key-mapping table: FreeCol keys → `image.classic_original.*` via committed
       `tools/classic_assets/aliases.properties` (appended into the pack automatically)
-- [ ] A3 — `--classic-assets` option / `classic_original` pack loader in `ClassicGUI`, fallback to FreeCol art
+- [x] A3 — `classic_original` pack loader **DONE — verified live 2026-07-07.** When `--classic`,
+      `FreeColClient` overlays the pack as the highest-priority mod
+      (`withClassicOriginalPack`, injected at the `ResourceManager.setMods` call), with graceful
+      fallback to FreeCol art when the pack is absent. **Open question settled:** the one-line
+      `mod.xml` (`<mod id="classic_original"/>`) is a *valid* mod descriptor — identical to every
+      other `data/mods/*/mod.xml` — so no fleshing-out was needed; the pack is discovered by
+      `FreeColModFile.loadMods()` (scans `data/mods/`) and looked up via `getFreeColModFile("classic_original")`.
+      Verified: preload count jumped 1390 → **2942** resources (+1552 pack keys), 0 SEVERE, no
+      resource-load warnings — i.e. the `image.classic_original.*` keys resolve in the running client.
 - [ ] A5 — runtime (in-game) extraction: install picker + on-demand decode, restart-to-apply UI switch
