@@ -22,10 +22,13 @@ package net.sf.freecol.client.gui.classic;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Frame;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
 import java.util.logging.Logger;
 
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
@@ -115,7 +118,27 @@ public class ClassicGUI extends GUI {
                 "<html><center>Classic UI scaffold (Phase 0)<br>"
                 + "map &amp; panels coming next.</center></html>",
                 SwingConstants.CENTER);
-            this.frame.add(placeholder, BorderLayout.CENTER);
+            // A2 end-to-end proof: paint the original-Colonization title screen
+            // as the background, fetched through the normal ImageLibrary path via
+            // the FreeCol key image.background.MainPanel.  That key is aliased to
+            // image.classic_original.pik.OPENING.PIK in the classic_original pack
+            // (tools/classic_assets/aliases.properties), so this shows original
+            // art only when the pack is loaded (A3) — otherwise the base FreeCol
+            // background shows and the scaffold still works.
+            final BufferedImage background =
+                ImageLibrary.getUnscaledImage("image.background.MainPanel");
+            final JPanel content = new JPanel(new BorderLayout()) {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    super.paintComponent(g);
+                    if (background != null) {
+                        g.drawImage(background, 0, 0, getWidth(), getHeight(), this);
+                    }
+                }
+            };
+            placeholder.setForeground(java.awt.Color.WHITE);
+            content.add(placeholder, BorderLayout.CENTER);
+            this.frame.setContentPane(content);
             this.frame.setSize(size);
             this.frame.setLocationByPlatform(true);
             if (!explicitSize) {

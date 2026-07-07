@@ -414,8 +414,15 @@ Asset track — bring-your-own original install (see "Asset strategy"):
         `BufferedImage`), dependency-free, GPLv2+-compatible, and reusable in-process for runtime
         extraction (A5). VICEROY.PAL layout cracked earlier still holds: 1024 B = 768-B 256×3
         six-bit-VGA palette + 256-B trailer (ignored).
-- [ ] A2 — key-mapping table: FreeCol keys → `image.classic_original.*` via committed
-      `tools/classic_assets/aliases.properties` (appended into the pack automatically)
+- [~] A2 — key-mapping table: FreeCol keys → `image.classic_original.*` via committed
+      `tools/classic_assets/aliases.properties` (appended into the pack automatically).
+      **Seeded & verified live 2026-07-07:** `image.background.MainPanel` →
+      `image.classic_original.pik.OPENING.PIK` (title screen) and `image.background.ColonyPanel`
+      → `…COLONY.PIK`. The Phase-0 `ClassicGUI` placeholder paints `image.background.MainPanel`
+      via `ImageLibrary.getUnscaledImage`, and the **original title screen renders** — proving
+      real-key → original-art through the normal ImageLibrary path. **Remaining: grow the table**
+      (terrain/units/goods with Phase 1, colony/europe/reports with Phase 2), driven by the
+      expert's per-screen screenshots.
 - [x] A3 — `classic_original` pack loader **DONE — verified live 2026-07-07.** When `--classic`,
       `FreeColClient` overlays the pack as the highest-priority mod
       (`withClassicOriginalPack`, injected at the `ResourceManager.setMods` call), with graceful
