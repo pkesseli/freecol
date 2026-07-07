@@ -1076,4 +1076,37 @@
                           destdir="cobertura/report"/>
     </target>
 
+    <!-- ================================================================= -->
+    <!-- Classic UI: one-time conversion of the user's OWN original          -->
+    <!-- Colonization (Sid Meier's, 1994) art into a local FreeCol mod pack. -->
+    <!--                                                                     -->
+    <!-- Ships NO copyrighted assets: reads the user's legally-owned         -->
+    <!-- GOG/Steam install and writes a git-ignored data/mods/classic_original.-->
+    <!-- The converter is pure Java (net.sf.freecol.tools.classicassets), so  -->
+    <!-- there is NO Python / venv / external tool involved (just the JDK).   -->
+    <!--                                                                     -->
+    <!-- Usage:                                                              -->
+    <!--   ant classic-assets \                                              -->
+    <!--     -Dcol.install="C:\...\GOG Galaxy\Games\Colonization\MPS\COLONIZE"-->
+    <!-- ================================================================= -->
+    <target name="classic-assets" depends="build"
+            description="One-time: convert your OWN original Colonization art into a local classic_original mod pack (needs -Dcol.install=...).">
+
+        <fail unless="col.install"
+              message="Set -Dcol.install to your original Colonization art directory, e.g.&#10;  ant classic-assets -Dcol.install=&quot;C:\Program Files (x86)\GOG Galaxy\Games\Colonization\MPS\COLONIZE&quot;"/>
+
+        <property name="classic.assets.pack"    value="${freecol.data.dir}/mods/classic_original"/>
+        <property name="classic.assets.aliases" value="${basedir}/tools/classic_assets/aliases.properties"/>
+
+        <java classname="net.sf.freecol.tools.classicassets.ClassicAssetConverter"
+              classpath="${freecol.build.dir}" fork="true" failonerror="true">
+            <arg value="--install"/><arg file="${col.install}"/>
+            <arg value="--out"/><arg file="${classic.assets.pack}"/>
+            <arg value="--aliases"/><arg file="${classic.assets.aliases}"/>
+        </java>
+
+        <echo message="classic-assets: pack written to ${classic.assets.pack} (git-ignored)."/>
+        <echo message="Next (A2): map FreeCol resource keys onto the image.classic_original.* keys via tools/classic_assets/aliases.properties."/>
+    </target>
+
 </project>
