@@ -21,6 +21,7 @@ package net.sf.freecol.client.gui.classic;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.Frame;
 import java.util.logging.Logger;
 
 import javax.swing.JFrame;
@@ -98,7 +99,14 @@ public class ClassicGUI extends GUI {
     @Override
     public void startGUI(final Dimension desiredWindowSize) {
         logger.info("Starting ClassicGUI (Phase 0 scaffold).");
-        final Dimension size = (desiredWindowSize != null)
+        // FreeCol passes Dimension(-1,-1) (WINDOWSIZE_FALLBACK) when no explicit
+        // --windowsize is given, meaning "use the full screen".  A plain
+        // null-check treats that sentinel as a real size and yields a 1x1 window,
+        // so only honour a size with positive dimensions; otherwise maximize
+        // (mirrors FreeColFrame's handling of invalid/absent bounds).
+        final boolean explicitSize = desiredWindowSize != null
+            && desiredWindowSize.width > 0 && desiredWindowSize.height > 0;
+        final Dimension size = explicitSize
             ? desiredWindowSize : new Dimension(1024, 768);
         SwingUtilities.invokeLater(() -> {
             this.frame = new JFrame("FreeCol — Classic UI (experimental)");
@@ -110,6 +118,9 @@ public class ClassicGUI extends GUI {
             this.frame.add(placeholder, BorderLayout.CENTER);
             this.frame.setSize(size);
             this.frame.setLocationByPlatform(true);
+            if (!explicitSize) {
+                this.frame.setExtendedState(Frame.MAXIMIZED_BOTH);
+            }
             this.frame.setVisible(true);
             logger.info("ClassicGUI window shown.");
         });
