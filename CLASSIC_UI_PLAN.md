@@ -12,6 +12,18 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
+## Status at a glance (2026-07-07)
+
+- **UI:** Phase 0 ✅ (scaffold boots a live game) → **Phase 1 (the map) is next**; Phases 2–3 ⬜.
+- **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
+  A3 ✅ (pack loader) · A2 🔨 seeded (original title screen renders live) · A5 ⬜ (runtime picker) ·
+  A6 ⬜ (audio).
+- **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
+
+Per-item detail (with verification notes) lives inline in the **Phased plan**, **Asset backlog &
+status**, and **Gameplay fidelity §D** sections below. This snapshot is the single at-a-glance
+tracker — update it as items land.
+
 ## How to run & test (classic UI)
 
 Build once after a code change, then launch with `--classic`. Run from the repo root so `data/`
@@ -32,6 +44,8 @@ Notes:
 - `;` is the Windows classpath separator; `jars/*` pulls in all dependency jars.
 - `--classic` selects `ClassicGUI` (see `FreeColClient` selector). Start a new game to reach the
   in-game view where `ClassicGUI.startGUI` fires.
+- Add `--fast --no-intro` to auto-start a new single-player game with **no GUI clicks** (skips the
+  intro video and the lobby) — the fastest way to reach the running in-game view for testing.
 - The `options.xml NoSuchFileException` on first launch is a benign pre-existing warning.
 - Packaged-jar alternative: `ant package` then `java -Xmx2G -jar FreeCol.jar --classic` (the Ant
   `run` target does not pass `--classic`, so invoke the jar directly).
@@ -51,6 +65,15 @@ Two distinct things, do not conflate them:
     a dialog mid-interaction — the *interactions* are as important as the static layout.
   - A one-line note per shot on what clicks/keys do is gold (we reuse the existing keyboard
     accelerators, so noting Col1's hotkeys helps us match them).
+  - **Priority order** (so the contributor isn't overwhelmed — matches the phase sequence):
+    1. **`mapview.png`** — the main map with the unit-orders/info bar, plus `mapview-unit-selected.png`
+       and `mapview-menus.png` (top menu bar open). *Drives Phase 1; capture first.*
+    2. **`colony.png`** — the signature colony screen, plus sub-states `colony-drag-colonist.png`,
+       `colony-build-queue.png`. *Drives Phase 2, the biggest screen.*
+    3. **`europe.png`** (+ `europe-recruit.png`, `europe-train.png`) and the **unit/cargo** view.
+    4. One clean **terrain + unit sprite reference** (a varied map area) to speed A2 frame ID.
+    5. **`report-*.png`** (the nine reports) and the **dialogs** (`combat-result-dialog.png`,
+       `negotiation.png`, end-turn) — Phase 2/3, lower urgency.
   These reference shots are design input only; we render with FreeCol's own art (below), not the
   original game's copyrighted assets.
 
@@ -146,6 +169,26 @@ A5 is mostly UI plumbing on top:
   **preference + restart** (an in-place `SwingGUI`↔`ClassicGUI` swap is a much larger job). Scope A5
   as restart-to-apply. FreeCol art remains the fallback skin when no install is configured.
 
+### Original audio — SFX & music (A6, not started)
+The install also holds the original sounds, in two tiers of very different difficulty (file headers
+inspected 2026-07-07):
+- **Digital SFX — `COLDIG.BIN` (~970 KB): feasible.** Raw **unsigned 8-bit PCM** (the bytes sit
+  around the `0x7F/0x80` silence midpoint) — the digitized sound-effect bank. Extractable to WAV
+  once its internal layout is cracked (an index/offset table of individual effects + the sample
+  rate). Mirrors the graphics pipeline: a small clean-room reader in `net.sf.freecol.tools`,
+  output WAVs + a `sound.classic_original.*` mapping aliased onto FreeCol's `sound.*` keys,
+  bring-your-own-install, ship nothing.
+- **Music — `AMER2.MP` + `*SOUND.COL`: hard, poor ROI.** The `A/G/P/RSOUND.COL` files start with
+  `MZ` — they are DOS sound-*driver* executables (AdLib/Gravis/ProAudio/Roland), not audio.
+  `AMER2.MP` is MPS synth **sequence** data (XMIDI-like note events) meant to *drive* an AdLib /
+  Roland MT-32 chip, not sampled audio — faithful playback needs both a sequence parser and chip
+  synthesis (or a bundled soundfont). Punt: FreeCol's own music is an acceptable fallback, and
+  recording DOSBox output beats writing an MPS synth.
+
+**Sequencing:** audio gates nothing (FreeCol's sound set is the fallback, exactly as its art is).
+Do the SFX only *after* the UI phases that trigger them; treat music as out-of-scope unless the
+expert deems the original score essential.
+
 ### Original-game screen manifest (from the 35 `.PIK` files) — drives UI phasing & the expert's shot list
 `COLONY` (colony screen), `EUROPE` (Europe), `REPORT1`–`REPORT9` (the nine reports), `NATIONS`
 (nation select), `DIFFICUL` (difficulty), `CUSTOMIZ` (customise), `DECLARAT`/`DECOIND` (declare
@@ -154,16 +197,26 @@ independence), `OPENING`/`OPENMENU`/`OPENBORD` (title/menu), `KINGLSS1/2` (king 
 art). This enumerates exactly which screens exist — use it to scope the UI phases and to give the
 expert a complete screenshot checklist.
 
-### Asset backlog (own track; UI phases 0–2 proceed on fallback art meanwhile)
-- **A0** — locate the PIC/MADSPACK assets in a Steam/GOG "Classic" install; confirm layout & format.
-- **A1** — stand up the converter → PNGs. **Native-Java** MADSPACK/FAB/SS/PIK decoder (no external tool).
-- **A2** — author the **key-mapping table**: FreeCol keys (terrain, units, goods, UI chrome, order
-  buttons, fonts) → original frames, in the committed `tools/classic_assets/aliases.properties`.
-  This curation is the bulk of the work.
-- **A3** — wire a `--classic-assets <dir>` option (or client option) + `classic_original` pack
-  loader, with graceful fallback to FreeCol art.
-- **A5** — runtime extraction: in-game install picker → decode on demand (see "Runtime extraction"
-  above). Reuses the A1 decoder in-process; scope the UI switch as restart-to-apply.
+### Asset backlog & status (own track; UI phases 0–2 proceed on fallback art meanwhile)
+- **A0 ✅** — assets located & format confirmed: GOG `…\Colonization\MPS\COLONIZE\`, all MADSPACK
+  2.0 (`.PIK` screens, `.SS` sprite sets, `VICEROY.PAL` palette).
+- **A1 ✅** — native-Java MADSPACK/FAB/SS/PIK decoder + converter
+  (`net.sf.freecol.tools.classicassets`, driven by `ant classic-assets`, no external tool);
+  produces the git-ignored `data/mods/classic_original/` pack (35 PIK screens + 1517 SS frames).
+- **A2 🔨 (seeded)** — key-mapping table in committed `tools/classic_assets/aliases.properties`
+  (appended into the pack by the converter, so regenerating never clobbers it). Seeds:
+  `image.background.MainPanel`→`…pik.OPENING.PIK` and `image.background.ColonyPanel`→`…pik.COLONY.PIK`;
+  the Phase-0 placeholder renders MainPanel, so the **original title screen shows live**.
+  **This curation is the bulk of the asset work** — grow terrain/units/goods with Phase 1, the
+  colony/europe/report screens with Phase 2, driven by the expert's screenshots.
+- **A3 ✅** — pack loader: when `--classic`, `FreeColClient.withClassicOriginalPack` overlays the
+  pack as the highest-priority mod (at the `ResourceManager.setMods` call), with graceful fallback
+  when it is absent. The one-line `mod.xml` is a valid descriptor (identical to every
+  `data/mods/*/mod.xml`), so no `--classic-assets <dir>` option was needed.
+- **A5 ⬜** — runtime (in-game) extraction: install picker → decode on demand, reusing the A1
+  decoder in-process; restart-to-apply UI switch. See "Runtime extraction" above.
+- **A6 ⬜** — original audio: SFX (`COLDIG.BIN`) feasible, music hard. See "Original audio" above.
+  Do the SFX after the UI phases that trigger them; music likely out-of-scope.
 
 ## Architecture findings (why this is feasible)
 
@@ -203,16 +256,16 @@ incrementally. Each base method's Javadoc names its callers.
 
 ## Phased plan (each slice independently demoable)
 
-- **Phase 0 — Scaffold & launch. ✅ DONE (verified live 2026-07-07).** New
-  `client/gui/classic/ClassicGUI extends GUI`; `--classic` flag; selector
-  `headless ? GUI : classic ? ClassicGUI : SwingGUI`. Bare window boots and a **new
-  single-player game runs** with `ClassicGUI` — 0 SEVERE, only the benign `options.xml`
-  warning. *(Proves the seam.)* One override was needed to reach the in-game view:
-  `showStartGamePanel` auto-launches single-player (base `GUI` no-ops the lobby, which
-  otherwise stalls a new game at login — see below).
-- **Phase 1 — The map.** `ClassicMapViewer` with rectangular projection (reuse `ImageLibrary`
-  lookups). Terrain/units/colonies/cursor/minimap. Wire mouse/keyboard → controllers. Override
-  `changeView`, active-unit state, `refresh`/`refreshTile`, scrolling. *(First real demo.)*
+- **Phase 0 — Scaffold & launch. ✅ DONE (verified live 2026-07-07).** `ClassicGUI extends GUI`,
+  `--classic` flag, selector `headless ? GUI : classic ? ClassicGUI : SwingGUI`. A new
+  single-player game boots and runs on `ClassicGUI` (placeholder window) with 0 SEVERE. *(Proves
+  the seam.)* Two fixes were needed: `showStartGamePanel` auto-launches single-player (the base
+  lobby is a no-op, else a new game stalls at login), and the window maximizes instead of reading
+  the `Dimension(-1,-1)` "use full screen" sentinel as a literal 1×1 size.
+- **Phase 1 — The map. 🔨 NEXT.** `ClassicMapViewer` with rectangular projection (reuse
+  `ImageLibrary` lookups). Terrain/units/colonies/cursor/minimap. Wire mouse/keyboard →
+  controllers. Override `changeView`, active-unit state, `refresh`/`refreshTile`, scrolling.
+  *(First real demo.)*
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
@@ -358,78 +411,11 @@ priority). Track these as their own backlog; they do not block UI phases 0–3 a
 [Civ wiki — FreeCol divergences from Colonization](https://civilization.fandom.com/wiki/FreeCol_1.0.0/Divergences_from_Colonization),
 and this repo's `data/rules/classic/specification.xml`.
 
-## Immediate next steps (as of the native-Java asset decoder landing)
+## History note
 
-Assets now extract cleanly, but **nothing renders them yet**: the `classic_original` pack is
-produced (A1) but not loaded (A3), unmapped (A2), and the classic UI has only its Phase-0 placeholder
-window. The classic UI runs on **fallback FreeCol art** until A3+A2 land — asset availability does
-*not* gate the UI phases. Recommended order:
-
-1. **Phase 0 live start-up test** *(gate; independent of the new assets).* ✅ **DONE 2026-07-07.**
-   `ant compile` then `java -cp "build;jars/*" net.sf.freecol.FreeCol --classic --fast --no-intro`
-   boots a new single-player game (map generated, in-game view reached) with 0 SEVERE and only the
-   benign `options.xml` warning. Fix applied: `ClassicGUI.showStartGamePanel` auto-launches
-   single-player (base lobby is a no-op, otherwise the new game stalls at login).
-2. **A3 — pack loader** *(small; makes A1's output usable).* Load `data/mods/classic_original/` into
-   the `ResourceManager` when it exists (and when `--classic`), with graceful fallback to base/default
-   art. Open question to settle here: does our minimal `mod.xml` satisfy `FreeColModFile`, or do we
-   overlay resources more directly? Verify one `image.classic_original.*` key resolves in the running
-   client.
-3. **A2 (seed) — a few aliases** to prove end-to-end that original art appears (e.g. one screen/tile),
-   then grow the mapping alongside each UI phase.
-4. **Phase 1 — the map** — the first real screen and the first place the extracted terrain/unit
-   sprites visibly pay off. Proceeds on fallback art if A2 lags.
-
-## Status
-
-UI track:
-- [x] Phase 0 — scaffold & launch: **DONE — verified live 2026-07-07.** `--classic` flag,
-      selector, `ClassicGUI` placeholder window, image libraries wired; icon-loading NPE fixed.
-      Live start-up test passed: `java --classic --fast --no-intro` boots a **new single-player
-      game** (map generated, in-game view reached) with **0 SEVERE** and only the benign
-      `options.xml` warning. Needed one override — `showStartGamePanel` auto-launches single-player
-      (the base `GUI` no-ops the lobby panel, so `ConnectController.login` otherwise stalls a new
-      game at login; auto-launch mirrors `StartGamePanel`'s Start button). Test recipe:
-      `--fast --no-intro` avoids needing GUI clicks to start a game.
-- [ ] Phase 1 — map
-- [ ] Phase 2 — HUD & core screens
-- [ ] Phase 3 — dialogs & polish
-
-Rules-fidelity track (see "Gameplay fidelity" §D):
-- [ ] R0 — baseline & instrumentation (load classic, conformance checklist, confirm class-B formulas)
-- [ ] R1 — ruleset-only corrections
-- [ ] R2 — engine corrections gated by option (combat first)
-- [ ] R3 — missing Col1 features
-
-Asset track — bring-your-own original install (see "Asset strategy"):
-- [x] A0 — assets located & format confirmed: GOG `…\Colonization\MPS\COLONIZE\`, all MADSPACK 2.0
-      (`.PIK` screens, `.SS` sprite sets, `VICEROY.PAL` palette).
-- [x] A1 — converter IMPLEMENTED & RUN end-to-end as a **native-Java** tool
-      (`net.sf.freecol.tools.classicassets`, driven by `ant classic-assets`; unpack→PNG,
-      git-ignored `data/mods/classic_original/`). BUILD SUCCESSFUL: **1723 SS frames + 35 PIK
-      screens** extracted, all usable. No Python / venv / Pillow / mpskit in the pipeline.
-      - History: originally wrapped `mpskit` (Python/AGPLv3) with a monkeypatch for its Pillow-9
-        palette-scrambling bug + palette-less-`COLONY.PIK` gap. That whole route was **removed** and
-        replaced by the clean-room Java decoder — structurally free of the palette bug (decodes into
-        `BufferedImage`), dependency-free, GPLv2+-compatible, and reusable in-process for runtime
-        extraction (A5). VICEROY.PAL layout cracked earlier still holds: 1024 B = 768-B 256×3
-        six-bit-VGA palette + 256-B trailer (ignored).
-- [~] A2 — key-mapping table: FreeCol keys → `image.classic_original.*` via committed
-      `tools/classic_assets/aliases.properties` (appended into the pack automatically).
-      **Seeded & verified live 2026-07-07:** `image.background.MainPanel` →
-      `image.classic_original.pik.OPENING.PIK` (title screen) and `image.background.ColonyPanel`
-      → `…COLONY.PIK`. The Phase-0 `ClassicGUI` placeholder paints `image.background.MainPanel`
-      via `ImageLibrary.getUnscaledImage`, and the **original title screen renders** — proving
-      real-key → original-art through the normal ImageLibrary path. **Remaining: grow the table**
-      (terrain/units/goods with Phase 1, colony/europe/reports with Phase 2), driven by the
-      expert's per-screen screenshots.
-- [x] A3 — `classic_original` pack loader **DONE — verified live 2026-07-07.** When `--classic`,
-      `FreeColClient` overlays the pack as the highest-priority mod
-      (`withClassicOriginalPack`, injected at the `ResourceManager.setMods` call), with graceful
-      fallback to FreeCol art when the pack is absent. **Open question settled:** the one-line
-      `mod.xml` (`<mod id="classic_original"/>`) is a *valid* mod descriptor — identical to every
-      other `data/mods/*/mod.xml` — so no fleshing-out was needed; the pack is discovered by
-      `FreeColModFile.loadMods()` (scans `data/mods/`) and looked up via `getFreeColModFile("classic_original")`.
-      Verified: preload count jumped 1390 → **2942** resources (+1552 pack keys), 0 SEVERE, no
-      resource-load warnings — i.e. the `image.classic_original.*` keys resolve in the running client.
-- [ ] A5 — runtime (in-game) extraction: install picker + on-demand decode, restart-to-apply UI switch
+Earlier iterations of this plan carried a separate "Immediate next steps" and "Status" section;
+both have been folded into the top-of-doc **Status at a glance** snapshot plus the inline status
+markers in the Phased-plan and Asset-backlog sections, to keep a single source of truth. The
+asset decoder's own history (the abandoned Python/`mpskit` route and its Pillow-9 palette bug,
+replaced by the clean-room Java decoder) is preserved in the git log and the "Decoder" section
+above.
