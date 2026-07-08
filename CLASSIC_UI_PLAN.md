@@ -267,28 +267,24 @@ incrementally. Each base method's Javadoc names its callers.
   the seam.)* Two fixes were needed: `showStartGamePanel` auto-launches single-player (the base
   lobby is a no-op, else a new game stalls at login), and the window maximizes instead of reading
   the `Dimension(-1,-1)` "use full screen" sentinel as a literal 1×1 size.
-- **Phase 1 — The map. 🔨 IN PROGRESS — first slice done & verified live (2026-07-08).**
-  `ClassicMapViewer` (a `JPanel` in `client/gui/classic/`) with the rectangular projection
-  (`screenX = cx + (x-focusX)*tileW - tileW/2`, same for y), reusing `ImageLibrary` terrain/unit/
-  settlement lookups. It owns the classic view state (viewMode/focus/selectedTile/activeUnit);
-  `ClassicGUI` installs it from `reconnectGUI(active, tile)` (game-start hook) and delegates
-  `changeView(Tile)`/`changeView(Unit,force)`/`changeView()`, `get{ViewMode,ActiveUnit,SelectedTile,
-  Focus}`, `setFocus`, `refresh`/`refreshTile`. Renders explored terrain, colonies, units, and a
-  white active-unit/selected-tile cursor; unexplored tiles stay black. Click selects a tile and
-  recentres. **Verified:** `--classic --fast --no-intro` boots to the start-at-sea view — the
-  starting ship + cursor on classic ocean tiles, 0 SEVERE (screenshot captured).
-  - **(a) Classic terrain sprites ✅ (done & verified live 2026-07-08).** The original rectangular
-    `TERRAIN.SS` tiles (12 frames, 16×16) are aliased onto FreeCol's `image.tile.<type>.center`
-    keys (`tools/classic_assets/aliases.properties`), so the grid now fills cleanly with **no
-    diamond gaps**. Frame order taken from the canonical Colonization terrain enum documented in
-    `net.sf.freecol.tools.ColonizationMapReader` (0=tundra…7=swamp) + visual ID (9=arctic, 10=ocean,
-    11=sea lane); all base/forest/water types mapped. `ClassicMapViewer` now uses **square** cells
-    (`TILE_SRC=16 × CLASSIC_SCALE=3` ⇒ 48px), fetches each tile at native 16×16 and up-scales with
-    nearest-neighbour so the pixels stay crisp; oversized FreeCol unit/settlement art is shrunk to
-    fit the cell. *(Land tiles use the identical alias mechanism as the verified ocean tiles.)*
+- **Phase 1 — The map. 🔨 IN PROGRESS.** `ClassicMapViewer` (a `JPanel` in `client/gui/classic/`)
+  owns the classic view state (viewMode/focus/selectedTile/activeUnit); `ClassicGUI` installs it
+  from `reconnectGUI(active, tile)` (game-start hook) and delegates the view-mode / focus / refresh
+  `GUI` methods (see the implementation reference below). **Done & verified live (2026-07-08),**
+  `--classic --fast --no-intro` boots to the start-at-sea view (ship + cursor on classic ocean
+  tiles, 0 SEVERE):
+  - Rectangular projection (`screenX = cx + (x-focusX)*TILE_W - TILE_W/2`, same for y) centred on
+    the focus tile; renders explored terrain + colonies + units + a white active-unit/selected-tile
+    cursor, unexplored tiles black. Click selects a tile and recentres (self-contained — **not yet**
+    wired to controllers, that is item (c)).
+  - Classic terrain sprites: the original rectangular `TERRAIN.SS` tiles fill the grid cleanly (no
+    diamond gaps). Square 48px cells (native 16px × scale 3), fetched at native size and up-scaled
+    nearest-neighbour to stay crisp; oversized FreeCol unit/settlement art shrunk to fit. The
+    key→frame mapping and its frame-order rationale live in
+    `tools/classic_assets/aliases.properties` (and the tools README's "A2" section).
   - **Remaining Phase-1 work:** (b) keyboard + edge scrolling; (c) wire click/keys →
-    `InGameController` for actual unit selection & movement (today's click is a self-contained
-    select/recentre only); (d) minimap; (e) overlay/forest/road/river compositing per tile.
+    `InGameController` for actual unit selection & movement; (d) minimap; (e) overlay / forest-tree /
+    road / river compositing per tile (only the base terrain `.center` tile is drawn today).
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
@@ -298,51 +294,28 @@ incrementally. Each base method's Javadoc names its callers.
 **Expert player drives:** screen priority, validating each rebuilt screen vs. the real
 Colonization layout/interaction, sign-off per slice.
 
-### Phase 1 — implementation notes (kickoff)
+### Phase 1 — implementation reference (for the remaining work)
 
-Concrete starting points (verified in-source 2026-07-07), so the map slice can start without
-re-deriving the seam:
+Seam facts (verified in-source), still relevant to items (b)–(e) above:
 
-**`GUI` methods to override** (all no-ops in the base class; each Javadoc names its callers):
-- `changeView(Tile)` — TERRAIN view mode, a tile is selected. `changeView(Unit, boolean force)` —
-  MOVE_UNITS mode, sets the active unit (usually centre on it). `changeView()` — END_TURN mode,
-  clears active unit/selected tile. `changeView(MapTransform)` — map-editor only, ignore for now.
-- `refresh()` — repaint the whole map. `refreshTile(Tile)` — repaint one tile.
+**`GUI` methods** (all no-ops in the base class; each Javadoc names its callers). The view-state
+ones are already overridden in `ClassicGUI`/`ClassicMapViewer`; listed here because item (c)
+(controller wiring) drives them:
+- `changeView(Tile)` — TERRAIN mode, a tile is selected. `changeView(Unit, boolean force)` —
+  MOVE_UNITS mode, sets the active unit. `changeView()` — END_TURN mode, clears active unit /
+  selected tile. `changeView(MapTransform)` — map-editor only, ignore.
+- `refresh()` / `refreshTile(Tile)` — repaint whole map / one tile.
 - `setFocus(Tile)` / `getFocus()` / `getFocusMapPoint()` / `setFocusMapPoint(Point)` — the map
   centre/focus tile; `ClassicMapViewer` owns this state.
-- Model access: `getFreeColClient().getGame().getMap()` for tiles, `getMyPlayer()` for the POV,
-  and the active unit from `changeView(Unit,…)`. `SwingGUI`'s pattern is
-  `changeViewMode(mode) + changeSelectedTile(...) + changeActiveUnit(...) + changeDone(change)` —
-  mirror that state (viewMode, selectedTile, activeUnit, focusTile) in our own viewer.
+- Model access: `getFreeColClient().getGame().getMap()`, `getMyPlayer()`. For item (c), route
+  clicks/keys through `getFreeColClient().getInGameController()` (select/move) rather than the
+  local self-contained select/recentre used today.
 
-**Image lookups to reuse** (from `ImageLibrary`; keep the *selection* logic, swap the projection):
-- Terrain: `getScaledTerrainImage(TileType, x, y)`, `getTerrainImage(TileType, x, y, size)`,
-  `getTileImageWithOverlayAndForest(...)`. Units/settlements have matching `get…Image` methods.
-- `client/gui/mapviewer/` (5210 lines) is the reference: reuse its per-tile image selection, but
-  **replace the isometric projection** (`TileBounds`/`MapViewerBounds`) with a rectangular one:
-  `screenX = (tileX - originX) * tileW`, `screenY = (tileY - originY) * tileH`, origin derived
-  from the focus tile so it centres.
-
-**First slice (minimal demoable):**
-1. `ClassicMapViewer extends JPanel` in `client/gui/classic/`, holding `FreeColClient` +
-   `ImageLibrary`; paints explored terrain tiles in a rectangular grid centred on the focus tile.
-2. `ClassicGUI`: build the viewer and swap it into the frame content when a game is in progress
-   (keep the title-screen placeholder for pre-game); override the methods above to update state +
-   `repaint()`.
-3. Add units + colonies on top; then a selected-tile cursor.
-4. Later slices: mouse click → `InGameController` (select/move), keyboard + edge scrolling, minimap.
-
-**Open questions to settle early:**
-- ⚠️ **Isometric fallback art vs. rectangular classic tiles.** FreeCol's base terrain images are
-  isometric diamonds (≈128×64); laid in a rectangular grid they leave gaps/overlap and look wrong.
-  The original `TERRAIN.SS` sprites are proper *rectangular* tiles — so a good-looking classic map
-  really wants a handful of **A2 terrain aliases** mapped early (grow the mapping here). Decide:
-  start the projection on whatever renders to prove the pipeline, then swap in classic terrain
-  sprites quickly — don't polish isometric-in-a-grid.
-- Pick a base tile pixel size (match the classic `TERRAIN.SS` native size); decide how to draw
-  unexplored/fog tiles.
-- `mapview.png` (contributor screenshot #1) tunes proportions/HUD placement but does **not** gate
-  starting the skeleton.
+**Image lookups** (from `ImageLibrary`) for item (e) — per-tile compositing beyond the base
+`.center` tile: `getTerrainImage(TileType, x, y, size)` (what we draw now),
+`getTileImageWithOverlayAndForest(...)`, plus overlay/forest/river/road `get…Image` helpers.
+`client/gui/mapviewer/` (5210 lines) is the reference for the *selection* logic; we keep that but
+use the rectangular projection above instead of its isometric `TileBounds`/`MapViewerBounds`.
 
 ## Gameplay fidelity: classic ruleset vs. original Colonization (Col1)
 
