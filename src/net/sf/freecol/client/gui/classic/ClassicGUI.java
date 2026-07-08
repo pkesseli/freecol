@@ -39,6 +39,8 @@ import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.panel.FreeColPanel;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Player;
+import net.sf.freecol.common.model.Tile;
+import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.resources.ImageCache;
 
 
@@ -63,6 +65,14 @@ public class ClassicGUI extends GUI {
 
     /** The main application window. */
     private JFrame frame;
+
+    /**
+     * The in-game map view, created lazily when a game starts (see
+     * {@link #reconnectGUI}).  Null before then (title-screen placeholder).
+     * Owns the classic view state (view mode, focus, selected tile, active
+     * unit); this class delegates the corresponding {@code GUI} methods to it.
+     */
+    private ClassicMapViewer mapViewer;
 
     /** Persistent image cache, shared by the image libraries. */
     private final ImageCache imageCache;
@@ -173,6 +183,107 @@ public class ClassicGUI extends GUI {
             getFreeColClient().getPreGameController().requestLaunch();
         }
         return null;
+    }
+
+    // In-game map
+
+    /**
+     * {@inheritDoc}
+     *
+     * Called from {@code FreeColClient.restoreGUI} once a game is ready (the
+     * initial active unit / focus tile are supplied here).  Phase 1: build the
+     * {@link ClassicMapViewer} and swap it in for the title-screen placeholder,
+     * then set the initial view state so the map renders centred on the action.
+     */
+    @Override
+    public void reconnectGUI(Unit active, Tile tile) {
+        SwingUtilities.invokeLater(() -> {
+            if (this.frame == null) return;
+            if (this.mapViewer == null) {
+                this.mapViewer = new ClassicMapViewer(getFreeColClient(),
+                                                      this.imageLibrary);
+            }
+            if (this.frame.getContentPane() != this.mapViewer) {
+                this.frame.setContentPane(this.mapViewer);
+                this.frame.revalidate();
+            }
+            if (active != null) {
+                this.mapViewer.changeToMoveUnits(active);
+            } else if (tile != null) {
+                this.mapViewer.changeToTerrain(tile);
+            }
+            final Tile focusTile = (tile != null) ? tile
+                : (active != null) ? active.getTile() : null;
+            if (focusTile != null) {
+                this.mapViewer.setFocus(focusTile);
+            }
+            this.mapViewer.requestFocusInWindow();
+            this.mapViewer.repaint();
+            logger.info("ClassicGUI: in-game map installed.");
+        });
+    }
+
+    // View mode / focus — delegated to the map viewer.
+
+    /** {@inheritDoc} */
+    @Override
+    public void changeView(Tile tile) {
+        if (this.mapViewer != null) this.mapViewer.changeToTerrain(tile);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void changeView(Unit unit, boolean force) {
+        if (this.mapViewer != null) this.mapViewer.changeToMoveUnits(unit);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void changeView() {
+        if (this.mapViewer != null) this.mapViewer.changeToEndTurn();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public ViewMode getViewMode() {
+        return (this.mapViewer != null) ? this.mapViewer.getViewMode()
+            : super.getViewMode();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Unit getActiveUnit() {
+        return (this.mapViewer != null) ? this.mapViewer.getActiveUnit() : null;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Tile getSelectedTile() {
+        return (this.mapViewer != null) ? this.mapViewer.getSelectedTile() : null;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Tile getFocus() {
+        return (this.mapViewer != null) ? this.mapViewer.getFocus() : null;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setFocus(Tile tile) {
+        if (this.mapViewer != null) this.mapViewer.setFocus(tile);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void refresh() {
+        if (this.mapViewer != null) this.mapViewer.repaint();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void refreshTile(Tile tile) {
+        if (this.mapViewer != null) this.mapViewer.repaint();
     }
 
     // Image libraries

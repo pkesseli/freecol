@@ -12,9 +12,12 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-07)
+## Status at a glance (2026-07-08)
 
-- **UI:** Phase 0 ✅ (scaffold boots a live game) → **Phase 1 (the map) is next**; Phases 2–3 ⬜.
+- **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 first slice landed & verified live** (terrain +
+  units + colonies + cursor render on a rectangular grid; click-to-select/recentre) — remaining
+  Phase-1 work: swap in classic terrain sprites (needs A2 aliases), keyboard/edge scrolling,
+  minimap, controller-wired unit moves. Phases 2–3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 seeded (original title screen renders live) · A5 ⬜ (runtime picker) ·
   A6 ⬜ (audio).
@@ -262,10 +265,22 @@ incrementally. Each base method's Javadoc names its callers.
   the seam.)* Two fixes were needed: `showStartGamePanel` auto-launches single-player (the base
   lobby is a no-op, else a new game stalls at login), and the window maximizes instead of reading
   the `Dimension(-1,-1)` "use full screen" sentinel as a literal 1×1 size.
-- **Phase 1 — The map. 🔨 NEXT.** `ClassicMapViewer` with rectangular projection (reuse
-  `ImageLibrary` lookups). Terrain/units/colonies/cursor/minimap. Wire mouse/keyboard →
-  controllers. Override `changeView`, active-unit state, `refresh`/`refreshTile`, scrolling.
-  *(First real demo.)*
+- **Phase 1 — The map. 🔨 IN PROGRESS — first slice done & verified live (2026-07-08).**
+  `ClassicMapViewer` (a `JPanel` in `client/gui/classic/`) with the rectangular projection
+  (`screenX = cx + (x-focusX)*tileW - tileW/2`, same for y), reusing `ImageLibrary` terrain/unit/
+  settlement lookups. It owns the classic view state (viewMode/focus/selectedTile/activeUnit);
+  `ClassicGUI` installs it from `reconnectGUI(active, tile)` (game-start hook) and delegates
+  `changeView(Tile)`/`changeView(Unit,force)`/`changeView()`, `get{ViewMode,ActiveUnit,SelectedTile,
+  Focus}`, `setFocus`, `refresh`/`refreshTile`. Renders explored terrain, colonies, units, and a
+  white active-unit/selected-tile cursor; unexplored tiles stay black. Click selects a tile and
+  recentres. **Verified:** `--classic --fast --no-intro` boots to the start-at-sea view — ocean
+  tiles + the starting ship + cursor, 0 SEVERE (screenshot captured). *(First real demo ✅.)*
+  **Remaining Phase-1 work:** (a) swap FreeCol's isometric 128×64 diamonds — which leave
+  diamond-shaped grid gaps, the known/expected artifact — for the original rectangular
+  `TERRAIN.SS` sprites via **A2 terrain aliases** (the real fidelity step); (b) keyboard + edge
+  scrolling; (c) wire click/keys → `InGameController` for actual unit selection & movement (today's
+  click is a self-contained select/recentre only); (d) minimap; (e) overlay/forest/road/river
+  compositing per tile.
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
