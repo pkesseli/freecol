@@ -14,13 +14,13 @@ Two independent axes (keep them separate):
 
 ## Status at a glance (2026-07-08)
 
-- **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 first slice landed & verified live** (terrain +
-  units + colonies + cursor render on a rectangular grid; click-to-select/recentre) — remaining
-  Phase-1 work: swap in classic terrain sprites (needs A2 aliases), keyboard/edge scrolling,
-  minimap, controller-wired unit moves. Phases 2–3 ⬜.
+- **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 in progress** (rectangular grid renders terrain +
+  units + colonies + cursor; click-to-select/recentre; **original `TERRAIN.SS` sprites now fill the
+  grid cleanly — verified live**) — remaining Phase-1 work: keyboard/edge scrolling, minimap,
+  controller-wired unit moves, per-tile overlay/forest/road/river compositing. Phases 2–3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
-  A3 ✅ (pack loader) · A2 🔨 seeded (original title screen renders live) · A5 ⬜ (runtime picker) ·
-  A6 ⬜ (audio).
+  A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles render
+  live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
 Per-item detail (with verification notes) lives inline in the **Phased plan**, **Asset backlog &
@@ -206,12 +206,14 @@ expert a complete screenshot checklist.
 - **A1 ✅** — native-Java MADSPACK/FAB/SS/PIK decoder + converter
   (`net.sf.freecol.tools.classicassets`, driven by `ant classic-assets`, no external tool);
   produces the git-ignored `data/mods/classic_original/` pack (35 PIK screens + 1517 SS frames).
-- **A2 🔨 (seeded)** — key-mapping table in committed `tools/classic_assets/aliases.properties`
-  (appended into the pack by the converter, so regenerating never clobbers it). Seeds:
-  `image.background.MainPanel`→`…pik.OPENING.PIK` and `image.background.ColonyPanel`→`…pik.COLONY.PIK`;
-  the Phase-0 placeholder renders MainPanel, so the **original title screen shows live**.
-  **This curation is the bulk of the asset work** — grow terrain/units/goods with Phase 1, the
-  colony/europe/report screens with Phase 2, driven by the expert's screenshots.
+- **A2 🔨 (growing)** — key-mapping table in committed `tools/classic_assets/aliases.properties`
+  (appended into the pack by the converter, so regenerating never clobbers it). Mapped so far:
+  `image.background.MainPanel`→`…pik.OPENING.PIK` and `image.background.ColonyPanel`→`…pik.COLONY.PIK`
+  (title screen shows live); **all map terrain** — the eight base land types, eight forest types,
+  and ocean/lake/greatRiver/highSeas/arctic/hills/mountains — aliased to `TERRAIN.SS` frames and
+  **rendering live** on the map (Phase 1a). **This curation is the bulk of the asset work** — grow
+  units/goods next in Phase 1, the colony/europe/report screens with Phase 2, driven by the
+  expert's screenshots.
 - **A3 ✅** — pack loader: when `--classic`, `FreeColClient.withClassicOriginalPack` overlays the
   pack as the highest-priority mod (at the `ResourceManager.setMods` call), with graceful fallback
   when it is absent. The one-line `mod.xml` is a valid descriptor (identical to every
@@ -273,14 +275,20 @@ incrementally. Each base method's Javadoc names its callers.
   `changeView(Tile)`/`changeView(Unit,force)`/`changeView()`, `get{ViewMode,ActiveUnit,SelectedTile,
   Focus}`, `setFocus`, `refresh`/`refreshTile`. Renders explored terrain, colonies, units, and a
   white active-unit/selected-tile cursor; unexplored tiles stay black. Click selects a tile and
-  recentres. **Verified:** `--classic --fast --no-intro` boots to the start-at-sea view — ocean
-  tiles + the starting ship + cursor, 0 SEVERE (screenshot captured). *(First real demo ✅.)*
-  **Remaining Phase-1 work:** (a) swap FreeCol's isometric 128×64 diamonds — which leave
-  diamond-shaped grid gaps, the known/expected artifact — for the original rectangular
-  `TERRAIN.SS` sprites via **A2 terrain aliases** (the real fidelity step); (b) keyboard + edge
-  scrolling; (c) wire click/keys → `InGameController` for actual unit selection & movement (today's
-  click is a self-contained select/recentre only); (d) minimap; (e) overlay/forest/road/river
-  compositing per tile.
+  recentres. **Verified:** `--classic --fast --no-intro` boots to the start-at-sea view — the
+  starting ship + cursor on classic ocean tiles, 0 SEVERE (screenshot captured).
+  - **(a) Classic terrain sprites ✅ (done & verified live 2026-07-08).** The original rectangular
+    `TERRAIN.SS` tiles (12 frames, 16×16) are aliased onto FreeCol's `image.tile.<type>.center`
+    keys (`tools/classic_assets/aliases.properties`), so the grid now fills cleanly with **no
+    diamond gaps**. Frame order taken from the canonical Colonization terrain enum documented in
+    `net.sf.freecol.tools.ColonizationMapReader` (0=tundra…7=swamp) + visual ID (9=arctic, 10=ocean,
+    11=sea lane); all base/forest/water types mapped. `ClassicMapViewer` now uses **square** cells
+    (`TILE_SRC=16 × CLASSIC_SCALE=3` ⇒ 48px), fetches each tile at native 16×16 and up-scales with
+    nearest-neighbour so the pixels stay crisp; oversized FreeCol unit/settlement art is shrunk to
+    fit the cell. *(Land tiles use the identical alias mechanism as the verified ocean tiles.)*
+  - **Remaining Phase-1 work:** (b) keyboard + edge scrolling; (c) wire click/keys →
+    `InGameController` for actual unit selection & movement (today's click is a self-contained
+    select/recentre only); (d) minimap; (e) overlay/forest/road/river compositing per tile.
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.

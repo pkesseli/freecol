@@ -21,6 +21,7 @@ package net.sf.freecol.client.gui.classic;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -55,12 +56,15 @@ import net.sf.freecol.common.model.Unit;
  * <pre>screenX = centreX + (tileX - focusX) * tileW - tileW/2
  * screenY = centreY + (tileY - focusY) * tileH - tileH/2</pre>
  *
- * <p><b>Phase 1, first slice.</b> This deliberately renders FreeCol's own
- * (isometric, 128&times;64) terrain art laid out on a rectangular grid, which
- * leaves diamond-shaped gaps between tiles — it proves the projection/paint
- * pipeline end-to-end. The next asset step (A2 terrain aliases) swaps in the
- * original {@code TERRAIN.SS} rectangular sprites so the grid fills cleanly;
- * see CLASSIC_UI_PLAN.md ("Phase 1 — implementation notes").
+ * <p><b>Phase 1.</b> Terrain is drawn from the original Colonization
+ * {@code TERRAIN.SS} sprites — square 16&times;16 tiles, aliased onto FreeCol's
+ * {@code image.tile.<type>.center} keys by the {@code classic_original} pack
+ * (see {@code tools/classic_assets/aliases.properties}) — so the rectangular
+ * grid fills cleanly with no diamond-shaped gaps. The native 16&times;16 tiles
+ * are fetched at source size and up-scaled by {@link #CLASSIC_SCALE} with
+ * nearest-neighbour interpolation to keep the chunky classic pixels crisp. When
+ * the pack is absent the same keys fall back to FreeCol's own (isometric) art,
+ * shrunk into the square cells. See CLASSIC_UI_PLAN.md ("Phase 1").
  *
  * <p>This panel owns the classic view state (view mode, focus, selected tile,
  * active unit); {@link ClassicGUI} delegates the corresponding {@code GUI}
@@ -68,9 +72,18 @@ import net.sf.freecol.common.model.Unit;
  */
 final class ClassicMapViewer extends JPanel {
 
-    /** Tile cell size in pixels — FreeCol's native terrain-image size. */
-    private static final int TILE_W = ImageLibrary.TILE_SIZE.width;   // 128
-    private static final int TILE_H = ImageLibrary.TILE_SIZE.height;  //  64
+    /** Native size (px) of an original {@code TERRAIN.SS} tile sprite. */
+    private static final int TILE_SRC = 16;
+
+    /** Integer up-scale from the native 16&times;16 tile to on-screen pixels. */
+    private static final int CLASSIC_SCALE = 3;
+
+    /** On-screen tile cell size (square, like the original game). */
+    private static final int TILE_W = TILE_SRC * CLASSIC_SCALE;  // 48
+    private static final int TILE_H = TILE_SRC * CLASSIC_SCALE;  // 48
+
+    /** Native tile-sprite size requested from {@link ImageLibrary}. */
+    private static final Dimension SRC_SIZE = new Dimension(TILE_SRC, TILE_SRC);
 
     private final FreeColClient freeColClient;
 
@@ -258,8 +271,10 @@ final class ClassicMapViewer extends JPanel {
             // Unexplored: leave the black background (classic "fog").
             return;
         }
-        final BufferedImage terrain =
-            this.lib.getScaledTerrainImage(tile.getType(), tile.getX(), tile.getY());
+        // Fetch the tile at its native 16x16 size and let the (nearest-neighbour)
+        // scaling in paintComponent up-scale it, so classic pixels stay crisp.
+        final BufferedImage terrain = this.lib.getTerrainImage(
+            tile.getType(), tile.getX(), tile.getY(), SRC_SIZE);
         if (terrain != null) {
             g.drawImage(terrain, sx, sy, TILE_W, TILE_H, null);
         }
@@ -276,12 +291,24 @@ final class ClassicMapViewer extends JPanel {
         }
     }
 
-    /** Draw an image centred within a tile cell at {@code (sx, sy)}. */
+    /**
+     * Draw an image centred within a tile cell at {@code (sx, sy)}, shrunk to
+     * fit the cell (preserving aspect) when it is larger — FreeCol's own
+     * unit/settlement art is sized for its 128&times;64 tiles, much bigger than
+     * our square classic cell.
+     */
     private void drawCentered(Graphics2D g, BufferedImage img, int sx, int sy) {
         if (img == null) return;
-        final int x = sx + (TILE_W - img.getWidth()) / 2;
-        final int y = sy + (TILE_H - img.getHeight()) / 2;
-        g.drawImage(img, x, y, null);
+        int w = img.getWidth();
+        int h = img.getHeight();
+        if (w > TILE_W || h > TILE_H) {
+            final double s = Math.min((double) TILE_W / w, (double) TILE_H / h);
+            w = Math.max(1, (int) Math.round(w * s));
+            h = Math.max(1, (int) Math.round(h * s));
+        }
+        final int x = sx + (TILE_W - w) / 2;
+        final int y = sy + (TILE_H - h) / 2;
+        g.drawImage(img, x, y, w, h, null);
     }
 
     /** Highlight the active-unit tile (or the selected tile) with a cursor. */
