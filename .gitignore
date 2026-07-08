@@ -13,6 +13,13 @@
 /build/classic-assets/
 # Classic UI: console-capture log from the test-loop one-liner (see plan).
 /classic_run.txt
+# Classic UI: scratch review/feedback notes (transient; folded into the plan).
+/REVIEW.md
+
+# Generated build artifacts at the build/ root (the tracked build/ resources —
+# installer, jars, skeletons — are committed explicitly and unaffected).
+/build/TEST-*.txt
+/build/dependencies.txt
 
 *.classpath
 *.project
