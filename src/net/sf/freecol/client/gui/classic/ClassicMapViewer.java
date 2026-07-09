@@ -25,14 +25,22 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.Stroke;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
+import javax.swing.AbstractAction;
+import javax.swing.ActionMap;
+import javax.swing.InputMap;
 import javax.swing.JPanel;
+import javax.swing.KeyStroke;
+import javax.swing.Timer;
 
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
@@ -85,6 +93,16 @@ final class ClassicMapViewer extends JPanel {
     /** Native tile-sprite size requested from {@link ImageLibrary}. */
     private static final Dimension SRC_SIZE = new Dimension(TILE_SRC, TILE_SRC);
 
+    /**
+     * Distance (px) from a window edge within which the mouse triggers edge
+     * scrolling.  Roughly a tile wide, so the hot zone is easy to hit without
+     * being triggered by ordinary map clicks.
+     */
+    private static final int EDGE_SCROLL_MARGIN = TILE_W;
+
+    /** Interval (ms) between successive edge-scroll steps while at an edge. */
+    private static final int EDGE_SCROLL_INTERVAL_MS = 110;
+
     private final FreeColClient freeColClient;
 
     /** Image library used for terrain/unit/settlement lookups. */
@@ -95,6 +113,15 @@ final class ClassicMapViewer extends JPanel {
     private Tile focus;
     private Tile selectedTile;
     private Unit activeUnit;
+
+    /**
+     * Repeating timer that drives edge scrolling; it pans the focus by
+     * {@link #edgeDX}/{@link #edgeDY} each tick while the mouse sits in an edge
+     * hot zone, and is stopped whenever that direction is zero.
+     */
+    private final Timer edgeScrollTimer;
+    private int edgeDX;
+    private int edgeDY;
 
 
     ClassicMapViewer(FreeColClient freeColClient, ImageLibrary lib) {
@@ -107,6 +134,63 @@ final class ClassicMapViewer extends JPanel {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     onClick(e);
+                }
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    stopEdgeScroll();
+                }
+            });
+        addMouseMotionListener(new MouseMotionAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    updateEdgeScroll(e.getPoint());
+                }
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    updateEdgeScroll(e.getPoint());
+                }
+            });
+        this.edgeScrollTimer = new Timer(EDGE_SCROLL_INTERVAL_MS, e -> {
+                if (this.edgeDX != 0 || this.edgeDY != 0) {
+                    panFocus(this.edgeDX, this.edgeDY);
+                }
+            });
+        installKeyBindings();
+    }
+
+
+    /**
+     * Bind the keyboard pan controls, matching FreeCol's own map accelerators
+     * (see {@code moveAction.*.accelerator} in the message bundle): the arrow
+     * keys and numpad 8/2/4/6 pan orthogonally, numpad 7/9/1/3 and
+     * Home/PageUp/End/PageDown pan diagonally.  Bound {@code WHEN_IN_FOCUSED_WINDOW}
+     * so panning works whenever the map window is focused, independent of which
+     * child component currently holds focus.
+     */
+    private void installKeyBindings() {
+        final InputMap im = getInputMap(WHEN_IN_FOCUSED_WINDOW);
+        final ActionMap am = getActionMap();
+        bindPan(im, am,  0, -1, "UP", "NUMPAD8");
+        bindPan(im, am,  0,  1, "DOWN", "NUMPAD2");
+        bindPan(im, am, -1,  0, "LEFT", "NUMPAD4");
+        bindPan(im, am,  1,  0, "RIGHT", "NUMPAD6");
+        bindPan(im, am, -1, -1, "HOME", "NUMPAD7");
+        bindPan(im, am,  1, -1, "PAGE_UP", "NUMPAD9");
+        bindPan(im, am, -1,  1, "END", "NUMPAD1");
+        bindPan(im, am,  1,  1, "PAGE_DOWN", "NUMPAD3");
+    }
+
+    /** Bind the given keystrokes to a focus pan of {@code (dx, dy)} raw cells. */
+    private void bindPan(InputMap im, ActionMap am, int dx, int dy,
+                         String... keys) {
+        final String name = "pan_" + dx + "_" + dy;
+        for (String key : keys) {
+            im.put(KeyStroke.getKeyStroke(key), name);
+        }
+        am.put(name, new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    panFocus(dx, dy);
                 }
             });
     }
@@ -213,6 +297,56 @@ final class ClassicMapViewer extends JPanel {
     /** Screen y of the top edge of the cell for map row {@code y}. */
     private int screenY(int y, int focusY) {
         return getHeight() / 2 + (y - focusY) * TILE_H - TILE_H / 2;
+    }
+
+    /**
+     * Pan the focus by {@code (dx, dy)} raw grid cells, clamped to the map.
+     *
+     * <p>The classic viewer draws on a plain rectangular grid keyed on raw map
+     * coordinates, so panning steps by raw {@code x}/{@code y} — not via
+     * {@link net.sf.freecol.common.model.Direction} (whose isometric N/S steps
+     * two rows), so the grid recentres exactly one cell in the pressed
+     * direction.
+     */
+    private void panFocus(int dx, int dy) {
+        final Map map = getMap();
+        final Tile f = getFocus();
+        if (map == null || f == null) return;
+        final int nx = Math.max(0, Math.min(map.getWidth() - 1, f.getX() + dx));
+        final int ny = Math.max(0, Math.min(map.getHeight() - 1, f.getY() + dy));
+        final Tile tile = map.getTile(nx, ny);
+        if (tile != null && tile != this.focus) {
+            this.focus = tile;
+            repaint();
+        }
+    }
+
+    /**
+     * Update the edge-scroll direction from the current mouse position, starting
+     * or stopping the repeating scroll timer as the mouse enters or leaves an
+     * edge hot zone.
+     */
+    private void updateEdgeScroll(Point p) {
+        int dx = 0;
+        int dy = 0;
+        if (p.x < EDGE_SCROLL_MARGIN) dx = -1;
+        else if (p.x >= getWidth() - EDGE_SCROLL_MARGIN) dx = 1;
+        if (p.y < EDGE_SCROLL_MARGIN) dy = -1;
+        else if (p.y >= getHeight() - EDGE_SCROLL_MARGIN) dy = 1;
+        this.edgeDX = dx;
+        this.edgeDY = dy;
+        if (dx == 0 && dy == 0) {
+            this.edgeScrollTimer.stop();
+        } else if (!this.edgeScrollTimer.isRunning()) {
+            this.edgeScrollTimer.start();
+        }
+    }
+
+    /** Stop edge scrolling (mouse left the panel). */
+    private void stopEdgeScroll() {
+        this.edgeDX = 0;
+        this.edgeDY = 0;
+        this.edgeScrollTimer.stop();
     }
 
     /** Map click → select the clicked tile and recentre on it. */

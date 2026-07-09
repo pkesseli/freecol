@@ -16,8 +16,9 @@ Two independent axes (keep them separate):
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 in progress** (rectangular grid renders terrain +
   units + colonies + cursor; click-to-select/recentre; **original `TERRAIN.SS` sprites now fill the
-  grid cleanly — verified live**) — remaining Phase-1 work: keyboard/edge scrolling, minimap,
-  controller-wired unit moves, per-tile overlay/forest/road/river compositing. Phases 2–3 ⬜.
+  grid cleanly**; **keyboard + edge panning of the focus tile — all verified live**) — remaining
+  Phase-1 work: minimap, controller-wired unit moves, per-tile overlay/forest/road/river
+  compositing. Phases 2–3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles render
   live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
@@ -282,9 +283,18 @@ incrementally. Each base method's Javadoc names its callers.
     nearest-neighbour to stay crisp; oversized FreeCol unit/settlement art shrunk to fit. The
     key→frame mapping and its frame-order rationale live in
     `tools/classic_assets/aliases.properties` (and the tools README's "A2" section).
-  - **Remaining Phase-1 work:** (b) keyboard + edge scrolling; (c) wire click/keys →
-    `InGameController` for actual unit selection & movement; (d) minimap; (e) overlay / forest-tree /
-    road / river compositing per tile (only the base terrain `.center` tile is drawn today).
+  - **(b) Keyboard + edge scrolling — DONE & verified live (2026-07-09).** `ClassicMapViewer`
+    pans the focus tile on a raw rectangular-grid step (not `Direction.step`, whose isometric N/S
+    jumps two rows), so the grid recentres exactly one cell per press. Arrow keys + numpad 8/2/4/6
+    pan orthogonally; numpad 7/9/1/3 and Home/PageUp/End/PageDown pan diagonally — matching
+    FreeCol's own `moveAction.*.accelerator` bindings — installed `WHEN_IN_FOCUSED_WINDOW`. Edge
+    scrolling: a mouse-motion listener sets an edge direction when the cursor enters a ~1-tile hot
+    zone at any window edge/corner, and a repeating `Timer` pans the focus while it stays there
+    (stopped on `mouseExited`). Self-contained in the panel; not yet wired to controllers (that is
+    item (c)).
+  - **Remaining Phase-1 work:** (c) wire click/keys → `InGameController` for actual unit selection
+    & movement; (d) minimap; (e) overlay / forest-tree / road / river compositing per tile (only
+    the base terrain `.center` tile is drawn today).
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
