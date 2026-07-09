@@ -321,6 +321,27 @@ ones are already overridden in `ClassicGUI`/`ClassicMapViewer`; listed here beca
   clicks/keys through `getFreeColClient().getInGameController()` (select/move) rather than the
   local self-contained select/recentre used today.
 
+**Item (c) — controller wiring seam (verified in-source):**
+- **Click:** the canonical select logic to port is `SwingGUI.clickAt(int count, int x, int y)`
+  (`client/gui/SwingGUI.java`, ~line 1599): unexplored tile → `setFocus`; own colony →
+  `showColonyPanel` (delegate to FreeCol's panel as a stopgap — do *not* build the colony screen
+  in Phase 1); own unit on the tile → `changeView(unit, false)` (make active); else terrain-select
+  via `changeView(tile)`. Our `changeView(Unit)`/`changeView(Tile)` already delegate to the
+  viewer's `changeToMoveUnits`/`changeToTerrain`, so this just triggers the same methods through
+  the GUI/controller path.
+- **Keys:** match `client/gui/action/MoveAction` semantics — MOVE_UNITS mode moves the active unit
+  via `InGameController.moveUnit(Unit unit, Direction direction)` (`InGameController.java` ~line
+  4025); TERRAIN mode moves the selected-tile cursor to `tile.getNeighbourOrNull(direction)` via
+  `changeView(newTile)`. These use model `Direction`s, **not** the raw-grid pan added for (b) —
+  which was a provisional stand-in precisely because (c) repurposes the arrow/numpad keys. After a
+  move, the active unit's `changeView(Unit)` already recenters the focus to follow it.
+- ⚠️ **Isometric-vs-rectangular caveat:** model `Direction` is isometric (`Direction.N` steps two
+  raw rows; see `Direction`'s odd/even DX/DY table), but the classic viewer draws a raw `(x,y)`
+  rectangular grid, so "move north" may not read as straight-up on screen. Verify the on-screen
+  movement matches the pressed key and adjust the key→`Direction` mapping if the visual is wrong.
+- Edge scrolling stays as the free-pan; decide whether to drop or gate (b)'s raw-grid keyboard
+  panning once the keys drive unit/cursor movement.
+
 **Image lookups** (from `ImageLibrary`) for item (e) — per-tile compositing beyond the base
 `.center` tile: `getTerrainImage(TileType, x, y, size)` (what we draw now),
 `getTileImageWithOverlayAndForest(...)`, plus overlay/forest/river/road `get…Image` helpers.
