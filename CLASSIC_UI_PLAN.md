@@ -12,13 +12,14 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-08)
+## Status at a glance (2026-07-09)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 in progress** (rectangular grid renders terrain +
-  units + colonies + cursor; click-to-select/recentre; **original `TERRAIN.SS` sprites now fill the
-  grid cleanly**; **keyboard + edge panning of the focus tile — all verified live**) — remaining
-  Phase-1 work: minimap, controller-wired unit moves, per-tile overlay/forest/road/river
-  compositing. Phases 2–3 ⬜.
+  units + colonies + cursor; **original `TERRAIN.SS` sprites now fill the grid cleanly**; **edge
+  panning of the focus tile**; **clicks + keys now drive the real `InGameController` — click
+  selects units/tiles & opens owned colonies, arrow/numpad keys move the active unit or the
+  terrain cursor with the focus following — all verified live**) — remaining Phase-1 work: minimap,
+  per-tile overlay/forest/road/river compositing. Phases 2–3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles render
   live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
@@ -276,25 +277,45 @@ incrementally. Each base method's Javadoc names its callers.
   tiles, 0 SEVERE):
   - Rectangular projection (`screenX = cx + (x-focusX)*TILE_W - TILE_W/2`, same for y) centred on
     the focus tile; renders explored terrain + colonies + units + a white active-unit/selected-tile
-    cursor, unexplored tiles black. Click selects a tile and recentres (self-contained — **not yet**
-    wired to controllers, that is item (c)).
+    cursor, unexplored tiles black. Clicks and keys are wired to the real controllers (item (c)
+    below).
   - Classic terrain sprites: the original rectangular `TERRAIN.SS` tiles fill the grid cleanly (no
     diamond gaps). Square 48px cells (native 16px × scale 3), fetched at native size and up-scaled
     nearest-neighbour to stay crisp; oversized FreeCol unit/settlement art shrunk to fit. The
     key→frame mapping and its frame-order rationale live in
     `tools/classic_assets/aliases.properties` (and the tools README's "A2" section).
-  - **(b) Keyboard + edge scrolling — DONE & verified live (2026-07-09).** `ClassicMapViewer`
-    pans the focus tile on a raw rectangular-grid step (not `Direction.step`, whose isometric N/S
-    jumps two rows), so the grid recentres exactly one cell per press. Arrow keys + numpad 8/2/4/6
-    pan orthogonally; numpad 7/9/1/3 and Home/PageUp/End/PageDown pan diagonally — matching
-    FreeCol's own `moveAction.*.accelerator` bindings — installed `WHEN_IN_FOCUSED_WINDOW`. Edge
-    scrolling: a mouse-motion listener sets an edge direction when the cursor enters a ~1-tile hot
-    zone at any window edge/corner, and a repeating `Timer` pans the focus while it stays there
-    (stopped on `mouseExited`). Self-contained in the panel; not yet wired to controllers (that is
-    item (c)).
-  - **Remaining Phase-1 work:** (c) wire click/keys → `InGameController` for actual unit selection
-    & movement; (d) minimap; (e) overlay / forest-tree / road / river compositing per tile (only
-    the base terrain `.center` tile is drawn today).
+  - **(b) Edge scrolling — DONE & verified live (2026-07-09).** A mouse-motion listener sets an
+    edge direction when the cursor enters a ~1-tile hot zone at any window edge/corner, and a
+    repeating `Timer` pans the focus (on a raw rectangular-grid step, not `Direction.step` whose
+    isometric N/S jumps two rows) while it stays there (stopped on `mouseExited`). *(b)'s original
+    arrow-key focus-panning was a provisional stand-in that (c) has now repurposed for unit/cursor
+    movement — the raw-grid pan survives only as the END_TURN-mode fallback when nothing is
+    selected, so the map stays navigable.)*
+  - **(c) Controller wiring — DONE & verified live (2026-07-09).** Clicks and keys now drive the
+    real `InGameController` (`ClassicMapViewer` holds a back-reference to `ClassicGUI` and routes
+    through the `GUI` facade, exactly as `SwingGUI.clickAt`/`MoveAction` do):
+    - **Click** ports `SwingGUI.clickAt`: unexplored → `setFocus`; owned colony → `showColonyPanel`
+      (a Phase-2 stopgap: `ClassicGUI.showColonyPanel` hosts FreeCol's own `ColonyPanel` in a
+      standalone window since the classic UI has no `Canvas`, guarded so a failure just logs — never
+      reached at start-at-sea); owned unit → `changeView(unit,false)` (make active); else terrain-
+      select via `changeView(tile)`. Single-click already terrain-selects (no drag ambiguity on the
+      rectangular grid), which also arms the TERRAIN-mode cursor keys. *Verified: clicking an empty
+      ocean tile selects it, switches to TERRAIN mode and recentres on it (cursor centred, ship
+      offset to its true relative position).*
+    - **Keys** mirror `MoveAction`: MOVE_UNITS → `moveUnit(activeUnit, dir)`; TERRAIN → step the
+      selected-tile cursor to `getNeighbourOrNull(dir)` via `changeView(newTile)`; nothing selected
+      → raw-grid free pan. **Isometric caveat resolved:** the four orthogonal keys resolve to the
+      `Direction` whose *raw* step lands on the visually adjacent cell (parity-aware via
+      `Map.getDirection` — e.g. the cell straight above is `NE` on even rows, `NW` on odd), so
+      on-screen movement matches the key; the four diagonal keys map to the isometric corner
+      directions (their raw offset shifts with parity — an inherent flattening artefact, documented
+      in `intentToDirection`). *Verified live: 4×Up carved a straight vertical exploration corridor
+      and 3×Right a straight horizontal one, with the focus following the unit each step.*
+    - Note: FreeCol's own `moveAction`/`endTurn` accelerators are **not** wired in the classic UI
+      (no menu bar / `Canvas` installs them yet), so e.g. Enter does not end the turn — a unit that
+      exhausts its moves simply stops until Phase 2 adds the HUD / end-turn control.
+  - **Remaining Phase-1 work:** (d) minimap; (e) overlay / forest-tree / road / river compositing
+    per tile (only the base terrain `.center` tile is drawn today).
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
@@ -321,7 +342,10 @@ ones are already overridden in `ClassicGUI`/`ClassicMapViewer`; listed here beca
   clicks/keys through `getFreeColClient().getInGameController()` (select/move) rather than the
   local self-contained select/recentre used today.
 
-**Item (c) — controller wiring seam (verified in-source):**
+**Item (c) — controller wiring seam (✅ implemented 2026-07-09; verified in-source + live).**
+The seam facts below drove the implementation; see the Phase-1 "(c) Controller wiring" entry
+above for what shipped (notably the parity-aware key→`Direction` resolution that fixed the
+isometric caveat).
 - **Click:** the canonical select logic to port is `SwingGUI.clickAt(int count, int x, int y)`
   (`client/gui/SwingGUI.java`, ~line 1599): unexplored tile → `setFocus`; own colony →
   `showColonyPanel` (delegate to FreeCol's panel as a stopgap — do *not* build the colony screen

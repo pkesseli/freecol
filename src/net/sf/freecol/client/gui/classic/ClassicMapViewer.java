@@ -45,6 +45,8 @@ import javax.swing.Timer;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.model.Colony;
+import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Settlement;
@@ -105,6 +107,14 @@ final class ClassicMapViewer extends JPanel {
 
     private final FreeColClient freeColClient;
 
+    /**
+     * The owning {@link ClassicGUI}, used to route clicks/keys through the
+     * {@code GUI} facade (select, focus, show-colony) exactly as
+     * {@code SwingGUI.clickAt}/{@code MoveAction} do, so the classic UI drives
+     * the real controllers rather than a self-contained local state.
+     */
+    private final ClassicGUI gui;
+
     /** Image library used for terrain/unit/settlement lookups. */
     private final ImageLibrary lib;
 
@@ -124,8 +134,10 @@ final class ClassicMapViewer extends JPanel {
     private int edgeDY;
 
 
-    ClassicMapViewer(FreeColClient freeColClient, ImageLibrary lib) {
+    ClassicMapViewer(FreeColClient freeColClient, ClassicGUI gui,
+                     ImageLibrary lib) {
         this.freeColClient = freeColClient;
+        this.gui = gui;
         this.lib = lib;
         setBackground(Color.BLACK);
         setOpaque(true);
@@ -160,39 +172,136 @@ final class ClassicMapViewer extends JPanel {
 
 
     /**
-     * Bind the keyboard pan controls, matching FreeCol's own map accelerators
-     * (see {@code moveAction.*.accelerator} in the message bundle): the arrow
-     * keys and numpad 8/2/4/6 pan orthogonally, numpad 7/9/1/3 and
-     * Home/PageUp/End/PageDown pan diagonally.  Bound {@code WHEN_IN_FOCUSED_WINDOW}
-     * so panning works whenever the map window is focused, independent of which
-     * child component currently holds focus.
+     * Bind the keyboard movement controls.  The arrow keys and numpad 8/2/4/6
+     * move orthogonally, numpad 7/9/1/3 and Home/PageUp/End/PageDown move
+     * diagonally — matching FreeCol's own {@code moveAction.*.accelerator}
+     * key layout.  Bound {@code WHEN_IN_FOCUSED_WINDOW} so the keys work
+     * whenever the map window is focused, independent of which child component
+     * currently holds focus.
+     *
+     * <p>Unlike item (b)'s provisional raw-grid pan, these keys now drive the
+     * real game, mirroring {@link net.sf.freecol.client.gui.action.MoveAction}:
+     * in MOVE_UNITS mode they move the active unit via
+     * {@link net.sf.freecol.client.control.InGameController#moveUnit}; in
+     * TERRAIN mode they step the selected-tile cursor to a neighbour.  When
+     * nothing is selected (END_TURN mode) they fall back to the raw-grid free
+     * pan so the map stays navigable.
+     *
+     * <p><b>Isometric vs. rectangular.</b> The model is isometric — a model
+     * {@link Direction} steps in the diamond lattice, so {@code Direction.N}
+     * jumps two raw rows — but this viewer draws a plain rectangular grid.  To
+     * keep on-screen movement matching the pressed key, the four orthogonal
+     * keys resolve to the {@code Direction} whose <em>raw</em> step lands on the
+     * visually adjacent cell (computed parity-aware via
+     * {@link Map#getDirection}); the four diagonal keys map to the isometric
+     * corner directions, whose raw offset shifts with row parity (documented in
+     * {@link #intentToDirection}).
      */
     private void installKeyBindings() {
         final InputMap im = getInputMap(WHEN_IN_FOCUSED_WINDOW);
         final ActionMap am = getActionMap();
-        bindPan(im, am,  0, -1, "UP", "NUMPAD8");
-        bindPan(im, am,  0,  1, "DOWN", "NUMPAD2");
-        bindPan(im, am, -1,  0, "LEFT", "NUMPAD4");
-        bindPan(im, am,  1,  0, "RIGHT", "NUMPAD6");
-        bindPan(im, am, -1, -1, "HOME", "NUMPAD7");
-        bindPan(im, am,  1, -1, "PAGE_UP", "NUMPAD9");
-        bindPan(im, am, -1,  1, "END", "NUMPAD1");
-        bindPan(im, am,  1,  1, "PAGE_DOWN", "NUMPAD3");
+        bindMove(im, am, Intent.UP,    0, -1, "UP", "NUMPAD8");
+        bindMove(im, am, Intent.DOWN,  0,  1, "DOWN", "NUMPAD2");
+        bindMove(im, am, Intent.LEFT, -1,  0, "LEFT", "NUMPAD4");
+        bindMove(im, am, Intent.RIGHT, 1,  0, "RIGHT", "NUMPAD6");
+        bindMove(im, am, Intent.NW,   -1, -1, "HOME", "NUMPAD7");
+        bindMove(im, am, Intent.NE,    1, -1, "PAGE_UP", "NUMPAD9");
+        bindMove(im, am, Intent.SW,   -1,  1, "END", "NUMPAD1");
+        bindMove(im, am, Intent.SE,    1,  1, "PAGE_DOWN", "NUMPAD3");
     }
 
-    /** Bind the given keystrokes to a focus pan of {@code (dx, dy)} raw cells. */
-    private void bindPan(InputMap im, ActionMap am, int dx, int dy,
-                         String... keys) {
-        final String name = "pan_" + dx + "_" + dy;
+    /**
+     * An on-screen movement intent from a key press.  Distinct from a model
+     * {@link Direction} because the four orthogonal intents resolve to a
+     * parity-dependent {@code Direction} (see {@link #intentToDirection}).
+     */
+    private enum Intent { UP, DOWN, LEFT, RIGHT, NW, NE, SW, SE }
+
+    /**
+     * Bind the given keystrokes to the given {@link Intent}; {@code (panDx,
+     * panDy)} is the raw-grid pan used as a fallback when nothing is selected.
+     */
+    private void bindMove(InputMap im, ActionMap am, Intent intent,
+                          int panDx, int panDy, String... keys) {
+        final String name = "move_" + intent;
         for (String key : keys) {
             im.put(KeyStroke.getKeyStroke(key), name);
         }
         am.put(name, new AbstractAction() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    panFocus(dx, dy);
+                    handleMoveKey(intent, panDx, panDy);
                 }
             });
+    }
+
+    /**
+     * Resolve a movement {@link Intent} to the model {@link Direction} to apply
+     * from a reference tile.
+     *
+     * <p>The four orthogonal intents pick the {@code Direction} whose step from
+     * {@code ref} lands on the visually adjacent raw cell — always a real
+     * isometric neighbour, but which one depends on {@code ref}'s row parity
+     * (e.g. the cell straight above is {@code NE} on even rows, {@code NW} on
+     * odd rows), so we look it up via {@link Map#getDirection}.  The four
+     * diagonal intents map straight to the isometric corner directions; their
+     * raw-grid offset likewise shifts with parity, so a diagonal key may read as
+     * a straight or diagonal step depending on the row — an inherent artefact of
+     * flattening the isometric map onto a rectangular grid.
+     *
+     * @return The {@code Direction}, or null if the intended neighbour is off
+     *     the map.
+     */
+    private Direction intentToDirection(Intent intent, Tile ref) {
+        final Map map = getMap();
+        if (map == null || ref == null) return null;
+        switch (intent) {
+        case UP:    return dirToRaw(ref, ref.getX(), ref.getY() - 1);
+        case DOWN:  return dirToRaw(ref, ref.getX(), ref.getY() + 1);
+        case LEFT:  return Direction.W;
+        case RIGHT: return Direction.E;
+        case NW:    return Direction.NW;
+        case NE:    return Direction.NE;
+        case SW:    return Direction.SW;
+        case SE:    return Direction.SE;
+        default:    return null;
+        }
+    }
+
+    /** The {@code Direction} from {@code ref} to the raw cell {@code (tx, ty)}. */
+    private Direction dirToRaw(Tile ref, int tx, int ty) {
+        final Map map = getMap();
+        final Tile t = (map == null) ? null : map.getTile(tx, ty);
+        return (t == null) ? null : map.getDirection(ref, t);
+    }
+
+    /**
+     * Handle a movement key: move the active unit (MOVE_UNITS), step the
+     * selected-tile cursor (TERRAIN), or raw-grid pan the focus when nothing is
+     * selected.  Mirrors {@code MoveAction.actionPerformed}.
+     */
+    private void handleMoveKey(Intent intent, int panDx, int panDy) {
+        if (this.viewMode == GUI.ViewMode.MOVE_UNITS
+            && this.activeUnit != null && this.activeUnit.getTile() != null) {
+            final Direction d = intentToDirection(intent, this.activeUnit.getTile());
+            if (d != null) {
+                final Unit u = this.activeUnit;
+                this.freeColClient.getInGameController().moveUnit(u, d);
+                // Focus follows the (possibly moved) unit.
+                if (u.getTile() != null) setFocus(u.getTile());
+            }
+            return;
+        }
+        if (this.viewMode == GUI.ViewMode.TERRAIN && this.selectedTile != null) {
+            final Direction d = intentToDirection(intent, this.selectedTile);
+            if (d != null) {
+                final Tile n = this.selectedTile.getNeighbourOrNull(d);
+                if (n != null) this.gui.changeView(n);
+            }
+            return;
+        }
+        // Nothing selected: keep the map navigable with a raw-grid free pan.
+        panFocus(panDx, panDy);
     }
 
 
@@ -349,21 +458,54 @@ final class ClassicMapViewer extends JPanel {
         this.edgeScrollTimer.stop();
     }
 
-    /** Map click → select the clicked tile and recentre on it. */
-    private void onClick(MouseEvent e) {
+    /** Resolve the map {@link Tile} under a screen point, or null if off-map. */
+    private Tile tileAt(int px, int py) {
         final Map map = getMap();
         final Tile f = getFocus();
-        if (map == null || f == null) return;
+        if (map == null || f == null) return null;
         final int x = f.getX()
-            + Math.floorDiv(e.getX() - (getWidth() / 2 - TILE_W / 2), TILE_W);
+            + Math.floorDiv(px - (getWidth() / 2 - TILE_W / 2), TILE_W);
         final int y = f.getY()
-            + Math.floorDiv(e.getY() - (getHeight() / 2 - TILE_H / 2), TILE_H);
-        final Tile tile = map.getTile(x, y);
-        if (tile != null && tile.isExplored()) {
-            this.selectedTile = tile;
-            this.focus = tile;
-            requestFocusInWindow();
-            repaint();
+            + Math.floorDiv(py - (getHeight() / 2 - TILE_H / 2), TILE_H);
+        return map.getTile(x, y);
+    }
+
+    /**
+     * Map click → select the tile through the {@code GUI}/controller path,
+     * porting {@code SwingGUI.clickAt}: an unexplored tile just takes the focus;
+     * an owned colony opens the colony panel; an owned unit becomes the active
+     * unit (MOVE_UNITS); anything else selects the tile in TERRAIN mode.  Unlike
+     * {@code SwingGUI}, a single click already terrain-selects (the rectangular
+     * classic grid has no drag-vs-click ambiguity to disambiguate with a
+     * double-click), which also arms the TERRAIN-mode cursor keys.
+     */
+    private void onClick(MouseEvent e) {
+        final Tile tile = tileAt(e.getX(), e.getY());
+        if (tile == null) return;
+        requestFocusInWindow();
+        final Player player = this.freeColClient.getMyPlayer();
+
+        if (!tile.isExplored()) { // Select (focus) unexplored tiles
+            this.gui.setFocus(tile);
+            return;
+        }
+        final Settlement settlement = tile.getSettlement();
+        if (settlement != null) {
+            if (settlement instanceof Colony && player != null
+                && player.owns(settlement)) {
+                this.gui.showColonyPanel((Colony) settlement, null);
+            } else { // Foreign/indian settlement: just centre for now
+                this.gui.setFocus(tile);
+            }
+            return;
+        }
+        final Unit unit = tile.getFirstUnit();
+        if (unit != null && player != null && player.owns(unit)) {
+            this.gui.changeView(unit, false); // Make our unit active
+        } else if (unit != null) { // Someone else's unit: select the tile
+            this.gui.setFocus(tile);
+        } else { // Empty explored tile: terrain-select
+            this.gui.changeView(tile);
         }
     }
 

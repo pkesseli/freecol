@@ -24,6 +24,7 @@ import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.swing.JFrame;
@@ -36,7 +37,9 @@ import javax.swing.WindowConstants;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.panel.ColonyPanel;
 import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Tile;
@@ -201,7 +204,7 @@ public class ClassicGUI extends GUI {
             if (this.frame == null) return;
             if (this.mapViewer == null) {
                 this.mapViewer = new ClassicMapViewer(getFreeColClient(),
-                                                      this.imageLibrary);
+                                                      this, this.imageLibrary);
             }
             if (this.frame.getContentPane() != this.mapViewer) {
                 this.frame.setContentPane(this.mapViewer);
@@ -284,6 +287,39 @@ public class ClassicGUI extends GUI {
     @Override
     public void refreshTile(Tile tile) {
         if (this.mapViewer != null) this.mapViewer.repaint();
+    }
+
+    // Core screens (Phase 2 stopgap)
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 1 stopgap: the classic colony screen is Phase 2 (it needs the
+     * expert's original-game screenshots), so a click on an owned colony
+     * delegates to FreeCol's own {@link ColonyPanel} — hosted in a standalone
+     * window since the classic UI has no {@code Canvas}.  This is only ever
+     * reached once the player founds a colony (never at the start-at-sea view);
+     * it is guarded so any failure degrades to a log line rather than breaking
+     * the map.  Phase 2 replaces this with a real classic colony screen.
+     */
+    @Override
+    public FreeColPanel showColonyPanel(Colony colony, Unit unit) {
+        if (colony == null) return null;
+        try {
+            final ColonyPanel panel = new ColonyPanel(getFreeColClient(), colony);
+            if (unit != null) panel.setSelectedUnit(unit);
+            final JFrame f = new JFrame(colony.getName());
+            f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+            f.add(panel);
+            f.pack();
+            f.setLocationRelativeTo(this.frame);
+            f.setVisible(true);
+            return panel;
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "ClassicGUI: could not show colony panel "
+                + "for " + colony.getId(), e);
+            return null;
+        }
     }
 
     // Image libraries
