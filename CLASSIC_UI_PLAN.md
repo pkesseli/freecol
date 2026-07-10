@@ -90,10 +90,20 @@ Notes:
     pack-absent fallback.
   - **Remaining map-fidelity polish (unblocked — no screenshots needed).** With the decoded pack in
     hand, two slices sharpen the map without waiting on the expert:
-    - **Coastline / beach tiles.** `PHYS0.SS` carries 8×8 coast quarter-tiles (frames 108–139) the
-      1994 game used to feather land/water borders; the classic viewer currently draws a hard
-      ocean↔land edge. Composite the beach pieces at coastal cells (same square-projection
-      compositing as item (e), via `ClassicTileArt`).
+    - **Coastline / beach tiles** *(recon done 2026-07-10; needs a dedicated reverse-engineering
+      pass before wiring)*. `PHYS0.SS` carries 32 **8×8** coast quarter-tiles (frames `108–139`)
+      the 1994 game used to feather land/water borders — plus separate **16×16** beach/estuary
+      pieces (`150–153`, diagonal sand strips) and 8 ocean-with-corner-hint tiles (`140–147`);
+      `148` is the deep-ocean fill, `149` the plowed field (already used). The classic viewer
+      currently draws a hard ocean↔land edge. **The assembly scheme did not cleanly resolve** from
+      the frames alone: `108–111` are empty, `116–119` have water but no land, and the land
+      placement across the 32 pieces does not separate cleanly into the expected
+      4-corner × 8-neighbour-config rule (`frame = 108 + config·4 + corner` was the working
+      hypothesis; corner grouping is roughly rotational N/E/S/W but noisy because the pieces are
+      curved coast shapes, not clean corners). Getting it wrong looks worse than the clean edge, so
+      this needs a focused RE pass (cross-check against `eb4x/viceroy` / `institution/mpskit` coast
+      docs, or trace Col1's own quadrant-selection) before implementing. Deferred in favour of the
+      lower-risk unit/goods-sprite slice below.
     - **Original unit & goods sprites.** Units/settlements render as FreeCol art shrunk into the
       cell; aliasing the original sprites (unit frames from the `.SS` sets, goods icons) is the same
       frame-ID curation as the terrain work (grows A2), with no layout guesswork.
