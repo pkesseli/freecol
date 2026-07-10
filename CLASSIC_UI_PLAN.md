@@ -12,13 +12,14 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-09)
+## Status at a glance (2026-07-10)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 in progress** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites now fill the grid cleanly**; **edge
   panning of the focus tile**; **clicks + keys now drive the real `InGameController` — click
   selects units/tiles & opens owned colonies, arrow/numpad keys move the active unit or the
-  terrain cursor with the focus following — all verified live**) — remaining Phase-1 work: minimap,
+  terrain cursor with the focus following**; **a bottom-left minimap overlay gives a whole-map
+  overview with a viewport box + click-to-recentre** — all verified live) — remaining Phase-1 work:
   per-tile overlay/forest/road/river compositing. Phases 2–3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles render
@@ -314,8 +315,25 @@ incrementally. Each base method's Javadoc names its callers.
     - Note: FreeCol's own `moveAction`/`endTurn` accelerators are **not** wired in the classic UI
       (no menu bar / `Canvas` installs them yet), so e.g. Enter does not end the turn — a unit that
       exhausts its moves simply stops until Phase 2 adds the HUD / end-turn control.
-  - **Remaining Phase-1 work:** (d) minimap; (e) overlay / forest-tree / road / river compositing
-    per tile (only the base terrain `.center` tile is drawn today).
+  - **(d) Minimap — DONE & verified live (2026-07-10).** A whole-map overview overlay in the
+    bottom-left of `ClassicMapViewer`, painted at the end of `paintComponent` (after map + cursor).
+    It is a plain rectangular `map.getWidth() × map.getHeight()` raster (no isometric projection,
+    unlike FreeCol's own `panel/MiniMap`): unexplored → `getMinimapBackgroundColor()`, explored →
+    `getMinimapPoliticsColor(tile.getType())`, settlements/units → the owner's `getNationColor()`.
+    An integer pixels-per-tile (`MINIMAP_MAX/max(w,h)`, ≥1) fits the raster into a ~200px box, so a
+    tall/narrow map gives a vertical strip. The raster is cached in a `BufferedImage` and rebuilt
+    only when `invalidateMinimap()` marks it dirty — wired to `ClassicGUI.refresh`/`refreshTile`
+    (the model-change hooks: exploration, settlements, unit moves) — so ordinary pan/cursor repaints
+    just blit the cache + overlay the viewport box. The **viewport box** is a `getMinimapBorderColor`
+    rectangle for the tile region visible in the main view (focus ± half the `TILE_W`/`TILE_H` span),
+    clipped to the box. **Click-to-recentre:** minimap-region clicks are intercepted in `onClick`
+    *before* `tileAt`, translated to a tile via the pixels-per-tile scale, and `setFocus`ed; the
+    edge-scroll hot zone is suppressed over the box. *Verified live at start-at-sea: the explored
+    ocean patch + orange (Dutch) ship dot render, the patch/box grow as the ship moves (arrow keys),
+    and a click near the top of the box recentres the main view far north into unexplored space with
+    the viewport box following.*
+  - **Remaining Phase-1 work:** (e) overlay / forest-tree / road / river compositing per tile (only
+    the base terrain `.center` tile is drawn today).
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.

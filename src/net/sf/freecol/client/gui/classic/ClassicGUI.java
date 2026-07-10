@@ -280,13 +280,21 @@ public class ClassicGUI extends GUI {
     /** {@inheritDoc} */
     @Override
     public void refresh() {
-        if (this.mapViewer != null) this.mapViewer.repaint();
+        if (this.mapViewer != null) {
+            // A refresh signals a model change (exploration, settlements, unit
+            // moves), so rebuild the minimap raster before the next paint.
+            this.mapViewer.invalidateMinimap();
+            this.mapViewer.repaint();
+        }
     }
 
     /** {@inheritDoc} */
     @Override
     public void refreshTile(Tile tile) {
-        if (this.mapViewer != null) this.mapViewer.repaint();
+        if (this.mapViewer != null) {
+            this.mapViewer.invalidateMinimap();
+            this.mapViewer.repaint();
+        }
     }
 
     // Core screens (Phase 2 stopgap)

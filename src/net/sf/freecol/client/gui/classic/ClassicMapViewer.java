@@ -26,7 +26,9 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.Stroke;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
@@ -132,6 +134,28 @@ final class ClassicMapViewer extends JPanel {
     private final Timer edgeScrollTimer;
     private int edgeDX;
     private int edgeDY;
+
+    /** Longest on-screen edge (px) of the whole-map minimap overlay box. */
+    private static final int MINIMAP_MAX = 200;
+
+    /** Gap (px) between the minimap box and the window edge (bottom-left). */
+    private static final int MINIMAP_MARGIN = 12;
+
+    /**
+     * Cached raster of the whole map (one {@link #minimapPPT}-px square per
+     * tile), rebuilt only when {@link #minimapDirty} — i.e. when the model
+     * changes (exploration / settlements / unit moves come through
+     * {@code refresh}) — not on every repaint.  Each paint just blits this
+     * image and overlays the viewport box, so panning/cursor repaints stay
+     * cheap even on a large map.  Null until first built.
+     */
+    private BufferedImage minimapCache;
+
+    /** Pixels per tile in {@link #minimapCache} (integer, at least 1). */
+    private int minimapPPT = 1;
+
+    /** Whether {@link #minimapCache} needs rebuilding before the next blit. */
+    private boolean minimapDirty = true;
 
 
     ClassicMapViewer(FreeColClient freeColClient, ClassicGUI gui,
@@ -338,6 +362,17 @@ final class ClassicMapViewer extends JPanel {
         repaint();
     }
 
+    /**
+     * Mark the cached minimap raster stale so it is rebuilt before the next
+     * paint.  Called from {@code ClassicGUI.refresh}/{@code refreshTile} — the
+     * hooks the controllers fire when the model changes (exploration, new
+     * settlements, unit movement) — so the minimap picks up map changes without
+     * rebuilding on ordinary (pan/cursor) repaints.
+     */
+    void invalidateMinimap() {
+        this.minimapDirty = true;
+    }
+
     /** TERRAIN view mode: a tile is selected (see {@code GUI.changeView(Tile)}). */
     void changeToTerrain(Tile tile) {
         this.viewMode = GUI.ViewMode.TERRAIN;
@@ -436,6 +471,13 @@ final class ClassicMapViewer extends JPanel {
      * edge hot zone.
      */
     private void updateEdgeScroll(Point p) {
+        // The minimap sits in the bottom-left corner, inside the edge hot zone;
+        // don't edge-scroll while the mouse is over it.
+        final Rectangle mb = minimapBounds();
+        if (mb != null && mb.contains(p)) {
+            stopEdgeScroll();
+            return;
+        }
         int dx = 0;
         int dy = 0;
         if (p.x < EDGE_SCROLL_MARGIN) dx = -1;
@@ -480,6 +522,11 @@ final class ClassicMapViewer extends JPanel {
      * double-click), which also arms the TERRAIN-mode cursor keys.
      */
     private void onClick(MouseEvent e) {
+        // A click inside the minimap overlay recentres the main view; intercept
+        // it before the normal tile-selection logic so it does not also select a
+        // terrain tile underneath the box.
+        if (minimapClick(e)) return;
+
         final Tile tile = tileAt(e.getX(), e.getY());
         if (tile == null) return;
         requestFocusInWindow();
@@ -539,6 +586,7 @@ final class ClassicMapViewer extends JPanel {
         }
 
         paintCursor(g, focusX, focusY);
+        paintMinimap(g);
     }
 
     /** Paint one tile: terrain, then any settlement or unit on top. */
@@ -600,6 +648,138 @@ final class ClassicMapViewer extends JPanel {
         g.setStroke(new BasicStroke(2f));
         g.drawRect(sx + 1, sy + 1, TILE_W - 3, TILE_H - 3);
         g.setStroke(old);
+    }
+
+    // Minimap overlay (item (d)): a scaled whole-map overview in the bottom-left
+    // corner, giving a navigation aid the 48px main view cannot (it shows only a
+    // handful of tiles).  Not isometric — a plain rectangular map.getWidth() x
+    // map.getHeight() raster, unlike FreeCol's own iso MiniMap.
+
+    /** {@code c} if non-null, else {@code fallback} (guards missing resources). */
+    private static Color orElse(Color c, Color fallback) {
+        return (c != null) ? c : fallback;
+    }
+
+    /**
+     * Rebuild {@link #minimapCache} if it is stale, then return the on-screen
+     * bounds of the minimap box (bottom-left), or null if there is no map to
+     * draw.  Both the paint and the click/edge-scroll hit-tests go through here,
+     * so they agree on the box geometry.
+     */
+    private Rectangle minimapBounds() {
+        if (this.minimapDirty || this.minimapCache == null) {
+            buildMinimap();
+        }
+        if (this.minimapCache == null) return null;
+        final int mmW = this.minimapCache.getWidth();
+        final int mmH = this.minimapCache.getHeight();
+        return new Rectangle(MINIMAP_MARGIN, getHeight() - mmH - MINIMAP_MARGIN,
+                             mmW, mmH);
+    }
+
+    /**
+     * Render the whole map into {@link #minimapCache}: one
+     * {@link #minimapPPT}-px square per tile, background colour for unexplored
+     * tiles, {@link ImageLibrary#getMinimapPoliticsColor} for explored terrain,
+     * and the owner's nation colour for a tile carrying a settlement or unit.
+     * Iterates every tile, so it runs only on a rebuild (see
+     * {@link #invalidateMinimap}).
+     */
+    private void buildMinimap() {
+        this.minimapDirty = false;
+        final Map map = getMap();
+        if (map == null) { this.minimapCache = null; return; }
+        final int w = map.getWidth();
+        final int h = map.getHeight();
+        if (w <= 0 || h <= 0) { this.minimapCache = null; return; }
+
+        final int ppt = Math.max(1, Math.min(MINIMAP_MAX / w, MINIMAP_MAX / h));
+        this.minimapPPT = ppt;
+        final Color bg = orElse(ImageLibrary.getMinimapBackgroundColor(),
+                                new Color(0x0a2a3a));
+        final BufferedImage img = new BufferedImage(w * ppt, h * ppt,
+                                                    BufferedImage.TYPE_INT_ARGB);
+        final Graphics2D g = img.createGraphics();
+        g.setColor(bg);
+        g.fillRect(0, 0, w * ppt, h * ppt);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                final Tile tile = map.getTile(x, y);
+                if (tile == null || !tile.isExplored()) continue;
+                Color c = orElse(
+                    ImageLibrary.getMinimapPoliticsColor(tile.getType()), bg);
+                final Settlement s = tile.getSettlement();
+                if (s != null && s.getOwner() != null) {
+                    c = orElse(s.getOwner().getNationColor(), c);
+                } else {
+                    final Unit u = tile.getFirstUnit();
+                    if (u != null && u.getOwner() != null) {
+                        c = orElse(u.getOwner().getNationColor(), c);
+                    }
+                }
+                g.setColor(c);
+                g.fillRect(x * ppt, y * ppt, ppt, ppt);
+            }
+        }
+        g.dispose();
+        this.minimapCache = img;
+    }
+
+    /**
+     * Blit the cached minimap in the bottom-left corner with a framed border,
+     * then overlay a rectangle marking the tile region currently visible in the
+     * main view (derived from the focus tile and the main view's tile span).
+     */
+    private void paintMinimap(Graphics2D g) {
+        final Rectangle b = minimapBounds();
+        if (b == null) return;
+        final Color border = orElse(ImageLibrary.getMinimapBorderColor(),
+                                    Color.WHITE);
+        // A dark frame so the box reads over any terrain, then the raster.
+        g.setColor(Color.BLACK);
+        g.fillRect(b.x - 2, b.y - 2, b.width + 4, b.height + 4);
+        g.drawImage(this.minimapCache, b.x, b.y, null);
+        g.setColor(border);
+        g.drawRect(b.x - 1, b.y - 1, b.width + 1, b.height + 1);
+
+        // Viewport box: the main view spans getWidth()/TILE_W by
+        // getHeight()/TILE_H tiles centred on the focus.  Clip to the minimap so
+        // a focus near the map edge doesn't draw lines out over the terrain.
+        final Tile f = getFocus();
+        if (f == null) return;
+        final int ppt = this.minimapPPT;
+        final int halfCols = Math.max(0, getWidth() / TILE_W / 2);
+        final int halfRows = Math.max(0, getHeight() / TILE_H / 2);
+        final int vx = b.x + (f.getX() - halfCols) * ppt;
+        final int vy = b.y + (f.getY() - halfRows) * ppt;
+        final int vw = (halfCols * 2 + 1) * ppt;
+        final int vh = (halfRows * 2 + 1) * ppt;
+        final Shape oldClip = g.getClip();
+        g.setClip(b);
+        g.setColor(border);
+        g.drawRect(vx, vy, vw, vh);
+        g.setClip(oldClip);
+    }
+
+    /**
+     * If {@code e} falls inside the minimap box, translate it to a map tile and
+     * recentre the main view on it, returning true so the caller skips the normal
+     * terrain-selection path.
+     */
+    private boolean minimapClick(MouseEvent e) {
+        final Rectangle b = minimapBounds();
+        if (b == null || !b.contains(e.getPoint())) return false;
+        requestFocusInWindow();
+        final Map map = getMap();
+        if (map != null && this.minimapPPT > 0) {
+            final int tx = (e.getX() - b.x) / this.minimapPPT;
+            final int ty = (e.getY() - b.y) / this.minimapPPT;
+            final Tile t = map.getTile(
+                Math.max(0, Math.min(map.getWidth() - 1, tx)),
+                Math.max(0, Math.min(map.getHeight() - 1, ty)));
+            if (t != null) this.gui.setFocus(t);
+        }
+        return true;
     }
 
     private void paintWaiting(Graphics2D g) {
