@@ -59,6 +59,196 @@ Notes:
 - Packaged-jar alternative: `ant package` then `java -Xmx2G -jar FreeCol.jar --classic` (the Ant
   `run` target does not pass `--classic`, so invoke the jar directly).
 
+## Phased plan (each slice independently demoable)
+
+- **Phase 0 — Scaffold & launch. ✅ DONE (verified live 2026-07-07).** `ClassicGUI extends GUI`,
+  `--classic` flag, selector `headless ? GUI : classic ? ClassicGUI : SwingGUI`; a single-player
+  game boots and runs on `ClassicGUI` with 0 SEVERE. Implementation details (auto-launch lobby
+  stopgap, window-size sentinel) live in the package README.
+- **Phase 1 — The map. ✅ DONE (verified live 2026-07-10).** `ClassicMapViewer` (a `JPanel` in
+  `client/gui/classic/`, installed as the frame's whole content pane) renders the map on a
+  rectangular 48px grid centred on a focus tile and owns the classic view state; `ClassicGUI`
+  delegates the view-mode / focus / refresh `GUI` methods to it. **Items (a)–(e) done & verified
+  live** — original `TERRAIN.SS` sprites fill the grid; (a) rectangular projection +
+  terrain/unit/colony/cursor rendering; (b) edge-of-window mouse panning; (c) clicks + keys drive
+  the real `InGameController` (select units/tiles, open owned colonies, move the active unit /
+  terrain cursor with the focus following, parity-aware key→`Direction` resolution); (d) a
+  bottom-left minimap overlay (cached whole-map raster, viewport box, click-to-recentre); (e)
+  per-tile feature overlays (forest trees, hills, mountains, rivers, roads, plowed fields, resource
+  markers, lost-city rumour) composited from the original `PHYS0.SS` overlay set on top of the base
+  terrain. **How each piece works — projection, view-state ownership, terrain scaling, the
+  isometric-vs-rectangular key caveat, the minimap caching model, and the `PHYS0.SS` overlay
+  compositing / frame map / connectivity — is documented in the package
+  [README](src/net/sf/freecol/client/gui/classic/README.md); consult it before extending the map.**
+  - **(e) resolved — the overlays came from `PHYS0.SS`, not `TERRAIN.SS`.** The base terrains are
+    in `TERRAIN.SS` (12 frames); the *physical-feature* overlays are a separate 154-frame square
+    16×16 set, `PHYS0.SS`, cut exactly for a rectangular grid — so they composite onto the classic
+    cells with no skew (the reason to prefer them over FreeCol's isometric overlay art). The
+    directional feature sets (minor/major river, mountains, hills, forest) share one 4-bit
+    connectivity encoding and roads are spoke-composited; the full frame map lives in
+    `ClassicTileArt` and the package README. FreeCol's own overlay/forest/river art remains the
+    pack-absent fallback.
+  - **Remaining map-fidelity polish (unblocked — no screenshots needed).** With the decoded pack in
+    hand, two slices sharpen the map without waiting on the expert:
+    - **Coastline / beach tiles.** `PHYS0.SS` carries 8×8 coast quarter-tiles (frames 108–139) the
+      1994 game used to feather land/water borders; the classic viewer currently draws a hard
+      ocean↔land edge. Composite the beach pieces at coastal cells (same square-projection
+      compositing as item (e), via `ClassicTileArt`).
+    - **Original unit & goods sprites.** Units/settlements render as FreeCol art shrunk into the
+      cell; aliasing the original sprites (unit frames from the `.SS` sets, goods icons) is the same
+      frame-ID curation as the terrain work (grows A2), with no layout guesswork.
+- **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
+  (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
+  delegate to existing Swing panel as a stopgap, then reskin.
+- **Phase 3 — Dialogs & polish.** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
+  negotiation, end-turn. Reuse existing Swing dialogs first, reskin to taste.
+
+**Expert player drives:** screen priority, validating each rebuilt screen vs. the real
+Colonization layout/interaction, sign-off per slice.
+
+> **Implementation reference.** The seam facts and per-piece "how it works" for the classic UI
+> (the `GUI` method contracts, `ClassicGUI`/`ClassicMapViewer` responsibilities, the rectangular
+> projection, controller wiring and key/click semantics, the minimap caching model, and the
+> live-testing harness recipe) now live next to the code in
+> [`src/net/sf/freecol/client/gui/classic/README.md`](src/net/sf/freecol/client/gui/classic/README.md).
+> This plan tracks *remaining* work; the README documents what shipped.
+
+## Gameplay fidelity: classic ruleset vs. original Colonization (Col1)
+
+FreeCol's `classic` ruleset is the team's **best-effort emulation of the original 1994 game**
+("attempts to emulate the rules of the original game as far as possible"). It is the base that
+the `freecol` ruleset extends. Choosing it gets us most of the way to Col1 fidelity *for free*,
+but it is **not a bit-perfect clone** — some divergences are deliberate options (already set to
+the Col1 value in classic) and some are residual engine-level differences the ruleset cannot fix.
+
+Because rules are data-driven, **our UI project does not implement any of this** — we just load
+the `classic` ruleset. This section exists so the expert player and we share one audited list of
+where "classic" still departs from the real game, separate from UI work.
+
+### A. Options where `classic` already matches Col1 (we get these for free)
+
+Verified against this repo's [`data/rules/classic/specification.xml`](data/rules/classic/specification.xml)
+(defaults shown are the classic values; the `freecol` ruleset flips several of these):
+
+| Behaviour | Option | classic default | Col1-faithful? |
+|---|---|---|---|
+| Amphibious assault (attack from ship) | `amphibiousMoves` | `false` | ✅ Col1 had none |
+| Manual choice of student to train | `allowStudentSelection` | `false` (least-skilled first) | ✅ matches Col1 |
+| REF arrival | `teleportREF` | `true` (teleports) | ✅ matches Col1 |
+| Custom House sells boycotted goods | `customIgnoreBoycott` | `true` (ignores boycott) | ✅ matches Col1 |
+| Enhanced missionaries (vision/trade/training) | `enhancedMissionaries` | `false` | ✅ Col1 had none |
+| Exploration (lost-city) points scoring | `explorationPoints` | `false` | ✅ matches Col1 |
+| Scouting any settlement action consumes bonus | `settlementActionsContactChief` | `false` | ✅ matches Col1 |
+| Found colonies during War of Independence | `foundColonyDuringRebellion` | `false` | ✅ matches Col1 |
+| Bell accumulation capped at 100% rebels | `bellAccumulationCapped` | `true` | ✅ matches Col1 |
+| Classic fixed starting positions | `startingPositions` | `0` (classic) | ✅ matches Col1 |
+| Equip new European recruits | `equipEuropeanRecruits` | `true` | ✅ matches Col1 |
+
+> ⚠️ Doc-vs-repo discrepancy: the official user guide (v0.11.6) describes classic as enabling
+> `expertsHaveConnections` ("experts produce without raw materials"). **This repo's classic spec
+> sets it `false`.** The repo is what we ship — treat the repo defaults above as authoritative and
+> re-audit if we bump the ruleset version.
+
+### B. Residual divergences the classic ruleset does *not* fix (true fidelity gaps)
+
+These are engine-level — not toggleable from the ruleset — so a faithful-classic goal means
+either accepting them or patching the engine. Confidence varies; sources noted.
+
+- **Combat math.** Even with the classic ruleset, FreeCol does **not** reproduce Col1's combat
+  resolution (FreeCol uses a power × modifiers / random model; Col1 used its own formula with
+  different terrain/ambush/odds handling). Acknowledged open item upstream (SF pending-feature
+  #65). *Highest-impact divergence; a power player will feel it.* **[Confirmed — FreeCol dev tracker]**
+- **Founding Father recruitment basis.** Col1 recruits from *gross* bell production; FreeCol uses
+  *net*. The classic ruleset is supposed to switch to gross — verify in our build. **[FreeCol "What Would Col1 Do?" wiki]**
+- **Movement-point carryover.** Col1 allegedly lets unused movement carry to the next turn;
+  FreeCol resets each turn. **[Community-reported]**
+- **River corner-cutting.** Diagonal moves cutting a corner go overland in Col1 (can end the turn
+  early); FreeCol treats them as river movement. **[Community-reported]**
+- **Bell→Sons-of-Liberty formula.** Col1 ≈ `bells/(pop+1)`; FreeCol ≈ `bells/(pop·2)`, giving a
+  different SoL ramp. **[Community-reported — verify before relying on it]**
+- **Food/horse growth ordering.** FreeCol counts fish before grain and fish don't feed horse
+  growth; Col1 ordered these differently. **[Community-reported]**
+- **REF growth.** Col1's REF scales with tax income; FreeCol grows it steadily regardless. **[FreeCol wiki]**
+- **Unimplemented Col1 features.** Escalating native tribute demands before war; sailing to other
+  Europeans' ports after independence; the Custom House rival-trade report / post-war trade perks;
+  the 9% tax bump accompanying the post-privateer frigate offer. **[FreeCol wiki]**
+- **Ranged attack is dormant, not a divergence.** The `AttackRanged` order requires a unit type
+  with `attackRange > 0`; **no classic (or freecol) unit type sets it**, so the order is always
+  disabled. It is a mod-only engine hook, not a gameplay difference to worry about.
+  (`model.ability.bombard` / fort-and-ship bombardment *is* genuine Col1 behaviour and is present.)
+
+### C. Other FreeCol additions to keep out of the classic experience
+
+Not rule divergences per se, but features absent from Col1 that our UI should not surface (or
+should gate behind the ruleset): **trade routes**, the four extra nations (Portugal/Sweden/
+Denmark/Russia) and their advantages, abandon-colony-anytime, and the "destroy all Europeans"
+victory condition. The classic ruleset already restricts nations to the original four.
+
+### Implications for this project
+
+- **Scope:** UI only. We do **not** re-implement rules; we load `classic`. Items in **B** are an
+  engine-fidelity backlog, explicitly *out of scope* for the UI phases unless we later choose to
+  patch the engine.
+- **Validation:** when the expert player flags a "that's not how Col1 behaves" issue, first
+  classify it — UI rendering (our bug), a class-A option (check the default), or a class-B engine
+  gap (known, backlog). This keeps UI iteration from getting derailed by rules questions.
+- **Open task:** confirm in *our* build that (a) classic loads with the defaults in table A, and
+  (b) the gross-vs-net Founding Father basis actually switches under classic.
+
+### D. Roadmap to "as-classic-as-possible" (rules, including engine changes)
+
+This is a **separate track** from the UI phases, runnable in parallel. Guiding principle, consistent
+with this project's "additive changes only" decision: **prefer data/ruleset fixes; when engine code
+must change, gate the new behaviour behind a ruleset option** (default = current behaviour for the
+`freecol` ruleset, Col1-correct for `classic`). That keeps us mergeable with upstream `master` and
+avoids regressing the default game. Each item below is tagged **[data]** (ruleset only) or
+**[engine]** (code + a gating option), with a rough confidence/effort note.
+
+**Phase R0 — Baseline & instrumentation** *(prereq for everything; low risk)*
+- Launch with `--classic` *and* the classic ruleset; confirm table-A defaults actually load.
+- Build a one-page **Col1 conformance checklist** the expert signs off against (combat odds,
+  SoL ramp, immigration, REF, prices…). This is the acceptance instrument for R1–R3.
+- Verify the gross-vs-net Founding-Father bell basis in *our* build; decide data vs engine fix.
+- Confirm the class-B "community-reported" formulas against the engine source before acting on
+  them (don't patch on forum lore). Promote each to confirmed/rejected.
+
+**Phase R1 — Ruleset-only corrections** *(no engine risk; do first)* **[data]**
+- Audit every `booleanOption`/modifier in `classic/specification.xml` against the checklist; flip
+  any whose default isn't Col1-correct.
+- Resolve the `expertsHaveConnections` doc-vs-repo discrepancy by decision, not assumption.
+- Tune Col1-divergent modifier *values* (e.g. combat terrain/ambush/fortify/artillery-in-open) where
+  the structure already exists and only the number is off.
+
+**Phase R2 — Engine corrections, gated by option** *(the substantive work)* **[engine]**
+- **Combat resolution** *(highest impact, hardest)* — implement a Col1-faithful combat path
+  selectable via a new `model.option.combatModel` (values: `freecol` default, `classic`). Reproduce
+  Col1's odds/terrain/ambush/fortification handling. Confidence: **confirmed gap**; effort: **high**.
+- **Bell→SoL formula** — if confirmed as `bells/(pop+1)` vs FreeCol's `bells/(pop·2)`, add a
+  ruleset-selectable formula. Effort: low–med once confirmed.
+- **Movement-point carryover** and **river corner-cutting** — option-gated tweaks in the move logic.
+  Effort: med; confirm first (R0).
+- **Founding-Father gross-bell basis** — switch under classic if not achievable in data.
+- **Food/horse growth ordering** — align ordering under a classic option. Effort: low.
+- **REF-growth-vs-tax** — make REF growth scale with tax income under classic. Effort: med.
+
+**Phase R3 — Missing Col1 features** *(net-new; largest)* **[engine]**
+- Escalating native **tribute demands** before war; post-independence **trade with other Europeans'
+  ports**; Custom House **rival-trade report** & post-war trade perks; the **9% tax bump** with the
+  post-privateer frigate offer. Each is a discrete feature; schedule by the expert's priority.
+
+**Explicitly out of scope (anti-fidelity if added):** keep trade routes, the four extra nations,
+abandon-colony-anytime, and "destroy all Europeans" victory *off* in the classic experience. The
+classic ruleset already restricts nations; ensure our UI doesn't surface the rest.
+
+**Sequencing:** R0 → R1 (cheap wins, no risk) → R2 (combat first, it dominates feel) → R3 (by
+priority). Track these as their own backlog; they do not block UI phases 0–3 and vice-versa.
+
+*Sources:* [FreeCol user guide — ruleset comparison](https://www.freecol.org/docs/FreeCol.html),
+[FreeCol "What Would Col1 Do?" wiki](https://sourceforge.net/p/freecol/wiki/What%20Would%20Col1%20Do%3F/),
+[SF pending-feature #65 — combat differs under classic](https://sourceforge.net/p/freecol/pending-features-for-freecol/65/),
+[Civ wiki — FreeCol divergences from Colonization](https://civilization.fandom.com/wiki/FreeCol_1.0.0/Divergences_from_Colonization),
+and this repo's `data/rules/classic/specification.xml`.
+
 ## Design inputs: reference screenshots & where the art comes from
 
 Two distinct things, do not conflate them:
@@ -217,9 +407,10 @@ expert a complete screenshot checklist.
   `image.background.MainPanel`→`…pik.OPENING.PIK` and `image.background.ColonyPanel`→`…pik.COLONY.PIK`
   (title screen shows live); **all map terrain** — the eight base land types, eight forest types,
   and ocean/lake/greatRiver/highSeas/arctic/hills/mountains — aliased to `TERRAIN.SS` frames and
-  **rendering live** on the map (Phase 1a). **This curation is the bulk of the asset work** — grow
-  units/goods next in Phase 1, the colony/europe/report screens with Phase 2, driven by the
-  expert's screenshots.
+  **rendering live** on the map (Phase 1a); the `PHYS0.SS` physical-feature overlays are loaded by
+  key (not alias) by `ClassicTileArt` for Phase 1e. **This curation is the bulk of the asset work** —
+  grow units/goods next (see the Phase-1 map-fidelity-polish bullet), the colony/europe/report
+  screens with Phase 2, driven by the expert's screenshots.
 - **A3 ✅** — pack loader: when `--classic`, `FreeColClient.withClassicOriginalPack` overlays the
   pack as the highest-priority mod (at the `ResourceManager.setMods` call), with graceful fallback
   when it is absent. The one-line `mod.xml` is a valid descriptor (identical to every
@@ -264,187 +455,6 @@ incrementally. Each base method's Javadoc names its callers.
 | `client/gui/action/` (86) | High |
 | `client/gui/mapviewer/` (5210 lines) | Partial — reuse image-selection logic, replace isometric→rectangular projection (`TileBounds`/`MapViewerBounds`) |
 | `client/gui/panel/` (101) + `dialog/` (33) | Optional — reskin our own, or delegate temporarily |
-
-## Phased plan (each slice independently demoable)
-
-- **Phase 0 — Scaffold & launch. ✅ DONE (verified live 2026-07-07).** `ClassicGUI extends GUI`,
-  `--classic` flag, selector `headless ? GUI : classic ? ClassicGUI : SwingGUI`; a single-player
-  game boots and runs on `ClassicGUI` with 0 SEVERE. Implementation details (auto-launch lobby
-  stopgap, window-size sentinel) live in the package README.
-- **Phase 1 — The map. ✅ DONE (verified live 2026-07-10).** `ClassicMapViewer` (a `JPanel` in
-  `client/gui/classic/`, installed as the frame's whole content pane) renders the map on a
-  rectangular 48px grid centred on a focus tile and owns the classic view state; `ClassicGUI`
-  delegates the view-mode / focus / refresh `GUI` methods to it. **Items (a)–(e) done & verified
-  live** — original `TERRAIN.SS` sprites fill the grid; (a) rectangular projection +
-  terrain/unit/colony/cursor rendering; (b) edge-of-window mouse panning; (c) clicks + keys drive
-  the real `InGameController` (select units/tiles, open owned colonies, move the active unit /
-  terrain cursor with the focus following, parity-aware key→`Direction` resolution); (d) a
-  bottom-left minimap overlay (cached whole-map raster, viewport box, click-to-recentre); (e)
-  per-tile feature overlays (forest trees, hills, mountains, rivers, roads, plowed fields, resource
-  markers, lost-city rumour) composited from the original `PHYS0.SS` overlay set on top of the base
-  terrain. **How each piece works — projection, view-state ownership, terrain scaling, the
-  isometric-vs-rectangular key caveat, the minimap caching model, and the `PHYS0.SS` overlay
-  compositing / frame map / connectivity — is documented in the package
-  [README](src/net/sf/freecol/client/gui/classic/README.md); consult it before extending the map.**
-  - **(e) resolved — the overlays came from `PHYS0.SS`, not `TERRAIN.SS`.** The base terrains are
-    in `TERRAIN.SS` (12 frames); the *physical-feature* overlays are a separate 154-frame square
-    16×16 set, `PHYS0.SS`, cut exactly for a rectangular grid — so they composite onto the classic
-    cells with no skew (the reason to prefer them over FreeCol's isometric overlay art). The
-    directional feature sets (minor/major river, mountains, hills, forest) share one 4-bit
-    connectivity encoding and roads are spoke-composited; the full frame map lives in
-    `ClassicTileArt` and the package README. FreeCol's own overlay/forest/river art remains the
-    pack-absent fallback.
-- **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
-  (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
-  delegate to existing Swing panel as a stopgap, then reskin.
-- **Phase 3 — Dialogs & polish.** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
-  negotiation, end-turn. Reuse existing Swing dialogs first, reskin to taste.
-
-**Expert player drives:** screen priority, validating each rebuilt screen vs. the real
-Colonization layout/interaction, sign-off per slice.
-
-> **Implementation reference.** The seam facts and per-piece "how it works" for the classic UI
-> (the `GUI` method contracts, `ClassicGUI`/`ClassicMapViewer` responsibilities, the rectangular
-> projection, controller wiring and key/click semantics, the minimap caching model, and the
-> live-testing harness recipe) now live next to the code in
-> [`src/net/sf/freecol/client/gui/classic/README.md`](src/net/sf/freecol/client/gui/classic/README.md).
-> This plan tracks *remaining* work; the README documents what shipped.
-
-## Gameplay fidelity: classic ruleset vs. original Colonization (Col1)
-
-FreeCol's `classic` ruleset is the team's **best-effort emulation of the original 1994 game**
-("attempts to emulate the rules of the original game as far as possible"). It is the base that
-the `freecol` ruleset extends. Choosing it gets us most of the way to Col1 fidelity *for free*,
-but it is **not a bit-perfect clone** — some divergences are deliberate options (already set to
-the Col1 value in classic) and some are residual engine-level differences the ruleset cannot fix.
-
-Because rules are data-driven, **our UI project does not implement any of this** — we just load
-the `classic` ruleset. This section exists so the expert player and we share one audited list of
-where "classic" still departs from the real game, separate from UI work.
-
-### A. Options where `classic` already matches Col1 (we get these for free)
-
-Verified against this repo's [`data/rules/classic/specification.xml`](data/rules/classic/specification.xml)
-(defaults shown are the classic values; the `freecol` ruleset flips several of these):
-
-| Behaviour | Option | classic default | Col1-faithful? |
-|---|---|---|---|
-| Amphibious assault (attack from ship) | `amphibiousMoves` | `false` | ✅ Col1 had none |
-| Manual choice of student to train | `allowStudentSelection` | `false` (least-skilled first) | ✅ matches Col1 |
-| REF arrival | `teleportREF` | `true` (teleports) | ✅ matches Col1 |
-| Custom House sells boycotted goods | `customIgnoreBoycott` | `true` (ignores boycott) | ✅ matches Col1 |
-| Enhanced missionaries (vision/trade/training) | `enhancedMissionaries` | `false` | ✅ Col1 had none |
-| Exploration (lost-city) points scoring | `explorationPoints` | `false` | ✅ matches Col1 |
-| Scouting any settlement action consumes bonus | `settlementActionsContactChief` | `false` | ✅ matches Col1 |
-| Found colonies during War of Independence | `foundColonyDuringRebellion` | `false` | ✅ matches Col1 |
-| Bell accumulation capped at 100% rebels | `bellAccumulationCapped` | `true` | ✅ matches Col1 |
-| Classic fixed starting positions | `startingPositions` | `0` (classic) | ✅ matches Col1 |
-| Equip new European recruits | `equipEuropeanRecruits` | `true` | ✅ matches Col1 |
-
-> ⚠️ Doc-vs-repo discrepancy: the official user guide (v0.11.6) describes classic as enabling
-> `expertsHaveConnections` ("experts produce without raw materials"). **This repo's classic spec
-> sets it `false`.** The repo is what we ship — treat the repo defaults above as authoritative and
-> re-audit if we bump the ruleset version.
-
-### B. Residual divergences the classic ruleset does *not* fix (true fidelity gaps)
-
-These are engine-level — not toggleable from the ruleset — so a faithful-classic goal means
-either accepting them or patching the engine. Confidence varies; sources noted.
-
-- **Combat math.** Even with the classic ruleset, FreeCol does **not** reproduce Col1's combat
-  resolution (FreeCol uses a power × modifiers / random model; Col1 used its own formula with
-  different terrain/ambush/odds handling). Acknowledged open item upstream (SF pending-feature
-  #65). *Highest-impact divergence; a power player will feel it.* **[Confirmed — FreeCol dev tracker]**
-- **Founding Father recruitment basis.** Col1 recruits from *gross* bell production; FreeCol uses
-  *net*. The classic ruleset is supposed to switch to gross — verify in our build. **[FreeCol "What Would Col1 Do?" wiki]**
-- **Movement-point carryover.** Col1 allegedly lets unused movement carry to the next turn;
-  FreeCol resets each turn. **[Community-reported]**
-- **River corner-cutting.** Diagonal moves cutting a corner go overland in Col1 (can end the turn
-  early); FreeCol treats them as river movement. **[Community-reported]**
-- **Bell→Sons-of-Liberty formula.** Col1 ≈ `bells/(pop+1)`; FreeCol ≈ `bells/(pop·2)`, giving a
-  different SoL ramp. **[Community-reported — verify before relying on it]**
-- **Food/horse growth ordering.** FreeCol counts fish before grain and fish don't feed horse
-  growth; Col1 ordered these differently. **[Community-reported]**
-- **REF growth.** Col1's REF scales with tax income; FreeCol grows it steadily regardless. **[FreeCol wiki]**
-- **Unimplemented Col1 features.** Escalating native tribute demands before war; sailing to other
-  Europeans' ports after independence; the Custom House rival-trade report / post-war trade perks;
-  the 9% tax bump accompanying the post-privateer frigate offer. **[FreeCol wiki]**
-- **Ranged attack is dormant, not a divergence.** The `AttackRanged` order requires a unit type
-  with `attackRange > 0`; **no classic (or freecol) unit type sets it**, so the order is always
-  disabled. It is a mod-only engine hook, not a gameplay difference to worry about.
-  (`model.ability.bombard` / fort-and-ship bombardment *is* genuine Col1 behaviour and is present.)
-
-### C. Other FreeCol additions to keep out of the classic experience
-
-Not rule divergences per se, but features absent from Col1 that our UI should not surface (or
-should gate behind the ruleset): **trade routes**, the four extra nations (Portugal/Sweden/
-Denmark/Russia) and their advantages, abandon-colony-anytime, and the "destroy all Europeans"
-victory condition. The classic ruleset already restricts nations to the original four.
-
-### Implications for this project
-
-- **Scope:** UI only. We do **not** re-implement rules; we load `classic`. Items in **B** are an
-  engine-fidelity backlog, explicitly *out of scope* for the UI phases unless we later choose to
-  patch the engine.
-- **Validation:** when the expert player flags a "that's not how Col1 behaves" issue, first
-  classify it — UI rendering (our bug), a class-A option (check the default), or a class-B engine
-  gap (known, backlog). This keeps UI iteration from getting derailed by rules questions.
-- **Open task:** confirm in *our* build that (a) classic loads with the defaults in table A, and
-  (b) the gross-vs-net Founding Father basis actually switches under classic.
-
-### D. Roadmap to "as-classic-as-possible" (rules, including engine changes)
-
-This is a **separate track** from the UI phases, runnable in parallel. Guiding principle, consistent
-with this project's "additive changes only" decision: **prefer data/ruleset fixes; when engine code
-must change, gate the new behaviour behind a ruleset option** (default = current behaviour for the
-`freecol` ruleset, Col1-correct for `classic`). That keeps us mergeable with upstream `master` and
-avoids regressing the default game. Each item below is tagged **[data]** (ruleset only) or
-**[engine]** (code + a gating option), with a rough confidence/effort note.
-
-**Phase R0 — Baseline & instrumentation** *(prereq for everything; low risk)*
-- Launch with `--classic` *and* the classic ruleset; confirm table-A defaults actually load.
-- Build a one-page **Col1 conformance checklist** the expert signs off against (combat odds,
-  SoL ramp, immigration, REF, prices…). This is the acceptance instrument for R1–R3.
-- Verify the gross-vs-net Founding-Father bell basis in *our* build; decide data vs engine fix.
-- Confirm the class-B "community-reported" formulas against the engine source before acting on
-  them (don't patch on forum lore). Promote each to confirmed/rejected.
-
-**Phase R1 — Ruleset-only corrections** *(no engine risk; do first)* **[data]**
-- Audit every `booleanOption`/modifier in `classic/specification.xml` against the checklist; flip
-  any whose default isn't Col1-correct.
-- Resolve the `expertsHaveConnections` doc-vs-repo discrepancy by decision, not assumption.
-- Tune Col1-divergent modifier *values* (e.g. combat terrain/ambush/fortify/artillery-in-open) where
-  the structure already exists and only the number is off.
-
-**Phase R2 — Engine corrections, gated by option** *(the substantive work)* **[engine]**
-- **Combat resolution** *(highest impact, hardest)* — implement a Col1-faithful combat path
-  selectable via a new `model.option.combatModel` (values: `freecol` default, `classic`). Reproduce
-  Col1's odds/terrain/ambush/fortification handling. Confidence: **confirmed gap**; effort: **high**.
-- **Bell→SoL formula** — if confirmed as `bells/(pop+1)` vs FreeCol's `bells/(pop·2)`, add a
-  ruleset-selectable formula. Effort: low–med once confirmed.
-- **Movement-point carryover** and **river corner-cutting** — option-gated tweaks in the move logic.
-  Effort: med; confirm first (R0).
-- **Founding-Father gross-bell basis** — switch under classic if not achievable in data.
-- **Food/horse growth ordering** — align ordering under a classic option. Effort: low.
-- **REF-growth-vs-tax** — make REF growth scale with tax income under classic. Effort: med.
-
-**Phase R3 — Missing Col1 features** *(net-new; largest)* **[engine]**
-- Escalating native **tribute demands** before war; post-independence **trade with other Europeans'
-  ports**; Custom House **rival-trade report** & post-war trade perks; the **9% tax bump** with the
-  post-privateer frigate offer. Each is a discrete feature; schedule by the expert's priority.
-
-**Explicitly out of scope (anti-fidelity if added):** keep trade routes, the four extra nations,
-abandon-colony-anytime, and "destroy all Europeans" victory *off* in the classic experience. The
-classic ruleset already restricts nations; ensure our UI doesn't surface the rest.
-
-**Sequencing:** R0 → R1 (cheap wins, no risk) → R2 (combat first, it dominates feel) → R3 (by
-priority). Track these as their own backlog; they do not block UI phases 0–3 and vice-versa.
-
-*Sources:* [FreeCol user guide — ruleset comparison](https://www.freecol.org/docs/FreeCol.html),
-[FreeCol "What Would Col1 Do?" wiki](https://sourceforge.net/p/freecol/wiki/What%20Would%20Col1%20Do%3F/),
-[SF pending-feature #65 — combat differs under classic](https://sourceforge.net/p/freecol/pending-features-for-freecol/65/),
-[Civ wiki — FreeCol divergences from Colonization](https://civilization.fandom.com/wiki/FreeCol_1.0.0/Divergences_from_Colonization),
-and this repo's `data/rules/classic/specification.xml`.
 
 ## History note
 
