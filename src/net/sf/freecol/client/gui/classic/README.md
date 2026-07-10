@@ -141,6 +141,51 @@ of `paintComponent` (after map + cursor). It is a plain rectangular
   *before* `tileAt`, translated to a tile via the pixels-per-tile scale, and
   `setFocus`ed, so a minimap click never also selects terrain underneath.
 
+**Feature overlays (item (e)).** On top of the base terrain, `paintTile`
+composites the per-tile *physical features* — forest trees, hills, mountains,
+rivers, roads, plowed fields, resource markers and the lost-city rumour — via
+`ClassicTileArt`, before the settlement/unit sprite. This is the last
+map-fidelity slice, and its crux was **asset shape, not code**:
+
+- **The overlays live in `PHYS0.SS`, not `TERRAIN.SS`.** `TERRAIN.SS` holds
+  only the 12 base terrains; the original game drew a cell as a base tile plus
+  square 16×16 *overlay* sprites, and those are a separate 154-frame set,
+  `PHYS0.SS`. Being square (like the base tiles), they composite onto the
+  classic rectangular cells with **no skew** — which is exactly why FreeCol's
+  own isometric-diamond overlay art could not be reused here.
+- **Frame map** (verified by pixel edge-analysis of the extracted frames, see
+  the `ClassicTileArt` class comment for the table): all the *directional*
+  feature sets share one 4-bit connectivity encoding — the frame within a set is
+  `(E?1) | (W?2) | (S?4) | (N?8)` over the neighbours that also carry the
+  feature — with bases minor-river `0`, major-river `16`, mountains `32`,
+  hills `48`, forest `64`. Roads are composited instead: frame `80` is the
+  centre hub and `81..88` the eight directional spokes (N…NW clockwise), one
+  drawn per neighbour with a road. `103` is the lost-city rumour, `149` the
+  plowed field, `89..102` the resource markers (a provisional read pending the
+  expert's validation).
+- **Connectivity is over *raw-grid* neighbours** (the cells drawn directly
+  up/down/left/right and at the corners), not FreeCol's isometric
+  `Direction`s, so a feature blends with whatever is *visually* adjacent on the
+  square grid. Area features (forest / hills / mountains) use the four cardinal
+  neighbours. Rivers are linear and FreeCol lays them along the isometric
+  long-sides — which flatten to raw *diagonals* — so each diagonal neighbour
+  with a river folds into its two adjacent cardinal bits, keeping a
+  diagonally-running river visually connected. Roads draw a spoke toward each of
+  the eight raw neighbours that has a road.
+- **Loading & fallback.** The frames are exposed by the `classic_original` pack
+  under the keys `image.classic_original.ss.PHYS0.SS.NNN` and loaded straight by
+  key (cached), so no new alias entries are needed. When the pack is absent
+  (`packPresent` false) `ClassicTileArt` falls back to FreeCol's own
+  `getForestImage` / `getSizedOverlayImage` / `getRiverImage` — imperfect
+  (isometric-shaped) on the square grid but enough to keep the build running.
+- **Live-verification note.** Forest compositing was confirmed live by sailing
+  the start ship to a coast (`--fast` starts at sea, so land must be reached to
+  see overlays). Rivers/hills/mountains/roads share the *identical* draw path
+  and 16×16 square sprites, so they render the same way; the classic UI's
+  reconnect stopgap makes FreeCol's debug "reveal map" ineffective (it resyncs
+  via a reconnect the classic UI does not fully reload), so inland features are
+  reached by sailing rather than revealed.
+
 ## Seam facts (for the remaining/next work)
 
 **`GUI` methods** (all no-ops in the base class; each Javadoc names its callers):
@@ -151,12 +196,12 @@ of `paintComponent` (after map + cursor). It is a plain rectangular
 - Model access: `getFreeColClient().getGame().getMap()`, `getMyPlayer()`; route
   clicks/keys through `getFreeColClient().getInGameController()`.
 
-**Image lookups** (`ImageLibrary`) for per-tile compositing beyond the base
-`.center` tile (Phase 1 item (e), still to do): `getTerrainImage(TileType,x,y,
-size)` (what we draw now), `getTileImageWithOverlayAndForest(...)`, plus
-overlay/forest/river/road `get…Image` helpers. `client/gui/mapviewer/` is the
-reference for the *selection* logic; keep that, but use the rectangular
-projection above instead of its isometric `TileBounds`/`MapViewerBounds`.
+**Image lookups** (`ImageLibrary`): `getTerrainImage(TileType,x,y,size)` is the
+base terrain the classic viewer draws; the pack-absent overlay fallbacks are
+`getForestImage` / `getSizedOverlayImage` / `getRiverImage` (see
+`ClassicTileArt`). With the pack present the feature overlays are the square
+`PHYS0.SS` frames loaded by key (item (e), done — see "Feature overlays" above),
+not FreeCol's isometric overlay art.
 
 ## Testing live (non-interactive harness)
 

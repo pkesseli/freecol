@@ -14,16 +14,19 @@ Two independent axes (keep them separate):
 
 ## Status at a glance (2026-07-10)
 
-- **UI:** Phase 0 ✅ → **Phase 1 (the map) 🔨 in progress** (rectangular grid renders terrain +
-  units + colonies + cursor; **original `TERRAIN.SS` sprites now fill the grid cleanly**; **edge
-  panning of the focus tile**; **clicks + keys now drive the real `InGameController` — click
+- **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
+  units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
+  panning of the focus tile**; **clicks + keys drive the real `InGameController` — click
   selects units/tiles & opens owned colonies, arrow/numpad keys move the active unit or the
   terrain cursor with the focus following**; **a bottom-left minimap overlay gives a whole-map
-  overview with a viewport box + click-to-recentre** — all verified live) — remaining Phase-1 work:
-  per-tile overlay/forest/road/river compositing. Phases 2–3 ⬜.
+  overview with a viewport box + click-to-recentre**; **per-tile feature overlays — forest trees,
+  hills, mountains, rivers, roads, plowed fields, resource markers and the lost-city rumour —
+  composite onto each square cell from the original `PHYS0.SS` overlay set** — all verified live).
+  → **Phase 2 (HUD & colony screen) is next, but it is GATED on the expert's original-game
+  screenshots** (`mapview.png`, `colony.png`, …). Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
-  A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles render
-  live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
+  A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
+  the `PHYS0.SS` physical-feature overlays render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
 Per-item detail (with verification notes) lives inline in the **Phased plan**, **Asset backlog &
@@ -268,26 +271,29 @@ incrementally. Each base method's Javadoc names its callers.
   `--classic` flag, selector `headless ? GUI : classic ? ClassicGUI : SwingGUI`; a single-player
   game boots and runs on `ClassicGUI` with 0 SEVERE. Implementation details (auto-launch lobby
   stopgap, window-size sentinel) live in the package README.
-- **Phase 1 — The map. 🔨 IN PROGRESS.** `ClassicMapViewer` (a `JPanel` in `client/gui/classic/`,
-  installed as the frame's whole content pane) renders the map on a rectangular 48px grid centred
-  on a focus tile and owns the classic view state; `ClassicGUI` delegates the view-mode / focus /
-  refresh `GUI` methods to it. **Items (a)–(d) done & verified live** — original `TERRAIN.SS`
-  sprites fill the grid; (a) rectangular projection + terrain/unit/colony/cursor rendering; (b)
-  edge-of-window mouse panning; (c) clicks + keys drive the real `InGameController` (select
-  units/tiles, open owned colonies, move the active unit / terrain cursor with the focus
-  following, parity-aware key→`Direction` resolution); (d) a bottom-left minimap overlay
-  (cached whole-map raster, viewport box, click-to-recentre). **How each piece works — projection,
-  view-state ownership, terrain scaling, the isometric-vs-rectangular key caveat, the minimap
-  caching model — is documented in the package
+- **Phase 1 — The map. ✅ DONE (verified live 2026-07-10).** `ClassicMapViewer` (a `JPanel` in
+  `client/gui/classic/`, installed as the frame's whole content pane) renders the map on a
+  rectangular 48px grid centred on a focus tile and owns the classic view state; `ClassicGUI`
+  delegates the view-mode / focus / refresh `GUI` methods to it. **Items (a)–(e) done & verified
+  live** — original `TERRAIN.SS` sprites fill the grid; (a) rectangular projection +
+  terrain/unit/colony/cursor rendering; (b) edge-of-window mouse panning; (c) clicks + keys drive
+  the real `InGameController` (select units/tiles, open owned colonies, move the active unit /
+  terrain cursor with the focus following, parity-aware key→`Direction` resolution); (d) a
+  bottom-left minimap overlay (cached whole-map raster, viewport box, click-to-recentre); (e)
+  per-tile feature overlays (forest trees, hills, mountains, rivers, roads, plowed fields, resource
+  markers, lost-city rumour) composited from the original `PHYS0.SS` overlay set on top of the base
+  terrain. **How each piece works — projection, view-state ownership, terrain scaling, the
+  isometric-vs-rectangular key caveat, the minimap caching model, and the `PHYS0.SS` overlay
+  compositing / frame map / connectivity — is documented in the package
   [README](src/net/sf/freecol/client/gui/classic/README.md); consult it before extending the map.**
-  - **Remaining Phase-1 work — (e) per-tile overlay / forest-tree / road / river compositing**
-    (only the base terrain `.center` tile is drawn today). Image lookups (`ImageLibrary`):
-    `getTerrainImage(TileType,x,y,size)` (what we draw now), `getTileImageWithOverlayAndForest(...)`,
-    plus overlay/forest/river/road `get…Image` helpers; `client/gui/mapviewer/` is the reference
-    for the *selection* logic, kept but driven with the rectangular projection instead of its
-    isometric `TileBounds`/`MapViewerBounds`. ⚠️ Deferred because those FreeCol overlays are
-    isometric-shaped and won't composite cleanly onto square classic cells — it needs a plan for
-    sourcing square river/road/resource sprites, likely more `TERRAIN.SS` aliases.
+  - **(e) resolved — the overlays came from `PHYS0.SS`, not `TERRAIN.SS`.** The base terrains are
+    in `TERRAIN.SS` (12 frames); the *physical-feature* overlays are a separate 154-frame square
+    16×16 set, `PHYS0.SS`, cut exactly for a rectangular grid — so they composite onto the classic
+    cells with no skew (the reason to prefer them over FreeCol's isometric overlay art). The
+    directional feature sets (minor/major river, mountains, hills, forest) share one 4-bit
+    connectivity encoding and roads are spoke-composited; the full frame map lives in
+    `ClassicTileArt` and the package README. FreeCol's own overlay/forest/river art remains the
+    pack-absent fallback.
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.

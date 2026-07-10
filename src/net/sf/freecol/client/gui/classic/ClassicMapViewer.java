@@ -120,6 +120,9 @@ final class ClassicMapViewer extends JPanel {
     /** Image library used for terrain/unit/settlement lookups. */
     private final ImageLibrary lib;
 
+    /** Composites the per-tile feature overlays (item (e)) onto each cell. */
+    private final ClassicTileArt tileArt;
+
     // Classic view state (owned here; ClassicGUI delegates to these).
     private GUI.ViewMode viewMode = GUI.ViewMode.END_TURN;
     private Tile focus;
@@ -163,6 +166,7 @@ final class ClassicMapViewer extends JPanel {
         this.freeColClient = freeColClient;
         this.gui = gui;
         this.lib = lib;
+        this.tileArt = new ClassicTileArt(lib);
         setBackground(Color.BLACK);
         setOpaque(true);
         setFocusable(true);
@@ -580,7 +584,7 @@ final class ClassicMapViewer extends JPanel {
             for (int dx = -cols; dx <= cols; dx++) {
                 final Tile tile = map.getTile(focusX + dx, focusY + dy);
                 if (tile == null) continue;
-                paintTile(g, tile, screenX(tile.getX(), focusX),
+                paintTile(g, map, tile, screenX(tile.getX(), focusX),
                           screenY(tile.getY(), focusY));
             }
         }
@@ -589,8 +593,12 @@ final class ClassicMapViewer extends JPanel {
         paintMinimap(g);
     }
 
-    /** Paint one tile: terrain, then any settlement or unit on top. */
-    private void paintTile(Graphics2D g, Tile tile, int sx, int sy) {
+    /**
+     * Paint one tile: base terrain, then the terrain-feature overlays (forest /
+     * hills / mountains / river / road / plow / resource / lost-city — item (e),
+     * composited by {@link ClassicTileArt}), then any settlement or unit on top.
+     */
+    private void paintTile(Graphics2D g, Map map, Tile tile, int sx, int sy) {
         if (!tile.isExplored()) {
             // Unexplored: leave the black background (classic "fog").
             return;
@@ -602,6 +610,9 @@ final class ClassicMapViewer extends JPanel {
         if (terrain != null) {
             g.drawImage(terrain, sx, sy, TILE_W, TILE_H, null);
         }
+
+        // Composite the physical-feature overlays on top of the base terrain.
+        this.tileArt.paintOverlays(g, map, tile, sx, sy, TILE_W, TILE_H);
 
         final Settlement settlement = tile.getSettlement();
         if (settlement != null) {
