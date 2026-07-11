@@ -244,6 +244,89 @@ final class ClassicMapViewer extends JPanel {
         bindMove(im, am, Intent.NE,    1, -1, "PAGE_UP", "NUMPAD9");
         bindMove(im, am, Intent.SW,   -1,  1, "END", "NUMPAD1");
         bindMove(im, am, Intent.SE,    1,  1, "PAGE_DOWN", "NUMPAD3");
+        bindTurnControls(im, am);
+    }
+
+    /**
+     * Bind the classic-<em>Colonization</em> turn-control keys, driving the real
+     * {@link net.sf.freecol.client.control.InGameController} (the classic UI has
+     * no menu bar / {@code Canvas} to install FreeCol's own accelerators, so we
+     * bind directly, {@code WHEN_IN_FOCUSED_WINDOW} like the movement keys).
+     *
+     * <p>Keys follow the original 1994 game's reference (from the manual):
+     * <ul>
+     *   <li><b>Enter</b> — end of turn ("Pressing the Space Bar, Enter key … causes
+     *   the next game turn to begin").</li>
+     *   <li><b>Space</b> — "no orders": skip the active unit for this turn.  With
+     *   no active unit, Space likewise ends the turn (matching the original, where
+     *   Space advances the turn once every unit is done).</li>
+     *   <li><b>W</b> — wait: temporarily skip this unit, cycle through the others,
+     *   then return to it.</li>
+     * </ul>
+     * (Movement keys — arrows + numpad — are bound above and unchanged.)
+     */
+    private void bindTurnControls(InputMap im, ActionMap am) {
+        im.put(KeyStroke.getKeyStroke("ENTER"), "classic_endTurn");
+        am.put("classic_endTurn", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    endTurn();
+                }
+            });
+        im.put(KeyStroke.getKeyStroke("SPACE"), "classic_skip");
+        am.put("classic_skip", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    skipActiveUnitOrEndTurn();
+                }
+            });
+        im.put(KeyStroke.getKeyStroke("W"), "classic_wait");
+        am.put("classic_wait", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    waitActiveUnit();
+                }
+            });
+    }
+
+    /**
+     * End the current turn.  Passes {@code showDialog=false}: the classic
+     * {@code GUI} no-ops modal dialogs, so {@code endTurn(true)}'s "units still
+     * active" confirmation would misbehave.  The server's new-turn response drives
+     * the next active unit back through the {@code changeView}/{@code refresh}
+     * hooks {@link ClassicGUI} already delegates here.
+     */
+    private void endTurn() {
+        this.freeColClient.getInGameController().endTurn(false);
+    }
+
+    /**
+     * The classic Space key: give the active unit "no orders" this turn (skip it
+     * and advance to the next unit needing orders), mirroring
+     * {@code SkipUnitAction}.  With no active unit there is nothing to skip, so —
+     * as in the original game — Space ends the turn instead.
+     */
+    private void skipActiveUnitOrEndTurn() {
+        final Unit unit = this.activeUnit;
+        if (unit == null) {
+            endTurn();
+            return;
+        }
+        if (unit.getState() != Unit.UnitState.SKIPPED) {
+            this.freeColClient.getInGameController()
+                .changeState(unit, Unit.UnitState.SKIPPED);
+        }
+        if (unit.getState() == Unit.UnitState.SKIPPED) {
+            this.freeColClient.getInGameController().nextActiveUnit();
+        }
+    }
+
+    /**
+     * The classic W key: wait the active unit — cycle to the other units needing
+     * orders and return to this one afterwards ({@code InGameController.waitUnit}).
+     */
+    private void waitActiveUnit() {
+        this.freeColClient.getInGameController().waitUnit();
     }
 
     /**

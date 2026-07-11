@@ -151,9 +151,29 @@ minimap box.
   on-screen movement matches the key. The four diagonal keys map to the
   isometric corner directions, whose raw offset shifts with row parity — an
   inherent flattening artefact, documented on `intentToDirection`.
-- **Not wired:** FreeCol's `moveAction`/`endTurn` accelerators (no menu bar /
-  `Canvas` installs them yet), so e.g. Enter does not end the turn. A unit that
-  exhausts its moves simply stops. Expected until Phase 2 adds the HUD.
+- **Turn controls (classic-*Colonization* key scheme).** Because there is no menu
+  bar / `Canvas` to install FreeCol's own accelerators, the viewer binds the
+  turn-control keys directly (`WHEN_IN_FOCUSED_WINDOW`, like the movement keys),
+  driving the real `InGameController`. Keys follow the original 1994 game (from its
+  manual — see `bindTurnControls`):
+  - **Enter** → `endTurn(false)` — end the turn. `false` because the classic `GUI`
+    no-ops modal dialogs, so `endTurn(true)`'s "units still active" confirm would
+    misbehave. Verified live: the turn advances (AI players process, a new turn
+    begins) and the map/minimap refresh.
+  - **Space** → "no orders": skip the active unit for this turn, mirroring
+    `SkipUnitAction` (`changeState(unit, SKIPPED)` then `nextActiveUnit()`). With no
+    active unit, Space ends the turn instead (as in the original, where Space
+    advances the turn once every unit is done).
+  - **W** → wait: `InGameController.waitUnit()` — cycle to the other units needing
+    orders and return to this one.
+- **Next-active-unit at turn start (caveat).** After `endTurn`, whether a fresh
+  active unit is auto-selected is up to the controller's `setCurrentPlayer` →
+  `updateActiveUnit` → `changeView(unit)` path, which the classic `GUI` already
+  delegates to `changeToMoveUnits` (so it *does* re-centre on the next active unit
+  when `player.hasNextActiveUnit()`). Movement was verified live post-end-turn
+  (the active ship moves and the focus follows it); note that panning the focus
+  away (e.g. a minimap click) leaves the active unit's cursor off-screen until a
+  movement key re-centres on it.
 
 **Minimap overlay.** A whole-map overview in the bottom-left, painted at the end
 of `paintComponent` (after map + cursor). It is a plain rectangular

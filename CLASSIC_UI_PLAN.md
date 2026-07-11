@@ -29,17 +29,22 @@ Two independent axes (keep them separate):
   colonies by size×stockade (per-nation keys) and camps/villages/inca/aztec by type — rendered through
   the same up-scale path** — all verified live (settlements by shared-pipeline + frame RE, as an
   existing native settlement is beyond turn-1 reach and colonies cannot be founded yet)).
-  → **Phase 2 (HUD & colony screen) is next, but it is GATED on the expert's original-game
-  screenshots** (`mapview.png`, `colony.png`, …). Phase 3 ⬜.
-  → **NEXT UNBLOCKED STEP — minimal turn control (functionality, not the gated HUD visuals).**
-  Wire **end-turn** + **next-active-unit cycling / skip** into `ClassicMapViewer`'s key bindings,
-  driving the real `InGameController` (`endTurn(false)`, `changeState(unit, SKIPPED)`,
-  `waitUnit()`, `player.getNextActiveUnit()` → `changeView(unit,false)`) — **using the original
-  *Colonization* key scheme** (RE/confirm the Col1 controls first; Enter = end turn and Space =
-  skip/wait are the strong candidates), *not* arbitrary FreeCol accelerators. This removes the
-  turn-1 movement cap that has blocked live verification of every recent map slice, so the same
-  session can finally sail to a **native settlement** and verify the just-shipped settlement sprites
-  live. The **visual** info/orders + menu bar stays Phase-2-gated; this is just the control wiring.
+  → **Turn control ✅ DONE (verified live 2026-07-11).** End-turn + skip/wait are wired into
+  `ClassicMapViewer`'s key bindings (bound `WHEN_IN_FOCUSED_WINDOW`, driving the real
+  `InGameController`), using the **original *Colonization* key scheme** confirmed from the 1994
+  manual: **Enter** = end turn (`endTurn(false)` — `false` because the classic GUI no-ops the
+  "units active" dialog); **Space** = "no orders" (skip the active unit, `changeState(unit,
+  SKIPPED)` + `nextActiveUnit()`, mirroring `SkipUnitAction`; with no active unit Space ends the
+  turn); **W** = wait (`waitUnit()`). Movement keys (arrows + numpad) unchanged. **Verified live:**
+  Enter advances the turn (AI players process, a new turn begins) three round-trips; the active
+  ship then moves and the focus follows it. This removes the turn-1 movement cap. See the package
+  README "Controller wiring → Turn controls" for the full contract and the next-active-unit caveat.
+  → **Phase 2 (HUD & core screens) — NOW UNBLOCKED.** The expert delivered the original-game
+  screenshots (local `screenshots/`, git-excluded, never commit): map + **top menu bar**
+  (SPIEL/ANSICHT/BEFEHLE/BERICHTE/HANDEL) + **right info/orders panel** (minimap, turn/gold/tax,
+  unit & terrain info, order hints); a **menu open** state; the **Europe** dock screen and its
+  **recruit** dialog; the signature **colony** screen ("Northern Sugar"); and a **report** screen.
+  Phase 2 is the next slice — start with the map-view HUD (info/orders panel + menu bar). Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
   the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
