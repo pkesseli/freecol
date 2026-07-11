@@ -77,8 +77,11 @@ import net.sf.freecol.common.resources.ResourceManager;
  * counter-clockwise edge neighbour is land, config&nbsp;4 = the clockwise edge,
  * config&nbsp;2 = a diagonal-only neighbour draws a light coastal-water wedge,
  * config&nbsp;5 = both edges land form an inlet, config&nbsp;0 = open ocean,
- * nothing drawn).  As with the directional sets, opaque <b>black is a
- * transparent colour-key</b> here (the base ocean tile shows through), so the
+ * nothing drawn).  Unlike the directional sets (which mark transparency with the
+ * {@code 0xFD} alpha index the decoder honours), this set encodes its transparent
+ * regions as an <b>opaque-black colour-key</b> that the decoder leaves opaque, so
+ * {@link #frame} keys that black out to alpha&nbsp;0 on load (see
+ * {@link #keyOutBlack}); the base ocean tile then shows through and the
  * quarter-tiles composite cleanly.  The estuary/river-mouth pieces
  * ({@code 140..147} ocean corner-hints, {@code 150..153} diagonal sand strips)
  * are not yet wired.
@@ -110,8 +113,9 @@ final class ClassicTileArt {
     private static final int LOST_CITY = 103;
     private static final int PLOWED = 149;
 
-    /** Base frame of the 32 coast/beach quarter-tiles ({@code 108..139}). */
+    /** Base and last frame of the 32 coast/beach quarter-tiles ({@code 108..139}). */
     private static final int COAST_BASE = 108;
+    private static final int COAST_LAST = 139;
 
     /**
      * Per-cell-quadrant coast data, one row per corner (clockwise):
@@ -170,9 +174,39 @@ final class ClassicTileArt {
     private BufferedImage frame(int n) {
         if (n < 0 || n >= PHYS0_FRAMES) return null;
         if (this.frames[n] == null) {
-            this.frames[n] = ImageLibrary.getUnscaledImage(phys0Key(n));
+            BufferedImage img = ImageLibrary.getUnscaledImage(phys0Key(n));
+            // The coast quarter-tiles (108..139) encode their transparent regions
+            // as an opaque-black colour-key (index 0), not the 0xFD alpha the other
+            // PHYS0.SS sets use, so the decoder leaves them opaque.  Key that black
+            // out to alpha 0 here (once, cached) so the base ocean shows through
+            // when the quarter-tile is composited -- otherwise plain drawImage
+            // paints black wedges over the sea along every coastline.
+            if (img != null && n >= COAST_BASE && n <= COAST_LAST) {
+                img = keyOutBlack(img);
+            }
+            this.frames[n] = img;
         }
         return this.frames[n];
+    }
+
+    /**
+     * Return a copy of {@code src} with every fully-opaque pure-black pixel made
+     * transparent.  Used to honour the coast set's black colour-key without
+     * mutating the shared image cached by {@link ImageLibrary}.
+     */
+    private static BufferedImage keyOutBlack(BufferedImage src) {
+        final int w = src.getWidth(), h = src.getHeight();
+        final BufferedImage out =
+            new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                final int argb = src.getRGB(x, y);
+                // Opaque (alpha 0xFF) and pure black (RGB 0) -> fully transparent.
+                out.setRGB(x, y,
+                    ((argb >>> 24) == 0xFF && (argb & 0xFFFFFF) == 0) ? 0 : argb);
+            }
+        }
+        return out;
     }
 
     /** Draw a {@code PHYS0.SS} frame scaled to fill the cell at {@code (sx, sy)}. */

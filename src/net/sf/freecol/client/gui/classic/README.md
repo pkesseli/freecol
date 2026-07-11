@@ -238,11 +238,14 @@ instead of showing a hard edge. The crux was again asset RE:
   nothing). The per-corner neighbour offsets live in `COAST_CORNERS`.
 - **Two decode quirks masked the scheme in earlier recon:** (i) these frames
   encode transparency as **opaque black** (a colour-key, index 0) rather than the
-  `0xFD` alpha the other sets use — so `108..111` ("empty") are config 0 and the
-  black regions let the base ocean show through when composited; (ii)
+  `0xFD` alpha the other sets use — so `108..111` ("empty") are config 0; (ii)
   `116..119`'s "water but no land" are config 2, the diagonal-only coastal-water
-  wedges. `ClassicTileArt.paintCoast` therefore just draws the 8×8 frame (black →
-  transparent under normal compositing) into its quadrant.
+  wedges. The decoder leaves that colour-key black **opaque**, so
+  `ClassicTileArt.frame` keys pure black out to alpha 0 when it loads a coast
+  frame (`keyOutBlack`, cached) — otherwise plain `drawImage` would paint the
+  black regions as opaque wedges over the sea along every coastline. With the
+  black keyed out the base ocean shows through and `paintCoast` just draws the
+  8×8 sub-tile into its quadrant.
 - **Not yet wired:** the estuary/river-mouth pieces — `140..147` (ocean
   corner-hints) and `150..153` (diagonal sand strips). Deferred (river mouths).
 

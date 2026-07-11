@@ -114,11 +114,14 @@ Notes:
       clockwise edge, config 2 = a diagonal-only neighbour draws a light coastal-water wedge,
       config 0 = open ocean draws nothing). The two decode quirks that had masked this: (i) these
       frames encode transparency as **opaque black** (a colour-key, index 0), *not* the `0xFD` alpha
-      used elsewhere — so "empty" `108–111` are config-0 (no adjacent land) and the black regions
-      let the base ocean show through; and (ii) `116–119`'s "water but no land" are config 2, the
-      diagonal-only coastal-water wedges. Drawn on **water** cells (`!tile.isLand()`), one 8×8
-      sub-tile per quadrant, `black`→transparent so it composites over the base ocean like the other
-      overlays. Frame layout + the RE writeup live in `ClassicTileArt`'s class comment and the
+      used elsewhere — so "empty" `108–111` are config-0 (no adjacent land); and (ii) `116–119`'s
+      "water but no land" are config 2, the diagonal-only coastal-water wedges. Drawn on **water**
+      cells (`!tile.isLand()`), one 8×8 sub-tile per quadrant. **Colour-key fix (2026-07-11):** the
+      decoder leaves that colour-key black *opaque*, so the first cut painted black wedges over the
+      sea along every coast; `ClassicTileArt.frame` now keys pure black out to alpha 0 when it loads a
+      coast frame (`keyOutBlack`, cached), so the base ocean shows through and only true unexplored
+      tiles stay black. Re-verified live. Frame layout + the RE writeup live in `ClassicTileArt`'s
+      class comment and the
       package README. **Not yet wired (deferred, low priority):** the estuary/river-mouth pieces —
       `140–147` (ocean corner-hints) and `150–153` (diagonal sand strips) — for river mouths.
     - **Original unit & goods sprites** ✅ **DONE (2026-07-11).** The original *Colonization*
