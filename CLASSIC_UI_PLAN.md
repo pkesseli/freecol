@@ -31,6 +31,15 @@ Two independent axes (keep them separate):
   existing native settlement is beyond turn-1 reach and colonies cannot be founded yet)).
   → **Phase 2 (HUD & colony screen) is next, but it is GATED on the expert's original-game
   screenshots** (`mapview.png`, `colony.png`, …). Phase 3 ⬜.
+  → **NEXT UNBLOCKED STEP — minimal turn control (functionality, not the gated HUD visuals).**
+  Wire **end-turn** + **next-active-unit cycling / skip** into `ClassicMapViewer`'s key bindings,
+  driving the real `InGameController` (`endTurn(false)`, `changeState(unit, SKIPPED)`,
+  `waitUnit()`, `player.getNextActiveUnit()` → `changeView(unit,false)`) — **using the original
+  *Colonization* key scheme** (RE/confirm the Col1 controls first; Enter = end turn and Space =
+  skip/wait are the strong candidates), *not* arbitrary FreeCol accelerators. This removes the
+  turn-1 movement cap that has blocked live verification of every recent map slice, so the same
+  session can finally sail to a **native settlement** and verify the just-shipped settlement sprites
+  live. The **visual** info/orders + menu bar stays Phase-2-gated; this is just the control wiring.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
   the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
