@@ -25,13 +25,17 @@ Two independent axes (keep them separate):
   feather with the original `PHYS0.SS` coast quarter-tiles (beach ring + coastal water) instead of a
   hard edge**; **the original Colonization unit map-sprites and goods icons (`ICONS.SS`) are aliased
   over FreeCol's own art, up-scaled into the cell so the classic ship/colonists/etc. render at a
-  sensible size** — all verified live).
+  sensible size**; **the original colony & native-settlement sprites (`ICONS.SS`) are aliased too —
+  colonies by size×stockade (per-nation keys) and camps/villages/inca/aztec by type — rendered through
+  the same up-scale path** — all verified live (settlements by shared-pipeline + frame RE, as an
+  existing native settlement is beyond turn-1 reach and colonies cannot be founded yet)).
   → **Phase 2 (HUD & colony screen) is next, but it is GATED on the expert's original-game
   screenshots** (`mapview.png`, `colony.png`, …). Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
   the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
-  `ICONS.SS` **unit map-sprites & goods icons** render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
+  `ICONS.SS` **unit map-sprites & goods icons** + the `ICONS.SS` **colony & native-settlement
+  sprites** render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
 Per-item detail (with verification notes) lives inline in the **Phased plan**, **Asset backlog &
@@ -148,9 +152,41 @@ Notes:
         carries per-nation colour variants of the colonist, but FreeCol tints units itself; the first
         pass aliases one neutral sprite per type/role, so all nations share a colour. Per-nation
         fidelity via the `image.unit.<id>.<nationResourceKey>` suffix is a later slice.
-        **(b) Settlement/colony sprites** (`ICONS.SS` `000–003`, `010–013`) are not yet aliased —
-        settlements still use FreeCol art shrunk to the cell. **(c) Goods icons** only surface on the
-        Phase-2 colony/Europe screens; the aliases resolve cleanly now but are not yet visible.
+        **(c) Goods icons** only surface on the Phase-2 colony/Europe screens; the aliases resolve
+        cleanly now but are not yet visible.
+    - **Original settlement/colony sprites** ✅ **DONE (2026-07-11)** (was follow-up (b)). The original
+      *Colonization* colony & native-settlement map-sprites (also `ICONS.SS`) are aliased over FreeCol's
+      own settlement art in the same committed `aliases.properties`, rendered through the **same**
+      `drawCentered` up-scale branch as the unit sprites. What shipped:
+      - **Frame map (labelled montage + eyeball).** Colonies (blue flag): `000` open colony (ring of
+        buildings, no wall), `001` wooden **stockade**, `002` grey stone **fort/fortress**, `003`
+        sparse huts (a just-founded / smallest colony). Natives: `010` teepee cluster (**camp**),
+        `011` tan longhouse (**village**), `012` terraced pyramid (**aztec**), `013` grey stone city
+        (**inca**).
+      - **Keys.** Native settlements key off the settlement-type id
+        (`image.tileitem.model.settlement.{camp,village,inca,aztec}` + the `.mission`/`.capital*`
+        variants). Colonies key off apparent **size** (`.small`/`.medium`/`.large`) × **stockade**
+        level (none/`.stockade`/`.fort`/`.fortress`) **and FreeCol prefers a per-nation frame when one
+        exists** — and the base pack defines one for every European nation, so `getSettlementKey`
+        resolves e.g. `…colony.small.dutch` and a neutral `…colony.small` alias would never be reached.
+        So all 8 nation suffixes (returned by `Player.getNationResourceKey`) are aliased directly
+        (`96` colony keys), collapsing Col1's real signal — **fortification** — onto FreeCol's
+        size×stockade grid: unfortified colonies grow `003`(small)→`000`(medium/large), a stockade is
+        `001`, a fort/fortress the stone `002`. Base non-nation colony keys catch REF-captured colonies
+        (no `…<nationREF>` art exists).
+      - **Code caveat (scaling).** `ClassicMapViewer.paintTile` now draws the settlement via
+        `getScaledSettlementImage` (native ~16px) instead of `getSettlementImage(…, TILE_SIZE)` (which
+        pre-sized to 128×64 and bypassed the crisp branch), so settlements hit the same
+        nearest-neighbour up-scale path as units — exactly `getScaledUnitImage`'s treatment.
+      - **Verification.** Aliases regenerate into the pack (125 settlement keys), 0 SEVERE, no
+        missing-resource warnings; the caravel (`ICONS.SS.005`) renders **live** crisp in-cell via the
+        identical `getScaled*Image → drawCentered` up-scale path settlements now share. Reaching an
+        *existing* native settlement in-game to screenshot it is beyond turn-1 movement radius and the
+        classic UI cannot yet end turns (same limitation the coastline/overlay slices hit for inland
+        features), and a player colony cannot be founded yet (no build-colony action) — so the
+        settlement pixels are verified by shared-pipeline + frame RE, not an in-game shot.
+      - **Follow-up:** a fortress-distinct frame (Col1's fort and fortress both map to stone `002`
+        here), and per-nation colony flag tints, are later slices — same axis as unit follow-up (a).
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
@@ -465,9 +501,11 @@ expert a complete screenshot checklist.
   key (not alias) by `ClassicTileArt` for Phase 1e — including the `PHYS0.SS` **coast/beach
   quarter-tiles** that feather water/land borders; and the `ICONS.SS` **unit map-sprites (all 194
   base+role `image.unit.model.unit.*` keys) and goods icons (22 `image.icon.model.goods.*` keys)**
-  are aliased and **rendering live** (Phase-1 map-fidelity polish — see that bullet for the frame
-  map and the `drawCentered` up-scale). **This curation is the bulk of the asset work** — remaining:
-  per-nation unit tints and settlement/colony sprites, then the colony/europe/report screens with
+  are aliased and **rendering live**; and the `ICONS.SS` **colony & native-settlement sprites**
+  (colonies by size×stockade over per-nation keys, camps/villages/inca/aztec by type) are aliased and
+  render through the same `drawCentered` up-scale path (Phase-1 map-fidelity polish — see those
+  bullets for the frame maps). **This curation is the bulk of the asset work** — remaining: per-nation
+  unit/colony tints and a fortress-distinct colony frame, then the colony/europe/report screens with
   Phase 2, driven by the expert's screenshots.
 - **A3 ✅** — pack loader: when `--classic`, `FreeColClient.withClassicOriginalPack` overlays the
   pack as the highest-priority mod (at the `ResourceManager.setMods` call), with graceful fallback

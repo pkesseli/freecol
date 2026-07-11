@@ -103,8 +103,24 @@ detection. The original `ICONS.SS` sprites are ~16px, so they fit *inside* the
 48px cell and are **up-scaled** to `UNIT_CELL_FRACTION` (0.9) of it,
 nearest-neighbour like the terrain (else a 16px unit renders tiny). FreeCol's own
 pack-absent art is sized for its 128×64 tiles, larger than the cell, and is
-**shrunk** to fit as before. Per-nation unit tinting and the settlement/colony
-sprites are not yet aliased (documented follow-ups in `CLASSIC_UI_PLAN.md`).
+**shrunk** to fit as before. `paintTile` draws the settlement sprite the same way,
+through `getScaledSettlementImage` (native ~16px, so the up-scale branch fires),
+mirroring `getScaledUnitImage` — *not* `getSettlementImage(…, TILE_SIZE)`, which
+would pre-size to 128×64 and bypass the crisp branch. Per-nation unit/colony
+tinting and a fortress-distinct colony frame are documented follow-ups in
+`CLASSIC_UI_PLAN.md`.
+
+**Settlement sprites.** Colony and native-settlement map-sprites are aliased onto
+FreeCol's `image.tileitem.model.settlement.*` keys in the same `aliases.properties`
+(the "Settlements" block). Native settlements key off the settlement-type id
+(`camp`/`village`/`inca`/`aztec` = `ICONS.SS` `010`/`011`/`012`/`013`). Colonies are
+subtler: `ImageLibrary.getSettlementKey` builds `…colony.<size>[.stockade|.fort|
+.fortress]` and then *prefers a per-nation key when one exists* — and the base pack
+defines one for every European nation — so a neutral `…colony.small` alias would
+never be reached. The block therefore overrides all 8 nation suffixes directly,
+folding Col1's real signal (fortification) onto FreeCol's size×stockade grid:
+unfortified `003`(small)→`000`(medium/large), stockade `001`, fort/fortress the
+stone `002`. See the "Settlements" block of `aliases.properties` for the full table.
 
 **Edge scrolling.** A mouse-motion listener sets an edge direction when the
 cursor enters a ~1-tile hot zone at any window edge/corner; a repeating `Timer`

@@ -624,8 +624,8 @@ final class ClassicMapViewer extends JPanel {
 
         final Settlement settlement = tile.getSettlement();
         if (settlement != null) {
-            drawCentered(g, this.lib.getSettlementImage(settlement,
-                    ImageLibrary.TILE_SIZE), sx, sy);
+            drawCentered(g, this.lib.getScaledSettlementImage(settlement),
+                    sx, sy);
         } else {
             final Unit unit = tile.getFirstUnit();
             if (unit != null) {
