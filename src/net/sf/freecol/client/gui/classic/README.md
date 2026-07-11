@@ -81,10 +81,30 @@ screenY = height/2 + (tileY - focusY) * TILE_H - TILE_H/2
 cleanly (no diamond gaps). Tiles are fetched at native 16×16 via
 `ImageLibrary.getTerrainImage(type, x, y, SRC_SIZE)` and up-scaled
 nearest-neighbour (`VALUE_INTERPOLATION_NEAREST_NEIGHBOR`) so the chunky classic
-pixels stay crisp; oversized FreeCol unit/settlement art is shrunk to fit the
-cell by `drawCentered`. Unexplored tiles are left black (classic fog). The
+pixels stay crisp. Unexplored tiles are left black (classic fog). The
 key→frame mapping lives in `tools/classic_assets/aliases.properties`. When the
 asset pack is absent the same keys fall back to FreeCol's own (isometric) art.
+
+**Unit & goods sprites.** The original *Colonization* unit map-sprites and goods
+icons come from `ICONS.SS`, aliased onto FreeCol's own resource keys in the same
+`aliases.properties` (all 194 `image.unit.model.unit.*` base+role keys and 22
+`image.icon.model.goods.*` keys). Because Col1 draws every civilian colonist with
+one generic map sprite and one sprite per *role*, the aliases collapse to a small
+set of frames: a base colonist for all civilian types, shared soldier / dragoon /
+scout / pioneer / missionary role sprites, one frame per ship, and wagon /
+artillery / treasure / brave / regular. The full frame table is documented in the
+"Units & goods" block of `aliases.properties`. Goods icons only surface on the
+Phase-2 colony/Europe screens; the unit sprites render on the map immediately.
+
+**`drawCentered` — cell-fit for both art styles.** `paintTile` draws the
+settlement/unit sprite through `drawCentered`, which sizes it to the cell
+(preserving aspect) by branching on source size — which doubles as pack
+detection. The original `ICONS.SS` sprites are ~16px, so they fit *inside* the
+48px cell and are **up-scaled** to `UNIT_CELL_FRACTION` (0.9) of it,
+nearest-neighbour like the terrain (else a 16px unit renders tiny). FreeCol's own
+pack-absent art is sized for its 128×64 tiles, larger than the cell, and is
+**shrunk** to fit as before. Per-nation unit tinting and the settlement/colony
+sprites are not yet aliased (documented follow-ups in `CLASSIC_UI_PLAN.md`).
 
 **Edge scrolling.** A mouse-motion listener sets an edge direction when the
 cursor enters a ~1-tile hot zone at any window edge/corner; a repeating `Timer`

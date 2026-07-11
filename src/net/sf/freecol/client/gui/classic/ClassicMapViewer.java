@@ -98,6 +98,14 @@ final class ClassicMapViewer extends JPanel {
     private static final Dimension SRC_SIZE = new Dimension(TILE_SRC, TILE_SRC);
 
     /**
+     * Fraction of the cell an up-scaled classic unit/settlement sprite fills.
+     * The original ICONS.SS sprites are ~16&times;16; drawn at a fraction just
+     * under 1 they read clearly while leaving a small margin so they do not
+     * bleed into neighbouring cells.
+     */
+    private static final double UNIT_CELL_FRACTION = 0.9;
+
+    /**
      * Distance (px) from a window edge within which the mouse triggers edge
      * scrolling.  Roughly a tile wide, so the hot zone is easy to hit without
      * being triggered by ordinary map clicks.
@@ -627,20 +635,33 @@ final class ClassicMapViewer extends JPanel {
     }
 
     /**
-     * Draw an image centred within a tile cell at {@code (sx, sy)}, shrunk to
-     * fit the cell (preserving aspect) when it is larger — FreeCol's own
-     * unit/settlement art is sized for its 128&times;64 tiles, much bigger than
-     * our square classic cell.
+     * Draw a unit/settlement sprite centred within the tile cell at
+     * {@code (sx, sy)}, sized to the cell (preserving aspect).
+     *
+     * <p>Two cases, distinguished by source size (which doubles as pack
+     * detection):
+     * <ul>
+     *   <li><b>Small classic art</b> — the original ICONS.SS sprites are
+     *   ~16&times;16, so they fit inside the 48px cell and would render tiny if
+     *   drawn native.  They are <em>up-scaled</em> to {@link #UNIT_CELL_FRACTION}
+     *   of the cell, nearest-neighbour (via the hint set in
+     *   {@link #paintComponent}) so the chunky classic pixels stay crisp, like
+     *   the terrain.</li>
+     *   <li><b>Large FreeCol art</b> — the pack-absent fallback art is sized for
+     *   FreeCol's 128&times;64 tiles, much bigger than our square cell, and is
+     *   <em>shrunk</em> to fit as before.</li>
+     * </ul>
      */
     private void drawCentered(Graphics2D g, BufferedImage img, int sx, int sy) {
         if (img == null) return;
         int w = img.getWidth();
         int h = img.getHeight();
-        if (w > TILE_W || h > TILE_H) {
-            final double s = Math.min((double) TILE_W / w, (double) TILE_H / h);
-            w = Math.max(1, (int) Math.round(w * s));
-            h = Math.max(1, (int) Math.round(h * s));
-        }
+        final double s = (w <= TILE_W && h <= TILE_H)
+            ? Math.min(UNIT_CELL_FRACTION * TILE_W / w,
+                       UNIT_CELL_FRACTION * TILE_H / h)   // up-scale classic art
+            : Math.min((double) TILE_W / w, (double) TILE_H / h); // shrink to fit
+        w = Math.max(1, (int) Math.round(w * s));
+        h = Math.max(1, (int) Math.round(h * s));
         final int x = sx + (TILE_W - w) / 2;
         final int y = sy + (TILE_H - h) / 2;
         g.drawImage(img, x, y, w, h, null);

@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-10)
+## Status at a glance (2026-07-11)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -21,12 +21,16 @@ Two independent axes (keep them separate):
   terrain cursor with the focus following**; **a bottom-left minimap overlay gives a whole-map
   overview with a viewport box + click-to-recentre**; **per-tile feature overlays — forest trees,
   hills, mountains, rivers, roads, plowed fields, resource markers and the lost-city rumour —
-  composite onto each square cell from the original `PHYS0.SS` overlay set** — all verified live).
+  composite onto each square cell from the original `PHYS0.SS` overlay set**; **the original
+  Colonization unit map-sprites and goods icons (`ICONS.SS`) are aliased over FreeCol's own art,
+  up-scaled into the cell so the classic ship/colonists/etc. render at a sensible size** — all
+  verified live).
   → **Phase 2 (HUD & colony screen) is next, but it is GATED on the expert's original-game
   screenshots** (`mapview.png`, `colony.png`, …). Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
-  the `PHYS0.SS` physical-feature overlays render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
+  the `PHYS0.SS` physical-feature overlays + the `ICONS.SS` **unit map-sprites & goods icons**
+  render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
 Per-item detail (with verification notes) lives inline in the **Phased plan**, **Asset backlog &
@@ -104,34 +108,40 @@ Notes:
       this needs a focused RE pass (cross-check against `eb4x/viceroy` / `institution/mpskit` coast
       docs, or trace Col1's own quadrant-selection) before implementing. Deferred in favour of the
       lower-risk unit/goods-sprite slice below.
-    - **Original unit & goods sprites** *(recon done 2026-07-10; the recommended next slice —
-      lowest-risk, no assembly guesswork)*. Units/settlements currently render as FreeCol's own art
-      shrunk into the cell; aliasing the original sprites is the same committed-`aliases.properties`
-      frame-ID curation as the terrain work (grows **A2**). Concrete context:
-      - **Source sheet:** `ICONS.SS` (131 frames) holds both — **goods icons** (roughly frames
-        `022–054`, each with a colour and a grayscale variant) and **unit map sprites** (roughly
-        `058–130`: colonists, soldiers/dragoons, pioneers, scouts, ships, wagon train, artillery),
-        plus colony/building icons (`000–015`). Frames `000–021` are goods bundles / UI chrome.
-        Exact frame→type identification is the curation work (montage + eyeball, as for `TERRAIN.SS`
-        / `PHYS0.SS`); build a labelled montage with the scratchpad `Montage.java`.
-      - **Target keys** (grep confirmed against `data/base|default/resources.properties`): goods →
-        `image.icon.model.goods.<id>` (22 types: food, grain, fish, meat, sugar, tobacco, cotton,
-        furs, lumber, ore, silver, horses, rum, cigars, cloth, coats, tradeGoods, tools, muskets,
-        bells, crosses, hammers); units → `image.unit.model.unit.<id>` (46 types) with optional
-        `.<roleSuffix>` (e.g. `.soldier`, `.dragoon`, `.pioneer`, `.missionary` — see
-        `ImageLibrary.getUnitTypeImageKey`, `Role.getRoleIdSuffix`) and optional `.<nation>`.
-      - **Two caveats to handle in code, not just aliases:**
-        1. **Scaling.** Original sprites are ~16px; `ClassicMapViewer.drawCentered` only *shrinks*
-           oversized art, so a 16px unit would render tiny in the 48px cell. The unit/settlement
-           draw path needs to *upscale* small classic sprites to a sensible cell fraction
-           (nearest-neighbour, like terrain) — a small change to `drawCentered`/the unit-draw call.
-        2. **Nation tint.** `ICONS.SS` carries several colour variants of the same colonist
-           (nation-tinted). FreeCol tints units itself, so for a first pass alias the neutral/base
-           sprite per unit type and accept one colour; per-nation fidelity via the
-           `image.unit.<id>.<nationResourceKey>` suffix is a follow-up.
-      - **Verify live** the same way as (e): sail to a coast and disembark isn't needed — units are
-        visible immediately (the start ship + any colonists), so a plain start-at-sea launch already
-        shows the aliased ship sprite; check goods later via the (Phase-2) colony screen.
+    - **Original unit & goods sprites** ✅ **DONE (2026-07-11).** The original *Colonization*
+      `ICONS.SS` unit map-sprites and goods icons are aliased over FreeCol's own art in the committed
+      `tools/classic_assets/aliases.properties` (grows **A2**), and the classic viewer now up-scales
+      the small (~16px) sprites into the 48px cell. Verified live: the start **merchantman** renders
+      as the original ship sprite, up-scaled crisp (nearest-neighbour) with no skew, cursor around it;
+      0 SEVERE, no missing-resource warnings. What shipped:
+      - **Frame map (curated by labelled montage + eyeball, as for `TERRAIN.SS`/`PHYS0.SS`).**
+        `ICONS.SS` (131 frames): **goods** are frames `022–037` in colour (food/corn `022`, sugar,
+        tobacco, cotton, furs, lumber, ore, silver, horses, rum, cigars, cloth, coats, tradeGoods,
+        tools, muskets `037`) with `038–053` their unused grayscale twins, plus `054` hammers,
+        `056` crosses, `057` bells (`055` is a red-X "none" marker). **Units:** `005` caravel,
+        `006` merchantman, `007` galleon, `014` privateer, `015` frigate, `127` man-o-war; `008`
+        wagon train, `016` treasure train, `065` artillery (cannon); `058` base colonist (all
+        civilian types share one map sprite in Col1), `061` elder statesman, `059` colonial regular,
+        `098` native brave, `115`/`116` king's regular infantry/cavalry. Role sprites (shared across
+        colonist types): `089` soldier, `076` dragoon, `075` scout, `081` pioneer, `085` missionary,
+        `099` armed brave, `101` mounted brave. (Note `117` is a *face portrait*, not a ship.)
+      - **Keys.** goods → `image.icon.model.goods.<id>` (all 22: incl. the FreeCol-only food-derived
+        grain/fish/meat, which reuse the food/corn frame `022`); units →
+        `image.unit.model.unit.<id>[.<roleSuffix>]` — all 194 base+role keys defined in
+        `data/base|default/resources.properties` are overridden so armed/mounted units also render
+        classic (per `ImageLibrary.getUnitTypeImageKey` / `Role.getRoleIdSuffix`; no nation-suffixed
+        unit keys exist, so the non-nation aliases take effect).
+      - **Code caveat #1 (scaling) — fixed.** `ClassicMapViewer.drawCentered` now branches on source
+        size (which doubles as pack detection): small classic art is *up-scaled* to
+        `UNIT_CELL_FRACTION` (0.9) of the cell, nearest-neighbour like terrain; large FreeCol
+        pack-absent art is still *shrunk* to fit as before.
+      - **Follow-ups (out of scope for this pass, documented):** **(a) Nation tint** — `ICONS.SS`
+        carries per-nation colour variants of the colonist, but FreeCol tints units itself; the first
+        pass aliases one neutral sprite per type/role, so all nations share a colour. Per-nation
+        fidelity via the `image.unit.<id>.<nationResourceKey>` suffix is a later slice.
+        **(b) Settlement/colony sprites** (`ICONS.SS` `000–003`, `010–013`) are not yet aliased —
+        settlements still use FreeCol art shrunk to the cell. **(c) Goods icons** only surface on the
+        Phase-2 colony/Europe screens; the aliases resolve cleanly now but are not yet visible.
 - **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
   (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
   delegate to existing Swing panel as a stopgap, then reskin.
@@ -443,9 +453,12 @@ expert a complete screenshot checklist.
   (title screen shows live); **all map terrain** — the eight base land types, eight forest types,
   and ocean/lake/greatRiver/highSeas/arctic/hills/mountains — aliased to `TERRAIN.SS` frames and
   **rendering live** on the map (Phase 1a); the `PHYS0.SS` physical-feature overlays are loaded by
-  key (not alias) by `ClassicTileArt` for Phase 1e. **This curation is the bulk of the asset work** —
-  grow units/goods next (see the Phase-1 map-fidelity-polish bullet), the colony/europe/report
-  screens with Phase 2, driven by the expert's screenshots.
+  key (not alias) by `ClassicTileArt` for Phase 1e; and the `ICONS.SS` **unit map-sprites (all 194
+  base+role `image.unit.model.unit.*` keys) and goods icons (22 `image.icon.model.goods.*` keys)**
+  are aliased and **rendering live** (Phase-1 map-fidelity polish — see that bullet for the frame
+  map and the `drawCentered` up-scale). **This curation is the bulk of the asset work** — remaining:
+  per-nation unit tints and settlement/colony sprites, then the colony/europe/report screens with
+  Phase 2, driven by the expert's screenshots.
 - **A3 ✅** — pack loader: when `--classic`, `FreeColClient.withClassicOriginalPack` overlays the
   pack as the highest-priority mod (at the `ResourceManager.setMods` call), with graceful fallback
   when it is absent. The one-line `mod.xml` is a valid descriptor (identical to every
