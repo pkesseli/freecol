@@ -65,6 +65,24 @@ import net.sf.freecol.common.resources.ResourceManager;
  *       resource markers {@code 89..102}.</li>
  * </ul>
  *
+ * <h2>Coastline (frames {@code 108..139})</h2>
+ * The 1994 game feathered the ocean&harr;land border with 32 small <b>8&times;8
+ * quarter-tiles</b> composited onto the four quadrants of each <em>water</em>
+ * cell — {@code 4 corners &times; 8 configs} laid out as
+ * {@code frame = 108 + config*4 + corner}, with {@code corner} clockwise
+ * {@code NW=0, NE=1, SE=2, SW=3}.  For a given corner the two orthogonal
+ * neighbours bounding it and the diagonal neighbour select the sub-tile:
+ * {@code config = (ccwEdgeLand?1) | (diagLand?2) | (cwEdgeLand?4)} — verified
+ * rotationally consistent across all four corners (config&nbsp;1 = the
+ * counter-clockwise edge neighbour is land, config&nbsp;4 = the clockwise edge,
+ * config&nbsp;2 = a diagonal-only neighbour draws a light coastal-water wedge,
+ * config&nbsp;5 = both edges land form an inlet, config&nbsp;0 = open ocean,
+ * nothing drawn).  As with the directional sets, opaque <b>black is a
+ * transparent colour-key</b> here (the base ocean tile shows through), so the
+ * quarter-tiles composite cleanly.  The estuary/river-mouth pieces
+ * ({@code 140..147} ocean corner-hints, {@code 150..153} diagonal sand strips)
+ * are not yet wired.
+ *
  * <h2>Connectivity on the classic grid</h2>
  * Connectivity is computed from <em>raw-grid</em> neighbours (the tiles drawn
  * directly up/down/left/right and at the corners) rather than FreeCol's
@@ -91,6 +109,27 @@ final class ClassicTileArt {
 
     private static final int LOST_CITY = 103;
     private static final int PLOWED = 149;
+
+    /** Base frame of the 32 coast/beach quarter-tiles ({@code 108..139}). */
+    private static final int COAST_BASE = 108;
+
+    /**
+     * Per-cell-quadrant coast data, one row per corner (clockwise):
+     * {@code {cornerIndex, qx, qy, e1dx,e1dy, ddx,ddy, e4dx,e4dy}} — the
+     * quadrant position ({@code qx,qy} in {@code {0,1}}), then the raw-grid
+     * offsets of the counter-clockwise edge (config bit&nbsp;1), the diagonal
+     * (bit&nbsp;2) and the clockwise edge (bit&nbsp;4) neighbours.
+     */
+    private static final int[][] COAST_CORNERS = {
+        // NW quad(0,0): ccwEdge=W, diag=NW, cwEdge=N
+        { 0, 0, 0, -1,  0, -1, -1,  0, -1 },
+        // NE quad(1,0): ccwEdge=N, diag=NE, cwEdge=E
+        { 1, 1, 0,  0, -1,  1, -1,  1,  0 },
+        // SE quad(1,1): ccwEdge=E, diag=SE, cwEdge=S
+        { 2, 1, 1,  1,  0,  1,  1,  0,  1 },
+        // SW quad(0,1): ccwEdge=S, diag=SW, cwEdge=W
+        { 3, 0, 1,  0,  1, -1,  1, -1,  0 },
+    };
 
     /** Connectivity bits (see the class comment): the frame is their sum. */
     private static final int E = 1, W = 2, S = 4, N = 8;
@@ -163,6 +202,12 @@ final class ClassicTileArt {
         final int x = tile.getX();
         final int y = tile.getY();
 
+        // Coastline: feather the border of a water cell with the 8x8 beach
+        // quarter-tiles wherever a neighbour is land (open ocean draws nothing).
+        if (!tile.isLand()) {
+            paintCoast(g, map, tile, sx, sy, w, h);
+        }
+
         // Terrain relief: forest trees, or the hill/mountain massif.  These are
         // area features, so connectivity is over the four cardinal neighbours.
         if (tile.isForested()) {
@@ -225,6 +270,36 @@ final class ClassicTileArt {
             g.drawImage(this.lib.getRiverImage(river.getStyle().getString(), size),
                         sx, sy, w, h, null);
         }
+    }
+
+
+    /**
+     * Composite the coastline for a water cell: for each of the four quadrants,
+     * pick the beach quarter-tile from its three raw-grid neighbours and draw it
+     * into that quadrant (open-ocean quadrants — config 0 — draw nothing).
+     */
+    private void paintCoast(Graphics2D g, Map map, Tile tile, int sx, int sy,
+                            int w, int h) {
+        final int x = tile.getX(), y = tile.getY();
+        final int halfW = w / 2, halfH = h / 2;
+        for (int[] c : COAST_CORNERS) {
+            int config = 0;
+            if (isLand(map, x + c[3], y + c[4])) config |= 1;   // ccw edge
+            if (isLand(map, x + c[5], y + c[6])) config |= 2;   // diagonal
+            if (isLand(map, x + c[7], y + c[8])) config |= 4;   // cw edge
+            if (config == 0) continue;
+            final int qx = sx + (c[1] == 0 ? 0 : halfW);
+            final int qy = sy + (c[2] == 0 ? 0 : halfH);
+            final int qw = (c[1] == 0 ? halfW : w - halfW);
+            final int qh = (c[2] == 0 ? halfH : h - halfH);
+            drawFrame(g, COAST_BASE + config * 4 + c[0], qx, qy, qw, qh);
+        }
+    }
+
+    /** True if the raw cell {@code (x, y)} exists and is land (not water). */
+    private boolean isLand(Map map, int x, int y) {
+        final Tile t = map.getTile(x, y);
+        return t != null && t.isLand();
     }
 
 

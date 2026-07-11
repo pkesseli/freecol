@@ -206,6 +206,30 @@ map-fidelity slice, and its crux was **asset shape, not code**:
   via a reconnect the classic UI does not fully reload), so inland features are
   reached by sailing rather than revealed.
 
+**Coastline (beach feathering).** On top of the base ocean, `paintOverlays`
+also feathers the land/water border for every **water** cell (`!tile.isLand()`)
+with the original `PHYS0.SS` coast quarter-tiles, so borders blend like Col1
+instead of showing a hard edge. The crux was again asset RE:
+
+- **32 8×8 quarter-tiles, frames `108..139`** — `4 corners × 8 configs` laid out
+  `frame = 108 + config*4 + corner`, corner clockwise `NW=0, NE=1, SE=2, SW=3`.
+  One sub-tile is drawn per cell quadrant; for a given corner the two orthogonal
+  neighbours bounding it and the diagonal neighbour select the config:
+  `config = (ccwEdgeLand?1) | (diagLand?2) | (cwEdgeLand?4)` (verified
+  rotationally consistent across all four corners — config 1 = the
+  counter-clockwise edge neighbour is land, 4 = the clockwise edge, 2 = a
+  diagonal-only neighbour draws a light coastal-water wedge, 0 = open ocean draws
+  nothing). The per-corner neighbour offsets live in `COAST_CORNERS`.
+- **Two decode quirks masked the scheme in earlier recon:** (i) these frames
+  encode transparency as **opaque black** (a colour-key, index 0) rather than the
+  `0xFD` alpha the other sets use — so `108..111` ("empty") are config 0 and the
+  black regions let the base ocean show through when composited; (ii)
+  `116..119`'s "water but no land" are config 2, the diagonal-only coastal-water
+  wedges. `ClassicTileArt.paintCoast` therefore just draws the 8×8 frame (black →
+  transparent under normal compositing) into its quadrant.
+- **Not yet wired:** the estuary/river-mouth pieces — `140..147` (ocean
+  corner-hints) and `150..153` (diagonal sand strips). Deferred (river mouths).
+
 ## Seam facts (for the remaining/next work)
 
 **`GUI` methods** (all no-ops in the base class; each Javadoc names its callers):

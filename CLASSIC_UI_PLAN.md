@@ -21,16 +21,17 @@ Two independent axes (keep them separate):
   terrain cursor with the focus following**; **a bottom-left minimap overlay gives a whole-map
   overview with a viewport box + click-to-recentre**; **per-tile feature overlays — forest trees,
   hills, mountains, rivers, roads, plowed fields, resource markers and the lost-city rumour —
-  composite onto each square cell from the original `PHYS0.SS` overlay set**; **the original
-  Colonization unit map-sprites and goods icons (`ICONS.SS`) are aliased over FreeCol's own art,
-  up-scaled into the cell so the classic ship/colonists/etc. render at a sensible size** — all
-  verified live).
+  composite onto each square cell from the original `PHYS0.SS` overlay set**; **land/water borders
+  feather with the original `PHYS0.SS` coast quarter-tiles (beach ring + coastal water) instead of a
+  hard edge**; **the original Colonization unit map-sprites and goods icons (`ICONS.SS`) are aliased
+  over FreeCol's own art, up-scaled into the cell so the classic ship/colonists/etc. render at a
+  sensible size** — all verified live).
   → **Phase 2 (HUD & colony screen) is next, but it is GATED on the expert's original-game
   screenshots** (`mapview.png`, `colony.png`, …). Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
-  the `PHYS0.SS` physical-feature overlays + the `ICONS.SS` **unit map-sprites & goods icons**
-  render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
+  the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
+  `ICONS.SS` **unit map-sprites & goods icons** render live) · A5 ⬜ (runtime picker) · A6 ⬜ (audio).
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
 Per-item detail (with verification notes) lives inline in the **Phased plan**, **Asset backlog &
@@ -92,22 +93,30 @@ Notes:
     connectivity encoding and roads are spoke-composited; the full frame map lives in
     `ClassicTileArt` and the package README. FreeCol's own overlay/forest/river art remains the
     pack-absent fallback.
-  - **Remaining map-fidelity polish (unblocked — no screenshots needed).** With the decoded pack in
-    hand, two slices sharpen the map without waiting on the expert:
-    - **Coastline / beach tiles** *(recon done 2026-07-10; needs a dedicated reverse-engineering
-      pass before wiring)*. `PHYS0.SS` carries 32 **8×8** coast quarter-tiles (frames `108–139`)
-      the 1994 game used to feather land/water borders — plus separate **16×16** beach/estuary
-      pieces (`150–153`, diagonal sand strips) and 8 ocean-with-corner-hint tiles (`140–147`);
-      `148` is the deep-ocean fill, `149` the plowed field (already used). The classic viewer
-      currently draws a hard ocean↔land edge. **The assembly scheme did not cleanly resolve** from
-      the frames alone: `108–111` are empty, `116–119` have water but no land, and the land
-      placement across the 32 pieces does not separate cleanly into the expected
-      4-corner × 8-neighbour-config rule (`frame = 108 + config·4 + corner` was the working
-      hypothesis; corner grouping is roughly rotational N/E/S/W but noisy because the pieces are
-      curved coast shapes, not clean corners). Getting it wrong looks worse than the clean edge, so
-      this needs a focused RE pass (cross-check against `eb4x/viceroy` / `institution/mpskit` coast
-      docs, or trace Col1's own quadrant-selection) before implementing. Deferred in favour of the
-      lower-risk unit/goods-sprite slice below.
+  - **Map-fidelity polish (unblocked — no screenshots needed).** With the decoded pack in
+    hand, both slices below shipped and sharpen the map without waiting on the expert:
+    - **Coastline / beach tiles** ✅ **DONE (2026-07-11).** The 1994 game's land/water feathering
+      now renders: the classic viewer composites the original `PHYS0.SS` coast quarter-tiles onto
+      each water cell adjacent to land, so borders feather like Col1 instead of the old hard edge.
+      **Verified live** (`--fast` start-at-sea, coast around the nearby landmasses) — the beach ring,
+      lighter coastal water, green coast outline and diagonal corner-bridges all render crisp
+      (nearest-neighbour), 0 SEVERE, no missing-resource warnings. **The RE resolved** (it was the
+      hypothesised 4-corner × 8-config scheme all along — the earlier recon was defeated by two
+      decode quirks): `PHYS0.SS` frames `108–139` are 32 **8×8** beach sub-tiles laid out
+      `frame = 108 + config·4 + corner` with `corner` clockwise `NW=0, NE=1, SE=2, SW=3`, and
+      per-corner `config = (ccwEdgeLand?1) | (diagLand?2) | (cwEdgeLand?4)` over the two orthogonal
+      neighbours bounding the corner plus the diagonal — **verified rotationally consistent across
+      all four corners** (config 1 = the counter-clockwise edge neighbour is land, config 4 = the
+      clockwise edge, config 2 = a diagonal-only neighbour draws a light coastal-water wedge,
+      config 0 = open ocean draws nothing). The two decode quirks that had masked this: (i) these
+      frames encode transparency as **opaque black** (a colour-key, index 0), *not* the `0xFD` alpha
+      used elsewhere — so "empty" `108–111` are config-0 (no adjacent land) and the black regions
+      let the base ocean show through; and (ii) `116–119`'s "water but no land" are config 2, the
+      diagonal-only coastal-water wedges. Drawn on **water** cells (`!tile.isLand()`), one 8×8
+      sub-tile per quadrant, `black`→transparent so it composites over the base ocean like the other
+      overlays. Frame layout + the RE writeup live in `ClassicTileArt`'s class comment and the
+      package README. **Not yet wired (deferred, low priority):** the estuary/river-mouth pieces —
+      `140–147` (ocean corner-hints) and `150–153` (diagonal sand strips) — for river mouths.
     - **Original unit & goods sprites** ✅ **DONE (2026-07-11).** The original *Colonization*
       `ICONS.SS` unit map-sprites and goods icons are aliased over FreeCol's own art in the committed
       `tools/classic_assets/aliases.properties` (grows **A2**), and the classic viewer now up-scales
@@ -453,7 +462,8 @@ expert a complete screenshot checklist.
   (title screen shows live); **all map terrain** — the eight base land types, eight forest types,
   and ocean/lake/greatRiver/highSeas/arctic/hills/mountains — aliased to `TERRAIN.SS` frames and
   **rendering live** on the map (Phase 1a); the `PHYS0.SS` physical-feature overlays are loaded by
-  key (not alias) by `ClassicTileArt` for Phase 1e; and the `ICONS.SS` **unit map-sprites (all 194
+  key (not alias) by `ClassicTileArt` for Phase 1e — including the `PHYS0.SS` **coast/beach
+  quarter-tiles** that feather water/land borders; and the `ICONS.SS` **unit map-sprites (all 194
   base+role `image.unit.model.unit.*` keys) and goods icons (22 `image.icon.model.goods.*` keys)**
   are aliased and **rendering live** (Phase-1 map-fidelity polish — see that bullet for the frame
   map and the `drawCentered` up-scale). **This curation is the bulk of the asset work** — remaining:
