@@ -37,8 +37,12 @@ import javax.swing.WindowConstants;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.FontLibrary;
+import net.sf.freecol.client.gui.menu.InGameMenuBar;
 import net.sf.freecol.client.gui.panel.ColonyPanel;
+import net.sf.freecol.client.gui.panel.FreeColImageBorder;
 import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Player;
@@ -76,6 +80,13 @@ public class ClassicGUI extends GUI {
      * unit); this class delegates the corresponding {@code GUI} methods to it.
      */
     private ClassicMapViewer mapViewer;
+
+    /**
+     * The right-hand info / orders panel (Phase 2 HUD), created alongside the
+     * map viewer in {@link #reconnectGUI}.  Repainted whenever the view state or
+     * model changes so it tracks the active unit / selected tile / treasury.
+     */
+    private ClassicInfoPanel infoPanel;
 
     /** Persistent image cache, shared by the image libraries. */
     private final ImageCache imageCache;
@@ -205,9 +216,22 @@ public class ClassicGUI extends GUI {
             if (this.mapViewer == null) {
                 this.mapViewer = new ClassicMapViewer(getFreeColClient(),
                                                       this, this.imageLibrary);
-            }
-            if (this.frame.getContentPane() != this.mapViewer) {
-                this.frame.setContentPane(this.mapViewer);
+                this.infoPanel = new ClassicInfoPanel(getFreeColClient(),
+                                                      this.mapViewer);
+                // Phase 2 HUD: the map fills the centre, the classic info/orders
+                // strip sits on the right, and the reused InGameMenuBar (wired to
+                // the real FreeColActions) is the top menu bar.
+                final JPanel content = new JPanel(new BorderLayout());
+                content.add(this.mapViewer, BorderLayout.CENTER);
+                content.add(this.infoPanel, BorderLayout.EAST);
+                this.frame.setContentPane(content);
+                try {
+                    this.frame.setJMenuBar(new InGameMenuBar(getFreeColClient(),
+                                                             null));
+                } catch (Exception e) {
+                    logger.log(Level.WARNING, "ClassicGUI: menu bar unavailable",
+                               e);
+                }
                 this.frame.revalidate();
             }
             if (active != null) {
@@ -222,28 +246,37 @@ public class ClassicGUI extends GUI {
             }
             this.mapViewer.requestFocusInWindow();
             this.mapViewer.repaint();
+            repaintInfo();
             logger.info("ClassicGUI: in-game map installed.");
         });
     }
 
     // View mode / focus — delegated to the map viewer.
 
+    /** Repaint the HUD info panel if it exists (view/model state changed). */
+    private void repaintInfo() {
+        if (this.infoPanel != null) this.infoPanel.repaint();
+    }
+
     /** {@inheritDoc} */
     @Override
     public void changeView(Tile tile) {
         if (this.mapViewer != null) this.mapViewer.changeToTerrain(tile);
+        repaintInfo();
     }
 
     /** {@inheritDoc} */
     @Override
     public void changeView(Unit unit, boolean force) {
         if (this.mapViewer != null) this.mapViewer.changeToMoveUnits(unit);
+        repaintInfo();
     }
 
     /** {@inheritDoc} */
     @Override
     public void changeView() {
         if (this.mapViewer != null) this.mapViewer.changeToEndTurn();
+        repaintInfo();
     }
 
     /** {@inheritDoc} */
@@ -286,6 +319,7 @@ public class ClassicGUI extends GUI {
             this.mapViewer.invalidateMinimap();
             this.mapViewer.repaint();
         }
+        repaintInfo();
     }
 
     /** {@inheritDoc} */
@@ -295,6 +329,7 @@ public class ClassicGUI extends GUI {
             this.mapViewer.invalidateMinimap();
             this.mapViewer.repaint();
         }
+        repaintInfo();
     }
 
     // Core screens (Phase 2 stopgap)
@@ -328,6 +363,39 @@ public class ClassicGUI extends GUI {
                 + "for " + colony.getId(), e);
             return null;
         }
+    }
+
+    // Look and feel
+
+    /**
+     * {@inheritDoc}
+     *
+     * Called once during client startup ({@code FreeColClient} constructor).
+     * The base {@code GUI} no-ops this, which leaves {@link FontLibrary}'s main
+     * font null — fine while nothing painted text, but the Phase 2 HUD (the
+     * reused {@link InGameMenuBar} draws a golden gold/tax/year status line via
+     * {@code FontLibrary.getMainFont()}) then NPEs.  So initialise the main font
+     * here, and the image-border scale factor so the menu bar's wood border
+     * renders.
+     *
+     * <p>We deliberately do <em>not</em> install {@code FreeColLookAndFeel}: it
+     * swaps in a {@code PanelUI} that paints the FreeCol parchment texture behind
+     * every {@code JPanel}, which would override the classic map's black fog and
+     * the dark info panel.  The reused {@link InGameMenuBar} paints its own
+     * parchment background + wood border regardless of the active L&F, so the top
+     * bar still reads classic; only the dropdown popups fall back to the default
+     * Swing styling (acceptable for this stopgap).  All guarded so a failure just
+     * leaves the default look rather than aborting startup.
+     */
+    @Override
+    public void installLookAndFeel(String fontName) throws FreeColException {
+        try {
+            FreeColImageBorder.setScaleFactor(this.imageLibrary.getScaleFactor());
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "ClassicGUI: image-border scale setup "
+                + "failed.", e);
+        }
+        FontLibrary.createMainFont(fontName);
     }
 
     // Image libraries

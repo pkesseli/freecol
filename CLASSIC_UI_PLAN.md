@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-11)
+## Status at a glance (2026-07-13)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -39,12 +39,23 @@ Two independent axes (keep them separate):
   Enter advances the turn (AI players process, a new turn begins) three round-trips; the active
   ship then moves and the focus follows it. This removes the turn-1 movement cap. See the package
   README "Controller wiring → Turn controls" for the full contract and the next-active-unit caveat.
-  → **Phase 2 (HUD & core screens) — NOW UNBLOCKED.** The expert delivered the original-game
-  screenshots (local `screenshots/`, git-excluded, never commit): map + **top menu bar**
-  (SPIEL/ANSICHT/BEFEHLE/BERICHTE/HANDEL) + **right info/orders panel** (minimap, turn/gold/tax,
-  unit & terrain info, order hints); a **menu open** state; the **Europe** dock screen and its
-  **recruit** dialog; the signature **colony** screen ("Northern Sugar"); and a **report** screen.
-  Phase 2 is the next slice — start with the map-view HUD (info/orders panel + menu bar). Phase 3 ⬜.
+  → **Phase 2 (HUD & core screens) — STARTED. Map-view HUD ✅ DONE (verified live 2026-07-13).**
+  The expert delivered the original-game screenshots (local `screenshots/`, git-excluded, never
+  commit): map + **top menu bar** (SPIEL/ANSICHT/BEFEHLE/BERICHTE/HANDEL) + **right info/orders
+  panel** (minimap, turn/gold/tax, unit & terrain info, order hints); a **menu open** state; the
+  **Europe** dock screen and its **recruit** dialog; the signature **colony** screen ("Northern
+  Sugar"); and a **report** screen. **First slice shipped:** `ClassicGUI.reconnectGUI` now composes
+  a map screen — `ClassicMapViewer` (centre) + new **`ClassicInfoPanel`** (right strip: turn, gold,
+  tax, live active-unit type/moves/terrain, order-key hints) + the **reused `InGameMenuBar`** (all
+  five classic menus wired to the real `FreeColAction`s + a golden gold/tax/year status line). A new
+  `installLookAndFeel` override creates the main font (needed by the menu bar) *without* installing
+  `FreeColLookAndFeel`, so the map keeps its black fog and the info panel its dark ground. Verified
+  live: menu bar + status line render, the info panel tracks the active ship (Moves 5/5→3/5, terrain
+  updates), 0 SEVERE. **Remaining Phase 2 (each its own slice, priority order): (1)** the **colony
+  screen** (biggest; screenshots `opening_016/017`) — reskin/replace the `showColonyPanel` stopgap;
+  **(2)** the **Europe** dock screen + recruit/train (`opening_009-013`); **(3)** the **report**
+  screens (`opening_014/015`); **(4)** HUD polish — port the minimap and order **buttons** into the
+  info panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization. Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
   the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
@@ -204,9 +215,22 @@ Notes:
         settlement pixels are verified by shared-pipeline + frame RE, not an in-game shot.
       - **Follow-up:** a fortress-distinct frame (Col1's fort and fortress both map to stone `002`
         here), and per-nation colony flag tints, are later slices — same axis as unit follow-up (a).
-- **Phase 2 — HUD & core screens.** Info/orders bar, menu bar (reuse `action/`), **Colony screen**
-  (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel` override; may
-  delegate to existing Swing panel as a stopgap, then reskin.
+- **Phase 2 — HUD & core screens. 🔨 STARTED.** Info/orders bar, menu bar (reuse `action/`),
+  **Colony screen** (signature original screen), Europe, unit/cargo, reports. Each = a `showXPanel`
+  override; may delegate to existing Swing panel as a stopgap, then reskin.
+  - **Map-view HUD ✅ DONE (verified live 2026-07-13).** `ClassicGUI.reconnectGUI` composes the map
+    screen: `ClassicMapViewer` (centre) + **`ClassicInfoPanel`** (right info/orders strip — turn,
+    gold, tax, live active-unit type/moves/terrain, order-key hints) + the reused **`InGameMenuBar`**
+    (five classic menus wired to the real actions + a golden gold/tax/year status line). New
+    `installLookAndFeel` override initialises the main font the menu bar needs, deliberately *without*
+    `FreeColLookAndFeel` (which would parchment-wash the black map fog and the dark info panel — the
+    menu bar paints its own parchment+wood chrome regardless). Info panel repaints on every
+    `changeView`/`refresh`. See the package README "Phase 2 HUD" for the full design + follow-ups.
+  - **Remaining (own slices, priority order):** **(1) colony screen** (biggest — reskin/replace the
+    `showColonyPanel` stopgap; refs `opening_016/017`); **(2) Europe** dock + recruit/train
+    (`opening_009-013`); **(3) reports** (`opening_014/015`); **(4) HUD polish** — port the minimap +
+    order **buttons** into the info panel, `WOODPANL.PIK` chrome, menu-label contrast, caption
+    localization.
 - **Phase 3 — Dialogs & polish.** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
   negotiation, end-turn. Reuse existing Swing dialogs first, reskin to taste.
 

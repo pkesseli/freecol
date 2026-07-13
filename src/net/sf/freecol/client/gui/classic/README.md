@@ -40,9 +40,22 @@ fastest way to the in-game view. It starts at sea: the ship on an ocean patch.
   the original `OPENING.PIK`, painted via the FreeCol key
   `image.background.MainPanel` when the `classic_original` asset pack is loaded;
   otherwise base art). `reconnectGUI(active, tile)` — the game-start hook fired
-  by `FreeColClient.restoreGUI` — builds the `ClassicMapViewer`, installs it as
-  the frame's whole content pane, and seeds the initial view state/focus.
-  `quitGUI` disposes the frame.
+  by `FreeColClient.restoreGUI` — builds the Phase-2 HUD: a `BorderLayout`
+  content pane with the `ClassicMapViewer` in the centre, the `ClassicInfoPanel`
+  on the right (`EAST`), and the reused `InGameMenuBar` as the frame's menu bar;
+  then seeds the initial view state/focus. `quitGUI` disposes the frame. See
+  "Phase 2 HUD" below.
+- **`installLookAndFeel(fontName)`.** The base `GUI` no-ops this, leaving
+  `FontLibrary`'s main font null — which NPEs once the reused `InGameMenuBar`
+  paints its golden gold/tax/year status line via `FontLibrary.getMainFont()`.
+  So the classic GUI overrides it to create the main font (and set the
+  image-border scale factor so the menu bar's wood border renders). It
+  deliberately does **not** install `FreeColLookAndFeel`: that L&F swaps in a
+  `PanelUI` that paints the parchment texture behind every `JPanel`, which would
+  override the classic map's black fog and the dark info panel. The menu bar
+  paints its own parchment background + wood border regardless of the L&F, so the
+  top bar still reads classic; only the dropdown popups fall back to default
+  Swing styling.
 - **Pre-game lobby stopgap.** There is no classic lobby yet, so
   `showStartGamePanel` auto-launches single-player games (`player.setReady(true)`
   + `requestLaunch`); otherwise a new game stalls at login because the base
@@ -268,6 +281,43 @@ instead of showing a hard edge. The crux was again asset RE:
   8×8 sub-tile into its quadrant.
 - **Not yet wired:** the estuary/river-mouth pieces — `140..147` (ocean
   corner-hints) and `150..153` (diagonal sand strips). Deferred (river mouths).
+
+## Phase 2 HUD (menu bar + info/orders panel)
+
+The map view no longer fills the whole frame. `ClassicGUI.reconnectGUI` composes
+the classic map screen: the `ClassicMapViewer` in the centre, a `ClassicInfoPanel`
+strip on the right, and a menu bar on top. This is the **first Phase-2 slice**,
+driven by the expert's original-game screenshots (local `screenshots/`, git-
+excluded); it is functional, not yet pixel-faithful chrome.
+
+- **Menu bar — reused `InGameMenuBar`.** Rather than build a classic menu bar, the
+  frame uses FreeCol's own `InGameMenuBar` (the sanctioned "reuse `action/`"
+  path): five menus (Game / View / Orders / Report / Colopedia) already wired to
+  the real `FreeColAction`s, plus a golden gold/tax/score/year status line it
+  paints itself. It renders its own parchment background + wood border regardless
+  of the active L&F, so the top bar reads classic even though we do not install
+  `FreeColLookAndFeel` (see `installLookAndFeel` above). Building the bar only
+  looks up pre-built actions, so it is safe; *triggering* some items reaches
+  `GUI` methods the classic UI still no-ops (reports, Europe) — acceptable for the
+  stopgap. In the user's locale the menus render localized (German in the
+  expert's shots). **Follow-ups:** the reused menu labels are dark-on-parchment
+  (lower contrast than Col1's light-on-dark bar), and the dropdown popups use
+  default Swing styling — both cosmetic, deferred to the reskin pass.
+- **`ClassicInfoPanel` — the right strip.** A fixed-width (240px) `Graphics2D`-
+  painted panel (dark ground, light text) echoing the original's right column. It
+  reads live state directly from the model (`game.getTurn()`, `player.getGold()`
+  / `getTax()`) and from the `ClassicMapViewer`'s view state (`getActiveUnit` /
+  `getSelectedTile`), showing top-to-bottom: turn (season+year), gold, tax; then
+  the active unit (localized `getLabel`, `getMovesAsString`, the terrain it stands
+  on) or, in TERRAIN mode, the selected tile's terrain; and a bottom reminder of
+  the classic order keys (Enter / Space / W). It is repainted by `ClassicGUI`'s
+  `repaintInfo()` on every `changeView`/`refresh`/`refreshTile`, so it tracks the
+  active unit and treasury live (verified: moving the ship updated Moves 5/5 → 3/5
+  and the terrain line). **Not yet ported from the original panel** (later
+  slices, need the expert's per-element sign-off): the in-panel minimap (today the
+  map viewer still draws its own bottom-left minimap overlay), a unit portrait,
+  clickable order **buttons**, and the wood-panel (`WOODPANL.PIK`) chrome; the few
+  hard-coded English captions (Gold/Tax/Moves/key hints) also want localization.
 
 ## Seam facts (for the remaining/next work)
 
