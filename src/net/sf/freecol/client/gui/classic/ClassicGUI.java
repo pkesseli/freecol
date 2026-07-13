@@ -24,28 +24,35 @@ import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.ChoiceItem;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.menu.InGameMenuBar;
-import net.sf.freecol.client.gui.panel.ColonyPanel;
 import net.sf.freecol.client.gui.panel.FreeColImageBorder;
 import net.sf.freecol.client.gui.panel.FreeColPanel;
 import net.sf.freecol.common.FreeColException;
+import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Player;
+import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.resources.ImageCache;
@@ -72,6 +79,9 @@ public class ClassicGUI extends GUI {
 
     /** The main application window. */
     private JFrame frame;
+
+    /** The colony screen's window, while one is open (see {@link #showColonyPanel}). */
+    private JFrame colonyFrame;
 
     /**
      * The in-game map view, created lazily when a game starts (see
@@ -332,36 +342,145 @@ public class ClassicGUI extends GUI {
         repaintInfo();
     }
 
-    // Core screens (Phase 2 stopgap)
+    // Core screens
 
     /**
      * {@inheritDoc}
      *
-     * Phase 1 stopgap: the classic colony screen is Phase 2 (it needs the
-     * expert's original-game screenshots), so a click on an owned colony
-     * delegates to FreeCol's own {@link ColonyPanel} — hosted in a standalone
-     * window since the classic UI has no {@code Canvas}.  This is only ever
-     * reached once the player founds a colony (never at the start-at-sea view);
-     * it is guarded so any failure degrades to a log line rather than breaking
-     * the map.  Phase 2 replaces this with a real classic colony screen.
+     * Phase 2: show the classic colony screen — {@link ClassicColonyPanel}, a
+     * 320&times;200 repaint of the original's signature screen — in a window of
+     * its own (the classic UI has no {@code Canvas} to host panels in).  Reached
+     * by clicking an owned colony on the map, and automatically by
+     * {@code InGameController.buildColony} the moment a colony is founded.
+     *
+     * <p>Only one colony screen is open at a time; opening another replaces it.
+     * The whole thing is guarded, so a failure degrades to a log line rather
+     * than breaking the map.  Returns null (as the base {@code GUI} does): no
+     * caller uses the returned panel, and the classic screen is not a
+     * {@code FreeColPanel}.
      */
     @Override
     public FreeColPanel showColonyPanel(Colony colony, Unit unit) {
         if (colony == null) return null;
+        SwingUtilities.invokeLater(() -> {
+            try {
+                closeColonyPanel();
+                final JFrame f = new JFrame(colony.getName());
+                this.colonyFrame = f;
+                f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                f.setContentPane(new ClassicColonyPanel(getFreeColClient(),
+                        this.imageLibrary, colony, this::closeColonyPanel));
+                f.pack();
+                f.setLocationRelativeTo(this.frame);
+                f.setVisible(true);
+                f.getContentPane().requestFocusInWindow();
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "ClassicGUI: could not show colony "
+                    + "screen for " + colony.getId(), e);
+            }
+        });
+        return null;
+    }
+
+    /** Dismiss the colony screen if one is open. */
+    private void closeColonyPanel() {
+        final JFrame f = this.colonyFrame;
+        this.colonyFrame = null;
+        if (f != null) f.dispose();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The base implementation asks for the name through {@code modalInputDialog},
+     * which the classic {@code GUI} still no-ops (dialogs are Phase 3) — so it
+     * would return null and silently abort every attempt to found a colony.
+     * Until the classic name prompt exists, take the name FreeCol would have
+     * suggested, made unique if the player somehow already used it.
+     */
+    @Override
+    public String getNewColonyName(Player player, Tile tile) {
+        final String suggested = player.getSettlementName(null);
+        if (player.getSettlementByName(suggested) == null) return suggested;
+        for (int i = 2; i < 100; i++) {
+            final String name = suggested + " " + i;
+            if (player.getSettlementByName(name) == null) return name;
+        }
+        return suggested;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The classic dialogs are Phase 3, but the base {@code GUI} <em>declines</em>
+     * every confirmation, which silently aborts the controller flows that gate on
+     * one — notably {@code buildColony}, which confirms the site warnings before
+     * founding a colony.  So show a plain Swing confirmation for now: unstyled,
+     * but it puts the real question (and the real choice) in front of the player.
+     * Phase 3 replaces it with classic chrome.
+     */
+    @Override
+    public boolean modalConfirmDialog(Tile tile, StringTemplate template,
+                                      ImageIcon icon, String okKey,
+                                      String cancelKey, boolean defaultOk) {
+        final String text = Messages.message(template);
+        final String ok = Messages.message(okKey);
+        final String cancel = Messages.message(cancelKey);
+        final Object[] options = { ok, cancel };
+        return onEventThread(() -> JOptionPane.showOptionDialog(this.frame, text,
+                colony(tile), JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE, icon, options,
+                (defaultOk ? ok : cancel)) == JOptionPane.YES_OPTION,
+            defaultOk);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Wired for the same reason as {@link #modalConfirmDialog}: some controller
+     * flows can only proceed through a choice.  Notably, disembarking a carrier
+     * that holds more than one unit asks <em>which</em> unit(s) to land — so
+     * without this a laden ship could never put colonists ashore, and the colony
+     * screen (which needs a founded colony) would be unreachable.  Presented as a
+     * plain Swing selection list for now; Phase 3 reskins it.
+     */
+    @Override
+    protected <T> T modalChoiceDialog(Tile tile, StringTemplate template,
+                                      ImageIcon icon, String cancelKey,
+                                      List<ChoiceItem<T>> choices) {
+        if (choices == null || choices.isEmpty()) return null;
+        final String text = Messages.message(template);
+        final ChoiceItem<T>[] options = choices.toArray(new ChoiceItem[0]);
+        final ChoiceItem<T> chosen = onEventThread(() -> {
+            final Object sel = JOptionPane.showInputDialog(this.frame, text,
+                colony(tile), JOptionPane.QUESTION_MESSAGE, icon,
+                options, options[0]);
+            return (ChoiceItem<T>) sel;
+        }, null);
+        return (chosen == null) ? null : chosen.getObject();
+    }
+
+    /** Title for a tile-anchored dialog: the settlement there, else the game name. */
+    private static String colony(Tile tile) {
+        final Colony c = (tile == null) ? null : tile.getColony();
+        return (c == null) ? "FreeCol" : c.getName();
+    }
+
+    /**
+     * Run {@code task} on the event dispatch thread and return its result.  The
+     * controllers call the dialog methods from whichever thread they happen to be
+     * on (a key binding runs on the EDT; a server message does not), and Swing
+     * dialogs must not be shown off it.  Any failure yields {@code fallback}.
+     */
+    private <T> T onEventThread(Callable<T> task, T fallback) {
         try {
-            final ColonyPanel panel = new ColonyPanel(getFreeColClient(), colony);
-            if (unit != null) panel.setSelectedUnit(unit);
-            final JFrame f = new JFrame(colony.getName());
-            f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-            f.add(panel);
-            f.pack();
-            f.setLocationRelativeTo(this.frame);
-            f.setVisible(true);
-            return panel;
+            if (SwingUtilities.isEventDispatchThread()) return task.call();
+            final FutureTask<T> ft = new FutureTask<>(task);
+            SwingUtilities.invokeAndWait(ft);
+            return ft.get();
         } catch (Exception e) {
-            logger.log(Level.WARNING, "ClassicGUI: could not show colony panel "
-                + "for " + colony.getId(), e);
-            return null;
+            logger.log(Level.WARNING, "ClassicGUI: dialog failed.", e);
+            return fallback;
         }
     }
 

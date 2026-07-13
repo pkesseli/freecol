@@ -69,10 +69,22 @@ fastest way to the in-game view. It starts at sea: the ship on an ocean patch.
   non-null even at scaffold stage: `ActionManager` builds every `FreeColAction`
   regardless of the active view and several look up order-button icons from
   their constructors. One unscaled `ImageLibrary` serves both today.
-- **`showColonyPanel` stopgap (Phase 2 seam).** A click on an owned colony
-  hosts FreeCol's own `ColonyPanel` in a standalone `JFrame` (the classic UI has
-  no `Canvas`), guarded so any failure just logs. Never reached at start-at-sea.
-  Phase 2 replaces this with a real classic colony screen.
+- **`showColonyPanel` — the classic colony screen.** A click on an owned colony
+  (and the automatic open when one is founded) shows the `ClassicColonyPanel` in a
+  window of its own (the classic UI has no `Canvas` to host panels in). Only one
+  colony screen is open at a time — opening another disposes the previous — and
+  the whole thing is guarded so a failure degrades to a log line. See "Colony
+  screen" below.
+- **Dialog seams (`modalConfirmDialog` / `modalChoiceDialog` / `getNewColonyName`).**
+  The classic dialogs are Phase 3, but three controller flows can't proceed
+  without an answer, so these are wired now with plain (unstyled) Swing dialogs:
+  `modalConfirmDialog` (e.g. the build-colony site warnings), `modalChoiceDialog`
+  (e.g. which unit(s) to disembark from a laden ship) and `getNewColonyName`
+  (which returns FreeCol's suggested name, made unique, rather than prompting —
+  the base `modalInputDialog` still no-ops). Without these, founding a colony —
+  and hence the colony screen — would be unreachable. All run their dialog on the
+  event thread via `onEventThread` (controllers call from arbitrary threads).
+  Phase 3 reskins them.
 
 ## `ClassicMapViewer` — the map
 
@@ -179,6 +191,15 @@ minimap box.
     advances the turn once every unit is done).
   - **W** → wait: `InGameController.waitUnit()` — cycle to the other units needing
     orders and return to this one.
+  - **B** → build colony: `InGameController.buildColony(activeUnit)`, mirroring
+    `BuildColonyAction` (the original manual: "To build a colony, press the build
+    key (B)"). Guarded by the same precondition as the action's `shouldBeEnabled`
+    (`hasTile() && canBuildColony()`), so pressing B with a ship or a spent unit
+    selected quietly does nothing. The controller does the rest — it confirms any
+    site warnings (`modalConfirmDialog`), names the colony (`getNewColonyName`) and
+    on success opens the colony screen. This is the only way to reach the colony
+    screen live, since `--fast` starts at sea; the flow is **sail to land →
+    disembark a colonist → press B**.
 - **Next-active-unit at turn start (caveat).** After `endTurn`, whether a fresh
   active unit is auto-selected is up to the controller's `setCurrentPlayer` →
   `updateActiveUnit` → `changeView(unit)` path, which the classic `GUI` already
@@ -318,6 +339,60 @@ excluded); it is functional, not yet pixel-faithful chrome.
   map viewer still draws its own bottom-left minimap overlay), a unit portrait,
   clickable order **buttons**, and the wood-panel (`WOODPANL.PIK`) chrome; the few
   hard-coded English captions (Gold/Tax/Moves/key hints) also want localization.
+
+## Colony screen (`ClassicColonyPanel`)
+
+The signature original screen (design ref: the expert's `opening_016/017`,
+"Northern Sugar"). Everything is painted into a virtual **320×200** canvas (the
+original's VGA size) then up-scaled by the largest integer factor that fits the
+window, nearest-neighbour — so the layout constants read straight off the
+screenshots and the classic pixels stay crisp. Reached by clicking an owned
+colony on the map (`ClassicMapViewer.onClick → gui.showColonyPanel`) or founding
+one with **B**; hosted in its own `JFrame` (no `Canvas`). Layout, top to bottom:
+
+- **Title bar** — colony name, turn and gold, gold-on-black.
+- **Buildings pane** (left) — the colony's buildings on the sandy ground
+  (`TERRAIN.SS.001`, tiled), each drawn from the original **`BUILDING.SS`** sprite
+  set with the colonists working inside it and a black production tag
+  (`amount` + goods icon). Names show **on hover** only (as in the original),
+  which also keeps them from overlapping; the hover targets are the building
+  bounds recorded during paint. *This slice flows the buildings left-to-right in
+  rows rather than at the original's fixed ground positions — a documented
+  deviation pending the expert's slot map.*
+- **Tile pane** (right) — the **3×3 work-tile grid** on the wood panel
+  (`WOODTILE.SS`), the colony in the centre cell and its eight neighbours around
+  it. Each cell is placed by the work tile's compass `Direction` from the colony
+  (`cellForDirection`), **not** its raw `(x,y)` offset — FreeCol's map is
+  isometric, so the eight neighbours' raw offsets do not fill a −1..+1 square
+  (the same isometric-vs-rectangular gotcha as the map viewer; placing by raw
+  offset left cells empty). Each cell draws the same terrain art as the map, plus
+  the colonist working it (green-boxed) and its production tag.
+- **Bottom band** — the original **`COLONY.PIK`** chrome (320×72) blitted as-is,
+  with the live figures over it: the SoL/tory split and the units standing in the
+  colony (left), the ships in port or the empty-dock caption (middle), the net
+  production (right), and the 16-slot **warehouse** row of goods icons + amounts
+  along the very bottom. The red **"E"** at the bottom-right (part of the
+  `COLONY.PIK` art) and **Escape** both close the screen.
+
+**Provisional `BUILDING.SS` frame map (`BUILDING_FRAMES`).** Which of the 48
+frames is which building was read off a labelled montage by eye. The clearly
+distinct sets are certain (fortification walls; dock/drydock/shipyard; the sooty
+blacksmith chain; the churches; the banner town hall), but several
+interchangeable house/shop/factory chains are best-effort — hence the hover name,
+which lets the expert spot a mis-mapped sprite and correct the table from a shot.
+
+**Verified live (2026-07-14):** sailed the start ship to land, disembarked a
+pioneer (the multi-unit disembark choice dialog now works), founded a colony with
+**B** (the site-warnings confirm dialog now works), clicked it — the colony
+screen renders (buildings, the filled 3×3 grid with the colony centred, the
+`COLONY.PIK` band with SoL/port/production/warehouse), hover shows building names,
+Escape closes it. 0 SEVERE.
+
+**Follow-ups (later slices, need the expert's sign-off):** validate/correct the
+`BUILDING.SS` frame map; the original's fixed building ground-slots (vs. our
+flow layout); interaction — dragging colonists between tiles/buildings, the build
+queue, loading cargo; per-nation building/flag tints; localizing the few
+hard-coded captions.
 
 ## Seam facts (for the remaining/next work)
 

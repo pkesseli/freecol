@@ -262,6 +262,8 @@ final class ClassicMapViewer extends JPanel {
      *   Space advances the turn once every unit is done).</li>
      *   <li><b>W</b> — wait: temporarily skip this unit, cycle through the others,
      *   then return to it.</li>
+     *   <li><b>B</b> — build a colony with the active unit ("To build a colony,
+     *   press the build key (B)").</li>
      * </ul>
      * (Movement keys — arrows + numpad — are bound above and unchanged.)
      */
@@ -285,6 +287,13 @@ final class ClassicMapViewer extends JPanel {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     waitActiveUnit();
+                }
+            });
+        im.put(KeyStroke.getKeyStroke("B"), "classic_buildColony");
+        am.put("classic_buildColony", new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    buildColony();
                 }
             });
     }
@@ -327,6 +336,22 @@ final class ClassicMapViewer extends JPanel {
      */
     private void waitActiveUnit() {
         this.freeColClient.getInGameController().waitUnit();
+    }
+
+    /**
+     * The classic B key: found a colony with the active unit, mirroring
+     * {@code BuildColonyAction} ({@code InGameController.buildColony}).  The
+     * controller does the rest — it checks the unit can build, confirms any
+     * site warnings, asks {@link ClassicGUI#getNewColonyName} for the name, and
+     * on success opens the colony screen.  Guarded by the same precondition as
+     * the action's {@code shouldBeEnabled}, so pressing B with (say) a ship
+     * selected quietly does nothing rather than provoking an error panel the
+     * classic GUI would swallow anyway.
+     */
+    private void buildColony() {
+        final Unit unit = this.activeUnit;
+        if (unit == null || !unit.hasTile() || !unit.canBuildColony()) return;
+        this.freeColClient.getInGameController().buildColony(unit);
     }
 
     /**

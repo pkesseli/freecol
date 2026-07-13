@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-13)
+## Status at a glance (2026-07-14)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -51,11 +51,24 @@ Two independent axes (keep them separate):
   `installLookAndFeel` override creates the main font (needed by the menu bar) *without* installing
   `FreeColLookAndFeel`, so the map keeps its black fog and the info panel its dark ground. Verified
   live: menu bar + status line render, the info panel tracks the active ship (Moves 5/5→3/5, terrain
-  updates), 0 SEVERE. **Remaining Phase 2 (each its own slice, priority order): (1)** the **colony
-  screen** (biggest; screenshots `opening_016/017`) — reskin/replace the `showColonyPanel` stopgap;
-  **(2)** the **Europe** dock screen + recruit/train (`opening_009-013`); **(3)** the **report**
-  screens (`opening_014/015`); **(4)** HUD polish — port the minimap and order **buttons** into the
-  info panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization. Phase 3 ⬜.
+  updates), 0 SEVERE.
+  → **Colony screen ✅ DONE (verified live 2026-07-14).** `showColonyPanel` now shows a real classic
+  colony screen — **`ClassicColonyPanel`**, a 320×200 (native-VGA) integer-up-scaled repaint of the
+  signature original (refs `opening_016/017`): a gold-on-black title bar; the **buildings pane** on the
+  sandy ground drawn from the original **`BUILDING.SS`** sprite set (workers + production tags, names
+  on hover); the **3×3 work-tile grid** on the `WOODTILE.SS` wood panel (cells placed by compass
+  `Direction`, colony centred); and the **`COLONY.PIK`** bottom band with the live SoL/tory split,
+  ships-in-port, net production and the 16-slot warehouse row. To reach it live the **`B` = build
+  colony** key was wired (`ClassicMapViewer`, mirroring `BuildColonyAction`), plus the
+  `modalConfirmDialog`/`modalChoiceDialog`/`getNewColonyName` seams the founding flow needs (plain
+  Swing for now — Phase 3 reskins). Verified: sail→disembark→**B**→click colony renders the screen,
+  hover names work, Escape closes, 0 SEVERE. See the package README "Colony screen" + "Controller
+  wiring → Turn controls". **Remaining Phase 2 (each its own slice, priority order): (1)** the
+  **Europe** dock screen + recruit/train (`opening_009-013`); **(2)** the **report** screens
+  (`opening_014/015`); **(3)** HUD polish — port the minimap and order **buttons** into the info
+  panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization; **(4)** colony-screen
+  polish — validate the `BUILDING.SS` frame map, the original fixed building slots (vs. our flow
+  layout), and interaction (drag colonists, build queue, cargo). Phase 3 ⬜.
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
   the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
@@ -226,9 +239,18 @@ Notes:
     `FreeColLookAndFeel` (which would parchment-wash the black map fog and the dark info panel — the
     menu bar paints its own parchment+wood chrome regardless). Info panel repaints on every
     `changeView`/`refresh`. See the package README "Phase 2 HUD" for the full design + follow-ups.
-  - **Remaining (own slices, priority order):** **(1) colony screen** (biggest — reskin/replace the
-    `showColonyPanel` stopgap; refs `opening_016/017`); **(2) Europe** dock + recruit/train
-    (`opening_009-013`); **(3) reports** (`opening_014/015`); **(4) HUD polish** — port the minimap +
+  - **Colony screen ✅ DONE (verified live 2026-07-14).** `ClassicColonyPanel` — a 320×200 integer
+    up-scaled repaint of the signature original (refs `opening_016/017`): title bar; buildings pane
+    (`BUILDING.SS` sprites, workers, production tags, hover names) on the sandy ground; the 3×3
+    work-tile grid on the `WOODTILE.SS` panel (cells by compass `Direction`, colony centred); and the
+    `COLONY.PIK` band with the SoL split, ships-in-port, net production and the 16-slot warehouse row.
+    Reached by the new **`B` = build colony** key (mirrors `BuildColonyAction`) or a click on an owned
+    colony; the founding flow's `modalConfirmDialog`/`modalChoiceDialog`/`getNewColonyName` seams were
+    wired (plain Swing, Phase-3 reskin). See the package README "Colony screen". **Follow-ups:** validate
+    the `BUILDING.SS` frame map (provisional), the original fixed building slots (vs. our flow layout),
+    and interaction (drag colonists between tiles/buildings, build queue, cargo).
+  - **Remaining (own slices, priority order):** **(1) Europe** dock + recruit/train
+    (`opening_009-013`); **(2) reports** (`opening_014/015`); **(3) HUD polish** — port the minimap +
     order **buttons** into the info panel, `WOODPANL.PIK` chrome, menu-label contrast, caption
     localization.
 - **Phase 3 — Dialogs & polish.** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
