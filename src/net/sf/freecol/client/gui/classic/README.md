@@ -452,6 +452,45 @@ lists the recruitable (`Schuldknecht (200)`), Ausbilden the cheapest trainable
 dialog reskin (shared Phase-3 component); refining the dock/pier sprite positions
 against the original; localizing the few captions.
 
+## Report screens (`ClassicReportColonyPanel`)
+
+The original 1994 game's **Colony Advisor report** — its "KOLONIEBERATER-BERICHT"
+(design ref: the expert's `opening_014` military-garrison and `opening_015`
+Sons-of-Liberty shots). In Col1 one report pages through several column sets; this
+first report slice renders the per-colony overview both shots share. Same host
+model as the colony/Europe screens — a virtual **320×200** canvas up-scaled by the
+largest integer factor that fits, nearest-neighbour, in its own `JFrame`. The
+original sepia fort illustration (**`REPORT6.PIK`**, loaded by its pack key) is the
+backdrop, dimmed with a translucent plate so the table reads over it. Layout:
+
+- **Title bar** — the localized report name (`reportColonyAction.name`), gold on
+  black.
+- **Column heads** — Colony / SoL / Pop / Troops (hard-coded English for now; the
+  same localization follow-up the info panel carries — there are no FreeCol keys
+  for these short heads).
+- **One row per colony** (`player.getColonyList()`): the colony's flag/settlement
+  sprite (`getScaledSettlementImage`), name, `getSonsOfLiberty()` %, `getUnitCount()`
+  population, the garrisoned **military units** (`tile.getUnitList()` filtered by
+  `isOffensiveUnit() && !isNaval()`) as sprites, and the colony's two largest
+  positive `getNetProductionOf` goods as icon+amount. Rows that overflow the canvas
+  are clipped (no scroll yet). Empty → "No colonies yet."
+- **Exit** — the red **Okay** plate at the bottom right (mirrors the original art)
+  and **Escape** both close it.
+
+Reached by the reused **Colony Advisor** report menu item (accelerator **F3**),
+enabled by the same `updateActions()` wiring the Europe menu item needed. Wired as
+`ClassicGUI.showReportColonyPanel` (own `JFrame`, one report at a time, guarded);
+the other eight `showReport*Panel` seams still no-op.
+
+**Verified live (2026-07-14):** F3 renders the framed report — empty first ("No
+colonies yet."), then after founding *Nieuw Amsterdam* with **B** a live row (flag,
+name, `SoL 0%`, `Pop 1`, its net production `+2`); Escape closes. 0 SEVERE.
+
+**Follow-ups (later slices):** the other eight reports and the original's
+page-through between column sets (population / production / military / SoL / …);
+click-a-colony-row to open its colony screen; row scrolling for many colonies;
+localizing the column heads.
+
 ## Seam facts (for the remaining/next work)
 
 **`GUI` methods** (all no-ops in the base class; each Javadoc names its callers):

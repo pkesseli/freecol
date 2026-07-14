@@ -89,6 +89,9 @@ public class ClassicGUI extends GUI {
     /** The Europe panel inside {@link #europeFrame}, kept so it can be repainted. */
     private ClassicEuropePanel europePanel;
 
+    /** The report screen's window, while one is open (see {@link #showReportColonyPanel}). */
+    private JFrame reportFrame;
+
     /**
      * The in-game map view, created lazily when a game starts (see
      * {@link #reconnectGUI}).  Null before then (title-screen placeholder).
@@ -462,6 +465,44 @@ public class ClassicGUI extends GUI {
         final JFrame f = this.europeFrame;
         this.europeFrame = null;
         this.europePanel = null;
+        if (f != null) f.dispose();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: show the classic <b>Colony Advisor report</b> — the original's
+     * "KOLONIEBERATER-BERICHT" — as {@link ClassicReportColonyPanel} in a window
+     * of its own.  Reached by the reused {@code Colony Advisor} report menu item
+     * (accelerator {@code F3}).  This is the first report slice; the other eight
+     * reports still no-op.  Guarded, one report window at a time.
+     */
+    @Override
+    public FreeColPanel showReportColonyPanel() {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                closeReportPanel();
+                final JFrame f = new JFrame(Messages.message("reportColonyAction.name"));
+                this.reportFrame = f;
+                f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                f.setContentPane(new ClassicReportColonyPanel(getFreeColClient(),
+                        this.imageLibrary, this::closeReportPanel));
+                f.pack();
+                f.setLocationRelativeTo(this.frame);
+                f.setVisible(true);
+                f.getContentPane().requestFocusInWindow();
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "ClassicGUI: could not show colony "
+                    + "report", e);
+            }
+        });
+        return null;
+    }
+
+    /** Dismiss the report screen if one is open. */
+    private void closeReportPanel() {
+        final JFrame f = this.reportFrame;
+        this.reportFrame = null;
         if (f != null) f.dispose();
     }
 

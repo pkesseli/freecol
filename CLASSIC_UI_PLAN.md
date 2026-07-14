@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-14b)
+## Status at a glance (2026-07-14c)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -77,11 +77,23 @@ Two independent axes (keep them separate):
   the reused `FreeColAction`s (and their menu items) actually enable in the classic HUD (they were stuck
   disabled with no `Canvas` to refresh them). Verified: **E** opens the port, recruit/train/purchase
   dialogs list the priced options and call the controllers, Escape closes, 0 SEVERE. See the package
-  README "Europe screen". **Remaining Phase 2 (each its own slice, priority order): (1)** the **report**
-  screens (`opening_014/015`); **(2)** HUD polish — port the minimap and order **buttons** into the info
-  panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization; **(3)** screen
-  interaction polish — the colony screen's `BUILDING.SS` frame map + fixed building slots + drag/queue/
-  cargo, and the Europe screen's drag-to-board / load-cargo / set-sail.
+  README "Europe screen".
+  → **Colony Advisor report ✅ DONE (verified live 2026-07-14).** `showReportColonyPanel` now shows a
+  classic-framed **`ClassicReportColonyPanel`** — the original's "KOLONIEBERATER-BERICHT" (refs
+  `opening_014` military-garrison + `opening_015` Sons-of-Liberty, both sub-views of the one Colony
+  Advisor report). A 320×200 up-scaled screen over the original sepia fort backdrop (**`REPORT6.PIK`**,
+  dimmed): a gold title bar, column heads, and one row per colony — the colony's flag/settlement sprite,
+  name, **SoL %**, population, the garrisoned **military units** as sprites, and its two largest net
+  productions — plus the red **Okay** plate (Escape closes). Reached by the reused **Colony Advisor**
+  report menu item (accelerator **F3**), now enabled by the same `updateActions()` wiring. This is the
+  **first of the nine reports**; the other eight still no-op. Verified live: F3 renders the framed report
+  (empty → "No colonies yet."; after founding *Nieuw Amsterdam* → a live row with flag/SoL/pop/production),
+  Escape closes, 0 SEVERE. See the package README "Report screens". **Remaining Phase 2 (each its own
+  slice, priority order): (1)** the **other report** screens + the report page-through (naval/trade/etc.);
+  **(2)** HUD polish — port the minimap and order **buttons** into the info panel, the `WOODPANL.PIK`
+  chrome, menu-label contrast, and caption localization; **(3)** screen interaction polish — the colony
+  screen's `BUILDING.SS` frame map + fixed building slots + drag/queue/cargo, and the Europe screen's
+  drag-to-board / load-cargo / set-sail.
   → **Phase 3 (dialogs) ⬜** — reskin the modal confirm/choice/input dialogs + event popups (meeting
   natives, king's demands, etc.) from the current plain-Java stopgap to the original wood-framed look
   (`WOODPANL.PIK` + colonist portrait + green-on-wood text), ideally as one shared classic-dialog
@@ -280,9 +292,17 @@ Notes:
     the reused actions were stuck disabled). See the package README "Europe screen". **Follow-ups:**
     drag-to-board / load-cargo / set-sail interaction; the recruit/train dialogs' wood-framed reskin
     (shared Phase-3 component); localizing captions.
-  - **Remaining (own slices, priority order):** **(1) reports** (`opening_014/015`); **(2) HUD polish**
-    — port the minimap + order **buttons** into the info panel, `WOODPANL.PIK` chrome, menu-label
-    contrast, caption localization.
+  - **Colony Advisor report ✅ DONE (verified live 2026-07-14).** `ClassicReportColonyPanel` — the
+    original "KOLONIEBERATER-BERICHT" (refs `opening_014/015`) over the sepia `REPORT6.PIK` fort backdrop:
+    a gold title bar, column heads, and one row per colony (flag/settlement sprite, name, SoL %,
+    population, garrisoned military units as sprites, two largest net productions), red **Okay** plate +
+    Escape. Wired as `showReportColonyPanel`, reached by the reused **Colony Advisor** menu item
+    (accelerator **F3**). First of the nine reports; the rest still no-op. See the package README
+    "Report screens". **Follow-ups:** the other reports + the original's page-through between column sets;
+    click-a-colony-to-open; localizing the column heads.
+  - **Remaining (own slices, priority order):** **(1) the other reports** + page-through; **(2) HUD
+    polish** — port the minimap + order **buttons** into the info panel, `WOODPANL.PIK` chrome,
+    menu-label contrast, caption localization.
 - **Phase 3 — Dialogs & polish. ⬜** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
   negotiation, end-turn. Reuse existing Swing dialogs first (done as a stopgap — the colony-founding
   flow already wires the confirm/choice/name seams as **plain Java dialogs**, e.g. the build-warnings
