@@ -68,7 +68,14 @@ Two independent axes (keep them separate):
   (`opening_014/015`); **(3)** HUD polish — port the minimap and order **buttons** into the info
   panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization; **(4)** colony-screen
   polish — validate the `BUILDING.SS` frame map, the original fixed building slots (vs. our flow
-  layout), and interaction (drag colonists, build queue, cargo). Phase 3 ⬜.
+  layout), and interaction (drag colonists, build queue, cargo).
+  → **Phase 3 (dialogs) ⬜** — reskin the modal confirm/choice/input dialogs + event popups (meeting
+  natives, king's demands, etc.) from the current plain-Java stopgap to the original wood-framed look
+  (`WOODPANL.PIK` + colonist portrait + green-on-wood text), ideally as one shared classic-dialog
+  component; plus negotiation + end-turn. **Phase 4 (pre-game/setup) ⬜** — nation select
+  (`NATIONS.PIK`), difficulty (`DIFFICUL.PIK`), customise (`CUSTOMIZ.PIK`); today auto-launched as a
+  stopgap, so lower-urgency than the in-game screens. **Out of scope (deliberate):** the intro/closing
+  **cinematics** (`--no-intro` skips them; only the static `OPENING.PIK` title shows).
 - **Assets (bring-your-own original install):** A0 ✅ · A1 ✅ (decoder + converter) ·
   A3 ✅ (pack loader) · A2 🔨 growing (title screen + all base/forest/water **terrain** tiles +
   the `PHYS0.SS` physical-feature overlays + the `PHYS0.SS` **coast/beach feathering** + the
@@ -253,8 +260,35 @@ Notes:
     (`opening_009-013`); **(2) reports** (`opening_014/015`); **(3) HUD polish** — port the minimap +
     order **buttons** into the info panel, `WOODPANL.PIK` chrome, menu-label contrast, caption
     localization.
-- **Phase 3 — Dialogs & polish.** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
-  negotiation, end-turn. Reuse existing Swing dialogs first, reskin to taste.
+- **Phase 3 — Dialogs & polish. ⬜** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
+  negotiation, end-turn. Reuse existing Swing dialogs first (done as a stopgap — the colony-founding
+  flow already wires the confirm/choice/name seams as **plain Java dialogs**, e.g. the build-warnings
+  box), then **reskin to the original wood-framed look**: the `WOODPANL.PIK`/`WOODPAN2.PIK` frame, a
+  colonist portrait, and green-on-wood text (design ref: the original's build-warning dialog). **Do
+  this once as a shared classic-dialog component** (a wood-framed equivalent of FreeCol's
+  `FreeColDialog` that all popups route through) rather than per-popup — the same component then also
+  reskins the **event popups** that share these seams: meeting natives, king's demands, learn-skill,
+  lost-city rumours, disembark/high-seas confirms, etc. Negotiation (`DiplomacyPanel`) and the
+  end-turn "units still active" prompt are the larger bespoke ones.
+- **Phase 4 — Pre-game & setup screens. ⬜** The classic UI has **no lobby yet** — `showStartGamePanel`
+  auto-launches a single-player game as a stopgap (see the package README), which is why `--fast` drops
+  straight into the map and there is no nation/difficulty choice. The original setup screens exist and
+  are catalogued in the screen manifest below; each is a `showXPanel`-style override + its `.PIK`
+  background:
+  - **Nation select** (`NATIONS.PIK`) — pick the European power (the classic ruleset already restricts
+    to the original four).
+  - **Difficulty** (`DIFFICUL.PIK`) and **Customise/game options** (`CUSTOMIZ.PIK`).
+  - The **declare-independence** setup/confirmation art (`DECLARAT.PIK`/`DECOIND.PIK`) and the **king**
+    screens (`KINGLSS1/2.PIK`) sit adjacent to this cluster (some overlap Phase 3's event dialogs).
+  Priority is **after** the in-game screens (Phases 2–3): the auto-launch stopgap keeps the game
+  reachable, so setup fidelity is lower-urgency than the screens the player stares at every turn.
+
+**Explicitly out of scope (a deliberate decision, not a backlog gap):** the **intro / new-game
+cinematics** and the **closing sequence**. `--no-intro` skips them today and only the static
+`OPENING.PIK` title screen renders; the animated intro/closing frames (`LEVN0001–0010`,
+`CLOS-BKG`/`CCBKGD`) are extracted but nothing is planned to play them. This is low fidelity-value for
+the effort versus the gameplay screens; revisit only if the expert deems the original intro essential
+(it would be a fresh scope decision, akin to the A6 audio track).
 
 **Expert player drives:** screen priority, validating each rebuilt screen vs. the real
 Colonization layout/interaction, sign-off per slice.
