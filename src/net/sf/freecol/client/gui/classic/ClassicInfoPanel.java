@@ -29,6 +29,7 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -84,6 +85,10 @@ final class ClassicInfoPanel extends JPanel {
     private static final int BTN = 32;
     private static final int BTN_GAP = 6;
 
+    /** Minimap box: sits at the top of the strip (as in the original). */
+    private static final int MM_TOP = 10;
+    private static final int MM_MAX_H = 130;
+
     private static final Color GROUND = new Color(0x20, 0x1a, 0x12); // dark wood
     private static final Color HEAD = new Color(0xF0, 0xD8, 0x8C);   // gold-ish
     private static final Color TEXT = new Color(0xE8, 0xE0, 0xD0);   // parchment
@@ -115,6 +120,10 @@ final class ClassicInfoPanel extends JPanel {
 
     /** Index of the hovered order button, or -1. */
     private int hovered = -1;
+
+    /** Minimap draw geometry, recorded each paint for click-to-recentre. */
+    private Rectangle minimapRect;
+    private double minimapScale = 1.0;
 
 
     ClassicInfoPanel(FreeColClient freeColClient, ClassicMapViewer mapViewer) {
@@ -161,7 +170,9 @@ final class ClassicInfoPanel extends JPanel {
 
         final Font base = getFont().deriveFont(Font.PLAIN, 14f);
         final Font head = getFont().deriveFont(Font.BOLD, 15f);
-        int y = 28;
+
+        // --- Minimap (top of the strip, as in the original) -------------
+        int y = paintMinimap(g) + 20;
 
         final Game game = this.freeColClient.getGame();
         final Player player = this.freeColClient.getMyPlayer();
@@ -219,6 +230,61 @@ final class ClassicInfoPanel extends JPanel {
     }
 
     /**
+     * Draw the whole-map minimap at the top of the strip — the raster the
+     * {@link ClassicMapViewer} builds (and keeps fresh), scaled to fit the panel
+     * width, framed, with a box marking the tile region visible in the main view.
+     * Records the draw geometry so {@link #onClick} can recentre the map on a
+     * minimap click.  Returns the y just below the minimap (or {@code MM_TOP} when
+     * there is no map yet).
+     */
+    private int paintMinimap(Graphics2D g) {
+        this.minimapRect = null;
+        final BufferedImage mm = this.mapViewer.getMinimapImage();
+        if (mm == null || mm.getWidth() <= 0 || mm.getHeight() <= 0) return MM_TOP;
+
+        final int targetW = getWidth() - 2 * PAD;
+        final double sc = Math.min((double) targetW / mm.getWidth(),
+                                   (double) MM_MAX_H / mm.getHeight());
+        final int dw = Math.max(1, (int) Math.round(mm.getWidth() * sc));
+        final int dh = Math.max(1, (int) Math.round(mm.getHeight() * sc));
+        final int x = (getWidth() - dw) / 2;
+        final Rectangle box = new Rectangle(x, MM_TOP, dw, dh);
+        this.minimapRect = box;
+        this.minimapScale = sc;
+
+        g.setColor(Color.BLACK);
+        g.fillRect(box.x - 2, box.y - 2, dw + 4, dh + 4);
+        final Object oldHint = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                           RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.drawImage(mm, box.x, box.y, dw, dh, null);
+        if (oldHint != null) {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldHint);
+        }
+        g.setColor(HEAD);
+        g.drawRect(box.x - 1, box.y - 1, dw + 1, dh + 1);
+
+        // Viewport box: the tile span the main view shows, centred on the focus.
+        final Tile f = this.mapViewer.getFocus();
+        final int ppt = this.mapViewer.getMinimapPixelsPerTile();
+        if (f != null && ppt > 0) {
+            final double pp = ppt * sc;
+            final int halfCols = this.mapViewer.getViewHalfCols();
+            final int halfRows = this.mapViewer.getViewHalfRows();
+            final int vx = box.x + (int) Math.round((f.getX() - halfCols) * pp);
+            final int vy = box.y + (int) Math.round((f.getY() - halfRows) * pp);
+            final int vw = (int) Math.round((halfCols * 2 + 1) * pp);
+            final int vh = (int) Math.round((halfRows * 2 + 1) * pp);
+            final java.awt.Shape oldClip = g.getClip();
+            g.setClip(box);
+            g.setColor(HEAD);
+            g.drawRect(vx, vy, vw, vh);
+            g.setClip(oldClip);
+        }
+        return box.y + dh;
+    }
+
+    /**
      * Paint the enabled unit-order buttons as a wrapped grid of icons starting at
      * {@code y0}, recording each one's bounds + action for {@link #onClick}.
      */
@@ -255,6 +321,18 @@ final class ClassicInfoPanel extends JPanel {
     }
 
     private void onClick(MouseEvent e) {
+        // A minimap click recentres the main view on the corresponding tile.
+        final Rectangle mm = this.minimapRect;
+        if (mm != null && mm.contains(e.getPoint())) {
+            final int ppt = this.mapViewer.getMinimapPixelsPerTile();
+            final double pp = ppt * this.minimapScale;
+            if (pp > 0) {
+                this.mapViewer.recenterOnTile(
+                    (int) ((e.getX() - mm.x) / pp),
+                    (int) ((e.getY() - mm.y) / pp));
+            }
+            return;
+        }
         for (int i = 0; i < this.buttonBounds.size(); i++) {
             if (this.buttonBounds.get(i).contains(e.getPoint())) {
                 final FreeColAction action = this.buttonActions.get(i);

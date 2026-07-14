@@ -209,27 +209,29 @@ minimap box.
   away (e.g. a minimap click) leaves the active unit's cursor off-screen until a
   movement key re-centres on it.
 
-**Minimap overlay.** A whole-map overview in the bottom-left, painted at the end
-of `paintComponent` (after map + cursor). It is a plain rectangular
+**Minimap raster.** A whole-map overview: a plain rectangular
 `map.getWidth() × map.getHeight()` raster — **no** isometric projection (unlike
-`client/gui/panel/MiniMap`, which is the colour-source reference only):
+`client/gui/panel/MiniMap`, which is the colour-source reference only). The map
+viewer *builds and caches* it (it is map data); it is **drawn by
+`ClassicInfoPanel`**, which hosts the minimap at the top of the right column as
+the original does. (It began as a bottom-left overlay on the map itself; the
+"HUD minimap" slice moved it into the info panel — see "Phase 2 HUD" below.)
 
 - Colours: unexplored → `ImageLibrary.getMinimapBackgroundColor()`; explored →
   `getMinimapPoliticsColor(tile.getType())`; a tile with a settlement/unit →
-  the owner's `getNationColor()`; frame + viewport box →
-  `getMinimapBorderColor()`. All guarded with fallbacks (`orElse`).
+  the owner's `getNationColor()`. All guarded with fallbacks (`orElse`).
 - Sizing: integer pixels-per-tile `max(1, MINIMAP_MAX/max(w,h))` fits the raster
   into a ~200px box, so a tall/narrow map renders as a vertical strip.
 - **Caching / performance:** the raster is cached in a `BufferedImage` and
   rebuilt only when `invalidateMinimap()` marks it dirty — wired to
   `ClassicGUI.refresh`/`refreshTile`, the model-change hooks (exploration, new
-  settlements, unit moves). Ordinary pan/cursor repaints just blit the cache +
-  overlay the viewport box, so no per-repaint tile iteration on large maps.
-- **Viewport box:** a rectangle marking the tile region visible in the main view
-  (focus ± half the `TILE_W`/`TILE_H` span), clipped to the box.
-- **Click-to-recentre:** minimap-region clicks are intercepted in `onClick`
-  *before* `tileAt`, translated to a tile via the pixels-per-tile scale, and
-  `setFocus`ed, so a minimap click never also selects terrain underneath.
+  settlements, unit moves). `getMinimapImage()` returns the cache, rebuilding if
+  stale; the panel blits it every repaint, so no per-repaint tile iteration.
+- **Accessors for the panel:** `getMinimapImage()`, `getMinimapPixelsPerTile()`,
+  `getViewHalfCols()`/`getViewHalfRows()` (the visible tile span, for the panel's
+  viewport box) and `recenterOnTile(x,y)` (a minimap click → `setFocus`). The old
+  in-viewer `paintMinimap`/`minimapClick`/`minimapBounds` and the edge-scroll
+  suppression over the overlay box were removed with the move.
 
 **Feature overlays (item (e)).** On top of the base terrain, `paintTile`
 composites the per-tile *physical features* — forest trees, hills, mountains,
@@ -328,7 +330,10 @@ excluded); it is functional, not yet pixel-faithful chrome.
   painted panel (dark ground, light text) echoing the original's right column. It
   reads live state directly from the model (`game.getTurn()`, `player.getGold()`
   / `getTax()`) and from the `ClassicMapViewer`'s view state (`getActiveUnit` /
-  `getSelectedTile`), showing top-to-bottom: turn (season+year), gold, tax; then
+  `getSelectedTile`), showing top-to-bottom: the **minimap** (at the very top, as
+  in the original — `paintMinimap` draws the map viewer's cached raster scaled to
+  the strip width, framed, with the viewport box, and recentres the map on a
+  click; see "Minimap raster" above); turn (season+year), gold, tax; then
   the active unit (localized `getLabel`, `getMovesAsString`, the terrain it stands
   on) or, in TERRAIN mode, the selected tile's terrain; then the **order buttons**
   (below); and a bottom reminder of the classic order keys (Enter / Space / W). It
