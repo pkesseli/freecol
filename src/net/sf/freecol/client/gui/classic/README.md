@@ -330,15 +330,32 @@ excluded); it is functional, not yet pixel-faithful chrome.
   / `getTax()`) and from the `ClassicMapViewer`'s view state (`getActiveUnit` /
   `getSelectedTile`), showing top-to-bottom: turn (season+year), gold, tax; then
   the active unit (localized `getLabel`, `getMovesAsString`, the terrain it stands
-  on) or, in TERRAIN mode, the selected tile's terrain; and a bottom reminder of
-  the classic order keys (Enter / Space / W). It is repainted by `ClassicGUI`'s
-  `repaintInfo()` on every `changeView`/`refresh`/`refreshTile`, so it tracks the
-  active unit and treasury live (verified: moving the ship updated Moves 5/5 → 3/5
-  and the terrain line). **Not yet ported from the original panel** (later
-  slices, need the expert's per-element sign-off): the in-panel minimap (today the
-  map viewer still draws its own bottom-left minimap overlay), a unit portrait,
-  clickable order **buttons**, and the wood-panel (`WOODPANL.PIK`) chrome; the few
-  hard-coded English captions (Gold/Tax/Moves/key hints) also want localization.
+  on) or, in TERRAIN mode, the selected tile's terrain; then the **order buttons**
+  (below); and a bottom reminder of the classic order keys (Enter / Space / W). It
+  is repainted by `ClassicGUI`'s `repaintInfo()` on every
+  `changeView`/`refresh`/`refreshTile`, so it tracks the active unit and treasury
+  live (verified: moving the ship updated Moves 5/5 → 3/5 and the terrain line). The
+  Gold/Tax/Moves/end-of-turn captions are localized (`gold`/`tax`/`infoPanel.moves`/
+  `endTurnAction.name`).
+- **Order buttons (the "orders" half).** The panel's lower half hosts the original's
+  unit-order buttons by **reusing the real `FreeColAction`s** (the sanctioned "reuse
+  `action/`" path). Each order action carries its own four-state order-button art
+  (`FreeColAction.BUTTON_IMAGE`, populated from `ImageLibrary.getButtonImages`),
+  enables itself via `shouldBeEnabled`, and its `actionPerformed` drives the real
+  `InGameController`. `paintOrderButtons` walks a curated id list
+  (`fortifyAction`, `sentryAction`, `buildColonyAction`, `roadAction`, `plowAction`,
+  `clearForestAction`, `waitAction`, `skipUnitAction`, `disbandUnitAction`), looks
+  each up in the `ActionManager`, and paints the `BUTTON_IMAGE` of every one that is
+  **currently enabled** into a wrapped icon grid — recording each rectangle so
+  `onClick` can fire the matching action (`onHover` highlights). Because the buttons
+  read the same enabled state the menu items do (kept fresh by the `updateActions()`
+  wiring), they track the active unit automatically: a pioneer shows fortify / sentry
+  / build-colony / road / plow / clear / wait / skip / disband, a ship a different
+  set. Verified live: the pioneer's two button rows render with the real art and
+  hover-highlight, and clicking **build colony** opens the founding confirm dialog
+  (proving click→action). **Still not ported** (later slices): the in-panel minimap
+  (the map viewer still draws its own bottom-left overlay), a unit portrait, the
+  wood-panel (`WOODPANL.PIK`) chrome, and the remaining key-hint captions.
 
 ## Colony screen (`ClassicColonyPanel`)
 

@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-14c)
+## Status at a glance (2026-07-14d)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -88,12 +88,22 @@ Two independent axes (keep them separate):
   report menu item (accelerator **F3**), now enabled by the same `updateActions()` wiring. This is the
   **first of the nine reports**; the other eight still no-op. Verified live: F3 renders the framed report
   (empty → "No colonies yet."; after founding *Nieuw Amsterdam* → a live row with flag/SoL/pop/production),
-  Escape closes, 0 SEVERE. See the package README "Report screens". **Remaining Phase 2 (each its own
-  slice, priority order): (1)** the **other report** screens + the report page-through (naval/trade/etc.);
-  **(2)** HUD polish — port the minimap and order **buttons** into the info panel, the `WOODPANL.PIK`
-  chrome, menu-label contrast, and caption localization; **(3)** screen interaction polish — the colony
-  screen's `BUILDING.SS` frame map + fixed building slots + drag/queue/cargo, and the Europe screen's
-  drag-to-board / load-cargo / set-sail.
+  Escape closes, 0 SEVERE. See the package README "Report screens".
+  → **HUD order buttons ✅ DONE (verified live 2026-07-14).** `ClassicInfoPanel` now hosts the original's
+  **unit-order buttons** — fortify, sentry, build-colony, road/plow/clear, wait, skip, disband — by
+  reusing the real `FreeColAction`s (each carries its own order-button art via `BUTTON_IMAGE`, enables
+  itself, and its `actionPerformed` drives the real `InGameController`). The panel paints the icon of
+  every currently-enabled order action and hit-tests clicks against the painted rectangles, so the
+  buttons track the active unit exactly as the menu items do (they re-enable via the `updateActions()`
+  wiring). The Gold/Tax/Moves/end-of-turn captions are now localized too (`gold`/`tax`/`infoPanel.moves`/
+  `endTurnAction.name` — German in the expert's locale). Verified live: the pioneer's two rows of order
+  buttons render with the real art, hover-highlight, and clicking **build colony** opens the founding
+  confirm — proving click→action; 0 SEVERE. See the package README "Phase 2 HUD". **Remaining Phase 2
+  (each its own slice, priority order): (1)** the **other report** screens + the report page-through
+  (naval/trade/etc.); **(2)** the rest of HUD polish — port the **minimap** into the info panel (it is
+  still a map-viewer overlay), the `WOODPANL.PIK` wood chrome, menu-label contrast, and the remaining
+  key-hint captions; **(3)** screen interaction polish — the colony screen's `BUILDING.SS` frame map +
+  fixed building slots + drag/queue/cargo, and the Europe screen's drag-to-board / load-cargo / set-sail.
   → **Phase 3 (dialogs) ⬜** — reskin the modal confirm/choice/input dialogs + event popups (meeting
   natives, king's demands, etc.) from the current plain-Java stopgap to the original wood-framed look
   (`WOODPANL.PIK` + colonist portrait + green-on-wood text), ideally as one shared classic-dialog
@@ -271,6 +281,13 @@ Notes:
     `FreeColLookAndFeel` (which would parchment-wash the black map fog and the dark info panel — the
     menu bar paints its own parchment+wood chrome regardless). Info panel repaints on every
     `changeView`/`refresh`. See the package README "Phase 2 HUD" for the full design + follow-ups.
+    **Order buttons ✅ DONE (verified live 2026-07-14):** the info panel's lower half now hosts the
+    original's unit-order buttons (fortify/sentry/build-colony/road/plow/clear/wait/skip/disband) by
+    reusing the real `FreeColAction`s and their `BUTTON_IMAGE` art — it paints every enabled order
+    action's icon and hit-tests clicks, firing the action (verified: build-colony opens the founding
+    confirm). Gold/Tax/Moves/end-of-turn captions localized. **Still to polish:** the minimap (still a
+    map-viewer overlay, not yet in the panel), the `WOODPANL.PIK` chrome, menu-label contrast, the
+    remaining key-hint captions.
   - **Colony screen ✅ DONE (verified live 2026-07-14).** `ClassicColonyPanel` — a 320×200 integer
     up-scaled repaint of the signature original (refs `opening_016/017`): title bar; buildings pane
     (`BUILDING.SS` sprites, workers, production tags, hover names) on the sandy ground; the 3×3
@@ -301,8 +318,8 @@ Notes:
     "Report screens". **Follow-ups:** the other reports + the original's page-through between column sets;
     click-a-colony-to-open; localizing the column heads.
   - **Remaining (own slices, priority order):** **(1) the other reports** + page-through; **(2) HUD
-    polish** — port the minimap + order **buttons** into the info panel, `WOODPANL.PIK` chrome,
-    menu-label contrast, caption localization.
+    polish (remaining)** — port the **minimap** into the info panel (the order buttons + caption
+    localization already landed), the `WOODPANL.PIK` chrome, menu-label contrast, key-hint captions.
 - **Phase 3 — Dialogs & polish. ⬜** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
   negotiation, end-turn. Reuse existing Swing dialogs first (done as a stopgap — the colony-founding
   flow already wires the confirm/choice/name seams as **plain Java dialogs**, e.g. the build-warnings

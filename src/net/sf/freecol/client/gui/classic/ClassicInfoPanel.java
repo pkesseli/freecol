@@ -24,11 +24,21 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
 
+import javax.swing.Action;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.action.FreeColAction;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Player;
@@ -43,14 +53,24 @@ import net.sf.freecol.common.model.Unit;
  * <p>It shows, top to bottom: the turn (season + year), the player's gold and
  * tax rate, then information about whatever is in focus — the active unit (type,
  * moves, state, the terrain it stands on) or, in TERRAIN mode, the selected
- * tile's terrain — and a short reminder of the classic order keys.
+ * tile's terrain — then a row of <b>clickable order buttons</b> for the active
+ * unit, and a short reminder of the classic order keys.
  *
- * <p><b>Phase 2, first HUD slice.</b> This is a plain {@code Graphics2D}-painted
- * panel (dark ground, light text) that reads live state directly from the model
- * and from the {@link ClassicMapViewer}'s view state; it is not yet the
- * pixel-faithful wood-panel chrome of the original (that needs the {@code
- * WOODPANL.PIK} art and the expert's sign-off — see CLASSIC_UI_PLAN.md Phase 2).
- * {@link ClassicGUI} repaints it whenever the view state or model changes.
+ * <p><b>Phase 2 HUD.</b> A plain {@code Graphics2D}-painted panel (dark ground,
+ * light text) that reads live state directly from the model and from the
+ * {@link ClassicMapViewer}'s view state; not yet the pixel-faithful wood-panel
+ * chrome of the original (that needs the {@code WOODPANL.PIK} art — see
+ * CLASSIC_UI_PLAN.md Phase 2). {@link ClassicGUI} repaints it whenever the view
+ * state or model changes.
+ *
+ * <p><b>Order buttons.</b> The lower half hosts the original's unit-order buttons
+ * — fortify, sentry, build colony, road/plow/clear, wait, skip and disband — by
+ * reusing the real {@link FreeColAction}s (the "reuse {@code action/}" path): each
+ * carries its own order-button art ({@link FreeColAction#BUTTON_IMAGE}), enables
+ * itself via {@code shouldBeEnabled}, and its {@code actionPerformed} drives the
+ * real {@code InGameController}. We paint the icon of every currently-enabled
+ * order action and hit-test clicks against the painted rectangles, so the buttons
+ * track the active unit exactly as the menu items do.
  */
 final class ClassicInfoPanel extends JPanel {
 
@@ -60,16 +80,41 @@ final class ClassicInfoPanel extends JPanel {
     /** Left inset (px) for the text column. */
     private static final int PAD = 14;
 
+    /** Order-button metrics. */
+    private static final int BTN = 32;
+    private static final int BTN_GAP = 6;
+
     private static final Color GROUND = new Color(0x20, 0x1a, 0x12); // dark wood
     private static final Color HEAD = new Color(0xF0, 0xD8, 0x8C);   // gold-ish
     private static final Color TEXT = new Color(0xE8, 0xE0, 0xD0);   // parchment
     private static final Color DIM = new Color(0x9a, 0x8f, 0x7c);    // muted
     private static final Color RULE = new Color(0x4a, 0x3c, 0x2a);   // separator
+    private static final Color BTN_HOT = new Color(0x4a, 0x3c, 0x2a); // hover plate
+
+    /**
+     * The unit-order actions to offer, in the original's rough order.  Looked up
+     * by id in the {@code ActionManager}; any that is absent, disabled or has no
+     * order-button art is simply skipped, so this list is a superset — the
+     * improvement actions ({@code road}/{@code plow}/{@code clearForest}) in
+     * particular exist only for the ruleset's improvement types.
+     */
+    private static final String[] ORDER_ACTION_IDS = {
+        "fortifyAction", "sentryAction", "buildColonyAction",
+        "roadAction", "plowAction", "clearForestAction",
+        "waitAction", "skipUnitAction", "disbandUnitAction",
+    };
 
     private final FreeColClient freeColClient;
 
     /** Source of the live view state (active unit / selected tile / mode). */
     private final ClassicMapViewer mapViewer;
+
+    /** Order-button hit targets, rebuilt each paint. */
+    private final List<Rectangle> buttonBounds = new ArrayList<>();
+    private final List<FreeColAction> buttonActions = new ArrayList<>();
+
+    /** Index of the hovered order button, or -1. */
+    private int hovered = -1;
 
 
     ClassicInfoPanel(FreeColClient freeColClient, ClassicMapViewer mapViewer) {
@@ -79,6 +124,22 @@ final class ClassicInfoPanel extends JPanel {
         setBackground(GROUND);
         setPreferredSize(new Dimension(PANEL_WIDTH, 100));
         setMinimumSize(new Dimension(PANEL_WIDTH, 100));
+        addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    onClick(e);
+                }
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    if (hovered != -1) { hovered = -1; repaint(); }
+                }
+            });
+        addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    onHover(e);
+                }
+            });
     }
 
 
@@ -114,8 +175,8 @@ final class ClassicInfoPanel extends JPanel {
         if (player != null) {
             g.setColor(TEXT);
             g.setFont(base);
-            y = line(g, "Gold: " + player.getGold(), y);
-            y = line(g, "Tax: " + player.getTax() + "%", y);
+            y = line(g, Messages.message("gold") + ": " + player.getGold(), y);
+            y = line(g, Messages.message("tax") + ": " + player.getTax() + "%", y);
         }
         y = rule(g, y);
 
@@ -128,7 +189,7 @@ final class ClassicInfoPanel extends JPanel {
             y = line(g, msg(unit.getLabel()), y);
             g.setColor(TEXT);
             g.setFont(base);
-            y = line(g, "Moves: " + safeMoves(unit), y);
+            y = line(g, Messages.message("infoPanel.moves") + " " + safeMoves(unit), y);
             final Tile ut = unit.getTile();
             if (ut != null && ut.getType() != null) {
                 g.setColor(DIM);
@@ -141,8 +202,11 @@ final class ClassicInfoPanel extends JPanel {
         } else {
             g.setColor(DIM);
             g.setFont(base);
-            y = line(g, "End of turn", y);
+            y = line(g, Messages.message("endTurnAction.name"), y);
         }
+
+        // --- Order buttons (for the active unit) ------------------------
+        paintOrderButtons(g, y + 4);
 
         // --- Order-key reminder (bottom) --------------------------------
         g.setFont(base.deriveFont(12f));
@@ -152,6 +216,65 @@ final class ClassicInfoPanel extends JPanel {
         yb = line(g, "Enter: end turn", yb);
         yb = line(g, "Space: skip unit", yb);
         line(g, "W: wait", yb);
+    }
+
+    /**
+     * Paint the enabled unit-order buttons as a wrapped grid of icons starting at
+     * {@code y0}, recording each one's bounds + action for {@link #onClick}.
+     */
+    private void paintOrderButtons(Graphics2D g, int y0) {
+        this.buttonBounds.clear();
+        this.buttonActions.clear();
+        if (this.freeColClient.getActionManager() == null) return;
+
+        int x = PAD;
+        int y = y0;
+        int i = 0;
+        for (String id : ORDER_ACTION_IDS) {
+            final FreeColAction action
+                = this.freeColClient.getActionManager().getFreeColAction(id);
+            if (action == null || !action.isEnabled()) continue;
+            final Icon icon = (Icon) action.getValue(FreeColAction.BUTTON_IMAGE);
+            if (!(icon instanceof ImageIcon)) continue;
+
+            if (x + BTN > getWidth() - PAD) {      // wrap to next row
+                x = PAD;
+                y += BTN + BTN_GAP;
+            }
+            final Rectangle r = new Rectangle(x, y, BTN, BTN);
+            if (i == this.hovered) {
+                g.setColor(BTN_HOT);
+                g.fillRect(r.x - 2, r.y - 2, BTN + 4, BTN + 4);
+            }
+            g.drawImage(((ImageIcon) icon).getImage(), x, y, BTN, BTN, this);
+            this.buttonBounds.add(r);
+            this.buttonActions.add(action);
+            x += BTN + BTN_GAP;
+            i++;
+        }
+    }
+
+    private void onClick(MouseEvent e) {
+        for (int i = 0; i < this.buttonBounds.size(); i++) {
+            if (this.buttonBounds.get(i).contains(e.getPoint())) {
+                final FreeColAction action = this.buttonActions.get(i);
+                action.actionPerformed(new ActionEvent(this,
+                    ActionEvent.ACTION_PERFORMED, action.getId()));
+                repaint();
+                return;
+            }
+        }
+    }
+
+    private void onHover(MouseEvent e) {
+        int found = -1;
+        for (int i = 0; i < this.buttonBounds.size(); i++) {
+            if (this.buttonBounds.get(i).contains(e.getPoint())) { found = i; break; }
+        }
+        if (found != this.hovered) {
+            this.hovered = found;
+            repaint();
+        }
     }
 
     /** Draw one text line at {@code (PAD, y)} and return the next baseline. */
