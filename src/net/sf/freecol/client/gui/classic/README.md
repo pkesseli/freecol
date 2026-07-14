@@ -394,6 +394,64 @@ flow layout); interaction — dragging colonists between tiles/buildings, the bu
 queue, loading cargo; per-nation building/flag tints; localizing the few
 hard-coded captions.
 
+## Europe screen (`ClassicEuropePanel`)
+
+The original's home-port dock (design ref: the expert's `opening_009`–`013`).
+Built exactly like the colony screen — painted into a virtual **320×200** canvas
+and up-scaled by the largest integer factor that fits, nearest-neighbour, hosted
+in its own `JFrame` (no `Canvas`). The original **`EUROPE.PIK`** harbour picture
+(sky, sea, the wooden piers, the row of European town houses) is blitted as the
+backdrop (loaded straight by its pack key `image.classic_original.pik.EUROPE.PIK`,
+with a plain sea/sky fallback when the pack is absent); the live figures are drawn
+over it. Layout:
+
+- **Title bar** — port name, turn, tax and treasury, gold on black.
+- **Action buttons** (top right) — the three golden buttons **Anwerben / Kaufen /
+  Ausbilden** (recruit / purchase / train). Their virtual-space bounds + actions
+  are recorded during paint so `onClick`/`onHover` can drive them (hover
+  highlights). Each opens a **plain Swing choice dialog** listing the priced
+  options and calls the **real controller** — recruit via
+  `InGameController.recruitUnitInEurope(index)` over `europe.getExpandedRecruitables`,
+  train/purchase via `trainUnitInEurope(unitType)` over the spec's
+  `getUnitTypes{Trained,Purchased}InEurope` (cheapest first). This mirrors the
+  standard `RecruitPanel` / `NewUnitPanel` exactly (both of those also route
+  purchase through `trainUnitInEurope`). The dialogs are the same stopgap as the
+  colony-founding seams; Phase 3 reskins them to the wood-framed look with the
+  colonist portrait (`opening_011`–`013`).
+- **Ships in port** — the naval units in Europe, floating on the water by the piers.
+- **Units on the docks** — the land units in Europe, standing on the quay (wrapping
+  onto a second rank).
+- **Sailing rows** — the high-seas units split by heading (to-America vs to-Europe,
+  keyed on `unit.getDestination() instanceof Europe`), each a caption + sprites.
+- **Market row** — every storable good with its current sale price
+  (`market.getPaidForSale`) along the bottom, on a dark plate.
+- **Exit** — the red "E" at the bottom-right (part of the `EUROPE.PIK` art) and
+  **Escape** both close the screen.
+
+**Reaching it — the `updateActions()` fix.** The Europe screen is opened by the
+reused `EuropeAction` (the **Europe** menu item, accelerator **E**) or
+automatically when a ship arrives in Europe (the controller calls
+`showEuropePanel`). The menu item is the intended trigger, but the reused
+`FreeColAction`s were **stuck disabled** in the classic HUD: `SwingGUI` refreshes
+their enabled state through the `Canvas` on every view change / panel open, and
+the classic UI has no `Canvas`, so `EuropeAction` (and the map/turn menu items)
+never re-evaluated `shouldBeEnabled` after construction. `ClassicGUI.updateActions`
+(→ `FreeColClient.updateActions` → `ActionManager.update`) is now called on
+`reconnectGUI` and every `changeView`, so the menu items enable correctly. Only
+one Europe screen is open at a time; `updateEuropeanSubpanels` (called by the
+controllers after a recruit/train) and the `refresh` hooks repaint it.
+
+**Verified live (2026-07-14):** **E** opens the Amsterdam port (backdrop, title,
+the three localized buttons, a colonist on the dock, the market row); Anwerben
+lists the recruitable (`Schuldknecht (200)`), Ausbilden the cheapest trainable
+(`Erfahrener Erzschürfer (600)`), Kaufen the cheapest purchasable
+(`Artillerie (500)`) — each calling the real controller; Escape closes. 0 SEVERE.
+
+**Follow-ups (later slices):** drag-to-board / load-cargo / set-sail interaction
+(the equivalent of the colony screen's drag/queue/cargo work); the wood-framed
+dialog reskin (shared Phase-3 component); refining the dock/pier sprite positions
+against the original; localizing the few captions.
+
 ## Seam facts (for the remaining/next work)
 
 **`GUI` methods** (all no-ops in the base class; each Javadoc names its callers):

@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-14)
+## Status at a glance (2026-07-14b)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -63,12 +63,25 @@ Two independent axes (keep them separate):
   `modalConfirmDialog`/`modalChoiceDialog`/`getNewColonyName` seams the founding flow needs (plain
   Swing for now — Phase 3 reskins). Verified: sail→disembark→**B**→click colony renders the screen,
   hover names work, Escape closes, 0 SEVERE. See the package README "Colony screen" + "Controller
-  wiring → Turn controls". **Remaining Phase 2 (each its own slice, priority order): (1)** the
-  **Europe** dock screen + recruit/train (`opening_009-013`); **(2)** the **report** screens
-  (`opening_014/015`); **(3)** HUD polish — port the minimap and order **buttons** into the info
-  panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization; **(4)** colony-screen
-  polish — validate the `BUILDING.SS` frame map, the original fixed building slots (vs. our flow
-  layout), and interaction (drag colonists, build queue, cargo).
+  wiring → Turn controls".
+  → **Europe screen ✅ DONE (verified live 2026-07-14).** `showEuropePanel` now shows a real classic
+  Europe dock — **`ClassicEuropePanel`**, a 320×200 integer-up-scaled repaint of the original harbour
+  (refs `opening_009-013`): the original **`EUROPE.PIK`** backdrop (sky, sea, piers, the row of town
+  houses); a gold-on-black title bar (port, turn, tax, gold); the three golden action buttons
+  **Anwerben/Kaufen/Ausbilden** (recruit/purchase/train) at the top-right; the ships in port and the
+  land units on the docks; the high-seas sailing rows (to-America / to-Europe); and the bottom market
+  row of every storable good + its sale price. The three buttons open choice dialogs that drive the
+  **real controllers** (`InGameController.recruitUnitInEurope` / `trainUnitInEurope`, the same calls the
+  standard recruit/train/purchase panels make; plain Swing dialogs for now — Phase-3 reskin). Reached by
+  the reused **Europe menu action** (accelerator **E**) — which needed a new `updateActions()` wiring so
+  the reused `FreeColAction`s (and their menu items) actually enable in the classic HUD (they were stuck
+  disabled with no `Canvas` to refresh them). Verified: **E** opens the port, recruit/train/purchase
+  dialogs list the priced options and call the controllers, Escape closes, 0 SEVERE. See the package
+  README "Europe screen". **Remaining Phase 2 (each its own slice, priority order): (1)** the **report**
+  screens (`opening_014/015`); **(2)** HUD polish — port the minimap and order **buttons** into the info
+  panel, the `WOODPANL.PIK` chrome, menu-label contrast, and caption localization; **(3)** screen
+  interaction polish — the colony screen's `BUILDING.SS` frame map + fixed building slots + drag/queue/
+  cargo, and the Europe screen's drag-to-board / load-cargo / set-sail.
   → **Phase 3 (dialogs) ⬜** — reskin the modal confirm/choice/input dialogs + event popups (meeting
   natives, king's demands, etc.) from the current plain-Java stopgap to the original wood-framed look
   (`WOODPANL.PIK` + colonist portrait + green-on-wood text), ideally as one shared classic-dialog
@@ -256,10 +269,20 @@ Notes:
     wired (plain Swing, Phase-3 reskin). See the package README "Colony screen". **Follow-ups:** validate
     the `BUILDING.SS` frame map (provisional), the original fixed building slots (vs. our flow layout),
     and interaction (drag colonists between tiles/buildings, build queue, cargo).
-  - **Remaining (own slices, priority order):** **(1) Europe** dock + recruit/train
-    (`opening_009-013`); **(2) reports** (`opening_014/015`); **(3) HUD polish** — port the minimap +
-    order **buttons** into the info panel, `WOODPANL.PIK` chrome, menu-label contrast, caption
-    localization.
+  - **Europe screen ✅ DONE (verified live 2026-07-14).** `ClassicEuropePanel` — a 320×200 integer
+    up-scaled repaint of the original harbour (refs `opening_009-013`): the `EUROPE.PIK` backdrop; a
+    gold-on-black title bar; the three golden action buttons (Anwerben/Kaufen/Ausbilden = recruit/
+    purchase/train) top-right; ships in port + land units on the docks; the to-America / to-Europe
+    high-seas sailing rows; and the bottom market row of every storable good + its sale price. The
+    buttons open plain-Swing choice dialogs (Phase-3 reskin) that drive the real controllers
+    (`recruitUnitInEurope` / `trainUnitInEurope`). Reached by the reused **Europe menu action**
+    (accelerator **E**), enabled by a new `updateActions()` wiring (the classic HUD has no `Canvas`, so
+    the reused actions were stuck disabled). See the package README "Europe screen". **Follow-ups:**
+    drag-to-board / load-cargo / set-sail interaction; the recruit/train dialogs' wood-framed reskin
+    (shared Phase-3 component); localizing captions.
+  - **Remaining (own slices, priority order):** **(1) reports** (`opening_014/015`); **(2) HUD polish**
+    — port the minimap + order **buttons** into the info panel, `WOODPANL.PIK` chrome, menu-label
+    contrast, caption localization.
 - **Phase 3 — Dialogs & polish. ⬜** `modalConfirmDialog`/`modalChoiceDialog`/`modalInputDialog`,
   negotiation, end-turn. Reuse existing Swing dialogs first (done as a stopgap — the colony-founding
   flow already wires the confirm/choice/name seams as **plain Java dialogs**, e.g. the build-warnings

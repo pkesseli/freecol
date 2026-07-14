@@ -83,6 +83,12 @@ public class ClassicGUI extends GUI {
     /** The colony screen's window, while one is open (see {@link #showColonyPanel}). */
     private JFrame colonyFrame;
 
+    /** The Europe screen's window, while one is open (see {@link #showEuropePanel}). */
+    private JFrame europeFrame;
+
+    /** The Europe panel inside {@link #europeFrame}, kept so it can be repainted. */
+    private ClassicEuropePanel europePanel;
+
     /**
      * The in-game map view, created lazily when a game starts (see
      * {@link #reconnectGUI}).  Null before then (title-screen placeholder).
@@ -257,6 +263,7 @@ public class ClassicGUI extends GUI {
             this.mapViewer.requestFocusInWindow();
             this.mapViewer.repaint();
             repaintInfo();
+            updateActions();
             logger.info("ClassicGUI: in-game map installed.");
         });
     }
@@ -266,6 +273,24 @@ public class ClassicGUI extends GUI {
     /** Repaint the HUD info panel if it exists (view/model state changed). */
     private void repaintInfo() {
         if (this.infoPanel != null) this.infoPanel.repaint();
+        if (this.europePanel != null) this.europePanel.refresh();
+    }
+
+    /**
+     * Refresh the enabled state of the reused {@code FreeColAction}s (and hence
+     * the menu items wired to them).  {@code SwingGUI} does this through the
+     * {@code Canvas} on every view change / panel open; the classic UI has no
+     * {@code Canvas}, so without this call the menu items keep the (disabled)
+     * state they were built with — e.g. the {@code Europe} item never enables and
+     * the map/turn menus stay greyed.  Cheap and idempotent (it just re-evaluates
+     * {@code shouldBeEnabled} on each action).
+     */
+    private void updateActions() {
+        try {
+            getFreeColClient().updateActions();
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "ClassicGUI: updateActions failed.", e);
+        }
     }
 
     /** {@inheritDoc} */
@@ -273,6 +298,7 @@ public class ClassicGUI extends GUI {
     public void changeView(Tile tile) {
         if (this.mapViewer != null) this.mapViewer.changeToTerrain(tile);
         repaintInfo();
+        updateActions();
     }
 
     /** {@inheritDoc} */
@@ -280,6 +306,7 @@ public class ClassicGUI extends GUI {
     public void changeView(Unit unit, boolean force) {
         if (this.mapViewer != null) this.mapViewer.changeToMoveUnits(unit);
         repaintInfo();
+        updateActions();
     }
 
     /** {@inheritDoc} */
@@ -287,6 +314,7 @@ public class ClassicGUI extends GUI {
     public void changeView() {
         if (this.mapViewer != null) this.mapViewer.changeToEndTurn();
         repaintInfo();
+        updateActions();
     }
 
     /** {@inheritDoc} */
@@ -387,6 +415,66 @@ public class ClassicGUI extends GUI {
         final JFrame f = this.colonyFrame;
         this.colonyFrame = null;
         if (f != null) f.dispose();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: show the classic Europe screen — {@link ClassicEuropePanel}, a
+     * 320&times;200 repaint of the original's harbour — in a window of its own
+     * (the classic UI has no {@code Canvas} to host panels in).  Reached by the
+     * {@code Europe} menu action (accelerator {@code E}) and automatically when a
+     * ship arrives in Europe (the controller calls this).
+     *
+     * <p>Only one Europe screen is open at a time; opening another replaces it.
+     * Guarded so a failure degrades to a log line rather than breaking the map.
+     */
+    @Override
+    public FreeColPanel showEuropePanel() {
+        final Player player = getMyPlayer();
+        if (player == null || player.getEurope() == null) return null;
+        SwingUtilities.invokeLater(() -> {
+            try {
+                closeEuropePanel();
+                final ClassicEuropePanel panel = new ClassicEuropePanel(
+                    getFreeColClient(), this.imageLibrary, player.getEurope(),
+                    this::closeEuropePanel);
+                final JFrame f = new JFrame(Messages.message(player.getEurope()
+                        .getNameKey()));
+                this.europeFrame = f;
+                this.europePanel = panel;
+                f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                f.setContentPane(panel);
+                f.pack();
+                f.setLocationRelativeTo(this.frame);
+                f.setVisible(true);
+                panel.requestFocusInWindow();
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "ClassicGUI: could not show Europe "
+                    + "screen", e);
+            }
+        });
+        return null;
+    }
+
+    /** Dismiss the Europe screen if one is open. */
+    private void closeEuropePanel() {
+        final JFrame f = this.europeFrame;
+        this.europeFrame = null;
+        this.europePanel = null;
+        if (f != null) f.dispose();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The controllers call this after a recruit / train / purchase so any open
+     * Europe view refreshes; repaint the classic Europe screen if it is showing.
+     */
+    @Override
+    public void updateEuropeanSubpanels() {
+        final ClassicEuropePanel panel = this.europePanel;
+        if (panel != null) SwingUtilities.invokeLater(panel::refresh);
     }
 
     /**
