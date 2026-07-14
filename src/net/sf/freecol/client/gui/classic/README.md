@@ -327,7 +327,11 @@ excluded); it is functional, not yet pixel-faithful chrome.
   (lower contrast than Col1's light-on-dark bar), and the dropdown popups use
   default Swing styling — both cosmetic, deferred to the reskin pass.
 - **`ClassicInfoPanel` — the right strip.** A fixed-width (240px) `Graphics2D`-
-  painted panel (dark ground, light text) echoing the original's right column. It
+  painted panel echoing the original's right column, backed by the original's
+  **`WOODPANL.PIK`** wood-panel texture (`paintWoodChrome` scales it to the strip
+  width, tiles it down the height and washes it slightly darker so the gold/
+  parchment text keeps contrast; it falls back to the flat dark ground when the
+  pack is absent). It
   reads live state directly from the model (`game.getTurn()`, `player.getGold()`
   / `getTax()`) and from the `ClassicMapViewer`'s view state (`getActiveUnit` /
   `getSelectedTile`), showing top-to-bottom: the **minimap** (at the very top, as

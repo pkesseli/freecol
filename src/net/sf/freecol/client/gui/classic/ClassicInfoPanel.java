@@ -39,6 +39,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.action.FreeColAction;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Game;
@@ -168,6 +169,8 @@ final class ClassicInfoPanel extends JPanel {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                            RenderingHints.VALUE_ANTIALIAS_ON);
 
+        paintWoodChrome(g);
+
         final Font base = getFont().deriveFont(Font.PLAIN, 14f);
         final Font head = getFont().deriveFont(Font.BOLD, 15f);
 
@@ -227,6 +230,26 @@ final class ClassicInfoPanel extends JPanel {
         yb = line(g, "Enter: end turn", yb);
         yb = line(g, "Space: skip unit", yb);
         line(g, "W: wait", yb);
+    }
+
+    /**
+     * The original's wood-panel chrome ({@code WOODPANL.PIK}) behind the strip,
+     * scaled to the panel width and tiled down its height, with a light dark wash
+     * so the gold/parchment text keeps its contrast.  Falls back to the flat
+     * {@code GROUND} colour (already painted by {@code super}) when the pack is
+     * absent.
+     */
+    private void paintWoodChrome(Graphics2D g) {
+        final BufferedImage wood
+            = ImageLibrary.getUnscaledImage("image.classic_original.pik.WOODPANL.PIK");
+        if (wood == null || wood.getWidth() <= 0) return;
+        final int tw = getWidth();
+        final int th = Math.max(1, wood.getHeight() * tw / wood.getWidth());
+        for (int yy = 0; yy < getHeight(); yy += th) {
+            g.drawImage(wood, 0, yy, tw, th, null);
+        }
+        g.setColor(new Color(0x18, 0x10, 0x0A, 0x66));
+        g.fillRect(0, 0, getWidth(), getHeight());
     }
 
     /**

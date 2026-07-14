@@ -12,7 +12,7 @@ Two independent axes (keep them separate):
   game is therefore mostly a *ruleset* question, audited in one place — see
   "Gameplay fidelity" below.
 
-## Status at a glance (2026-07-14e)
+## Status at a glance (2026-07-14f)
 
 - **UI:** Phase 0 ✅ → **Phase 1 (the map) ✅ DONE** (rectangular grid renders terrain +
   units + colonies + cursor; **original `TERRAIN.SS` sprites fill the grid cleanly**; **edge
@@ -107,11 +107,17 @@ Two independent axes (keep them separate):
   `ClassicInfoPanel` draws the raster scaled to the strip width, framed, with the viewport box, and
   recentres the main view on a minimap click. Verified live: the minimap renders top-of-panel (no more
   bottom-left overlay), and clicking it recentres the map; 0 SEVERE. See the package README "Phase 2
-  HUD". **Remaining Phase 2 (each its own slice, priority order): (1)** the **other report** screens +
-  the report page-through (naval/trade/etc.); **(2)** the rest of HUD polish — the `WOODPANL.PIK` wood
-  chrome, menu-label contrast, a unit portrait, the remaining key-hint captions; **(3)** screen
-  interaction polish — the colony screen's `BUILDING.SS` frame map + fixed building slots +
-  drag/queue/cargo, and the Europe screen's drag-to-board / load-cargo / set-sail.
+  HUD".
+  → **HUD wood chrome ✅ DONE (verified live 2026-07-14).** `ClassicInfoPanel` now paints the original's
+  **`WOODPANL.PIK`** wood-panel texture as its background (scaled to the strip width, tiled down its
+  height, with a light dark wash for text contrast) instead of the flat dark ground — falling back to
+  the flat colour when the pack is absent. Verified live: the strip reads as wood paneling with the
+  minimap, gold/parchment text and order buttons legible over it; 0 SEVERE. **Remaining Phase 2 (each
+  its own slice, priority order): (1)** the **other report** screens + the report page-through
+  (naval/trade/etc.); **(2)** the rest of HUD polish — menu-label contrast, a unit portrait, the
+  remaining key-hint captions, and refining the wood-chrome tiling seams; **(3)** screen interaction
+  polish — the colony screen's `BUILDING.SS` frame map + fixed building slots + drag/queue/cargo, and
+  the Europe screen's drag-to-board / load-cargo / set-sail.
   → **Phase 3 (dialogs) ⬜** — reskin the modal confirm/choice/input dialogs + event popups (meeting
   natives, king's demands, etc.) from the current plain-Java stopgap to the original wood-framed look
   (`WOODPANL.PIK` + colonist portrait + green-on-wood text), ideally as one shared classic-dialog
@@ -296,8 +302,10 @@ Notes:
     confirm). Gold/Tax/Moves/end-of-turn captions localized. **Minimap ✅ DONE (verified live
     2026-07-14):** moved from the map's bottom-left overlay to the **top of the info panel** — the map
     viewer still builds the raster (exposed via accessors) but the panel draws it (scaled + framed +
-    viewport box) and recentres the map on a minimap click. **Still to polish:** the `WOODPANL.PIK`
-    chrome, a unit portrait, menu-label contrast, the remaining key-hint captions.
+    viewport box) and recentres the map on a minimap click. **Wood chrome ✅ DONE (verified live
+    2026-07-14):** the flat dark ground is replaced by the original `WOODPANL.PIK` wood-panel texture
+    (scaled to width, tiled, dark-washed for contrast). **Still to polish:** a unit portrait, menu-label
+    contrast, the remaining key-hint captions, and the wood-chrome tiling seams.
   - **Colony screen ✅ DONE (verified live 2026-07-14).** `ClassicColonyPanel` — a 320×200 integer
     up-scaled repaint of the signature original (refs `opening_016/017`): title bar; buildings pane
     (`BUILDING.SS` sprites, workers, production tags, hover names) on the sandy ground; the 3×3
