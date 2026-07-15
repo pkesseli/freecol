@@ -20,6 +20,7 @@
 package net.sf.freecol.client.gui.classic;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
@@ -33,6 +34,7 @@ import java.util.logging.Logger;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -82,6 +84,14 @@ public class ClassicGUI extends GUI {
 
     /** The colony screen's window, while one is open (see {@link #showColonyPanel}). */
     private JFrame colonyFrame;
+
+    /**
+     * The original's menu bar is a dark strip with light labels (design ref:
+     * {@code opening_008}), where FreeCol's reused bar is dark-on-parchment.
+     * See {@link #styleClassicMenuBar}.
+     */
+    private static final Color MENU_BAR_BG = new Color(0x20, 0x18, 0x10);
+    private static final Color MENU_BAR_FG = new Color(0xE8, 0xE0, 0xC0);
 
     /** The Europe screen's window, while one is open (see {@link #showEuropePanel}). */
     private JFrame europeFrame;
@@ -245,8 +255,10 @@ public class ClassicGUI extends GUI {
                 content.add(this.infoPanel, BorderLayout.EAST);
                 this.frame.setContentPane(content);
                 try {
-                    this.frame.setJMenuBar(new InGameMenuBar(getFreeColClient(),
-                                                             null));
+                    final InGameMenuBar menuBar
+                        = new InGameMenuBar(getFreeColClient(), null);
+                    styleClassicMenuBar(menuBar);
+                    this.frame.setJMenuBar(menuBar);
                 } catch (Exception e) {
                     logger.log(Level.WARNING, "ClassicGUI: menu bar unavailable",
                                e);
@@ -269,6 +281,37 @@ public class ClassicGUI extends GUI {
             updateActions();
             logger.info("ClassicGUI: in-game map installed.");
         });
+    }
+
+    /**
+     * Give the reused {@link InGameMenuBar} the original's <b>light-on-dark</b>
+     * menu bar (design ref: the expert's {@code opening_008}), in place of
+     * FreeCol's dark-on-parchment one.
+     *
+     * <p>The hook is {@code FreeColMenuBar.paintComponent}, which tiles its
+     * parchment background <em>only while the bar is non-opaque</em> and otherwise
+     * defers to {@code super.paintComponent} — so making the bar opaque with a dark
+     * background swaps the parchment for Col1's dark strip.  The menu labels are
+     * then re-coloured light for contrast.  The bar's own golden gold/tax/year
+     * status line already reads on dark (it is drawn after this, over the
+     * background, by {@code InGameMenuBar.paintComponent}), and the wood border is
+     * kept — it still reads classic.
+     *
+     * <p>Safe to do after construction: {@code InGameMenuBar.reset()} — which
+     * rebuilds (and would re-create) the menus — is only called from its own
+     * constructor and from {@code FreeColFrame}, which the classic UI does not use.
+     * The dropdown popups keep default Swing styling (the Phase-3 reskin covers
+     * them).
+     */
+    private void styleClassicMenuBar(InGameMenuBar menuBar) {
+        menuBar.setOpaque(true);
+        menuBar.setBackground(MENU_BAR_BG);
+        for (int i = 0; i < menuBar.getMenuCount(); i++) {
+            final JMenu menu = menuBar.getMenu(i);
+            if (menu == null) continue;   // separators/glue are null here
+            menu.setOpaque(false);
+            menu.setForeground(MENU_BAR_FG);
+        }
     }
 
     // View mode / focus — delegated to the map viewer.

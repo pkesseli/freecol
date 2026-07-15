@@ -317,15 +317,23 @@ excluded); it is functional, not yet pixel-faithful chrome.
   frame uses FreeCol's own `InGameMenuBar` (the sanctioned "reuse `action/`"
   path): five menus (Game / View / Orders / Report / Colopedia) already wired to
   the real `FreeColAction`s, plus a golden gold/tax/score/year status line it
-  paints itself. It renders its own parchment background + wood border regardless
-  of the active L&F, so the top bar reads classic even though we do not install
-  `FreeColLookAndFeel` (see `installLookAndFeel` above). Building the bar only
-  looks up pre-built actions, so it is safe; *triggering* some items reaches
-  `GUI` methods the classic UI still no-ops (reports, Europe) — acceptable for the
-  stopgap. In the user's locale the menus render localized (German in the
-  expert's shots). **Follow-ups:** the reused menu labels are dark-on-parchment
-  (lower contrast than Col1's light-on-dark bar), and the dropdown popups use
-  default Swing styling — both cosmetic, deferred to the reskin pass.
+  paints itself. Building the bar only looks up pre-built actions, so it is safe.
+  In the user's locale the menus render localized (German in the expert's shots).
+- **Menu-bar contrast — `ClassicGUI.styleClassicMenuBar`.** The original's bar is a
+  **dark strip with light labels** (design ref: `opening_008`); FreeCol's reused bar
+  is dark-on-parchment, which read as nearly illegible in our HUD. The hook is
+  `FreeColMenuBar.paintComponent`, which tiles its parchment background **only while
+  the bar is non-opaque** and otherwise defers to `super.paintComponent` — so making
+  the bar **opaque with a dark background** swaps the parchment for Col1's dark
+  strip, and the menu labels are then re-coloured light. The bar's own golden status
+  line already reads on dark (`InGameMenuBar.paintComponent` draws it *after* the
+  background), and the wood border is kept — it still reads classic.
+  - Safe **after construction**: `InGameMenuBar.reset()` rebuilds (and would
+    re-create) the menus, but it is only called from its own constructor and from
+    `FreeColFrame`, which the classic UI does not use.
+  - **Still deferred:** the dropdown popups keep default Swing styling (light
+    background, dark text) — the Phase-3 reskin covers them. *Triggering* a few
+    items still reaches `GUI` methods the classic UI no-ops.
 - **`ClassicInfoPanel` — the right strip.** A fixed-width (240px) `Graphics2D`-
   painted panel echoing the original's right column, backed by the original's
   **`WOODPANL.PIK`** wood-panel texture (`paintWoodChrome` scales it to the strip
