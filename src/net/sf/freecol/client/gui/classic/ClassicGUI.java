@@ -474,26 +474,82 @@ public class ClassicGUI extends GUI {
      * Phase 2: show the classic <b>Colony Advisor report</b> — the original's
      * "KOLONIEBERATER-BERICHT" — as {@link ClassicReportColonyPanel} in a window
      * of its own.  Reached by the reused {@code Colony Advisor} report menu item
-     * (accelerator {@code F3}).  This is the first report slice; the other eight
-     * reports still no-op.  Guarded, one report window at a time.
+     * (accelerator {@code F3}).
      */
     @Override
     public FreeColPanel showReportColonyPanel() {
+        return showReport("reportColonyAction.name",
+            onClose -> new ClassicReportColonyPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Military Advisor report</b> — the standing-army
+     * roster (accelerator {@code F7}).  See {@link ClassicReportMilitaryPanel}.
+     */
+    @Override
+    public FreeColPanel showReportMilitaryPanel() {
+        return showReport("reportMilitaryAction.name",
+            onClose -> new ClassicReportMilitaryPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Trade Advisor report</b> — the goods ledger
+     * (accelerator {@code F9}).  See {@link ClassicReportTradePanel}.
+     */
+    @Override
+    public FreeColPanel showReportTradePanel() {
+        return showReport("reportTradeAction.name",
+            onClose -> new ClassicReportTradePanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Religious Advisor report</b> — the immigration /
+     * crosses standing (accelerator {@code F1}).  See
+     * {@link ClassicReportReligiousPanel}.
+     */
+    @Override
+    public FreeColPanel showReportReligiousPanel() {
+        return showReport("reportReligionAction.name",
+            onClose -> new ClassicReportReligiousPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * Show a classic advisor report in a window of its own, one report at a
+     * time.  Every {@code showReport*Panel} override routes through here: it
+     * disposes any open report, builds the panel via {@code factory} (passing the
+     * close callback), and frames it.  Guarded so a failure degrades to a log
+     * line.  The report panels themselves share {@link ClassicReportPanel}.
+     *
+     * @param titleKey The message key of the window title.
+     * @param factory Builds the report panel given its close callback.
+     * @return {@code null} (the classic UI hosts its own windows).
+     */
+    private FreeColPanel showReport(String titleKey,
+            java.util.function.Function<Runnable, JPanel> factory) {
         SwingUtilities.invokeLater(() -> {
             try {
                 closeReportPanel();
-                final JFrame f = new JFrame(Messages.message("reportColonyAction.name"));
+                final JFrame f = new JFrame(Messages.message(titleKey));
                 this.reportFrame = f;
                 f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-                f.setContentPane(new ClassicReportColonyPanel(getFreeColClient(),
-                        this.imageLibrary, this::closeReportPanel));
+                f.setContentPane(factory.apply(this::closeReportPanel));
                 f.pack();
                 f.setLocationRelativeTo(this.frame);
                 f.setVisible(true);
                 f.getContentPane().requestFocusInWindow();
             } catch (Exception e) {
-                logger.log(Level.WARNING, "ClassicGUI: could not show colony "
-                    + "report", e);
+                logger.log(Level.WARNING, "ClassicGUI: could not show report "
+                    + titleKey, e);
             }
         });
         return null;

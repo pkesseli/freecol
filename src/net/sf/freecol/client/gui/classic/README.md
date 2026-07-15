@@ -478,43 +478,89 @@ lists the recruitable (`Schuldknecht (200)`), Ausbilden the cheapest trainable
 dialog reskin (shared Phase-3 component); refining the dock/pier sprite positions
 against the original; localizing the few captions.
 
-## Report screens (`ClassicReportColonyPanel`)
+## Report screens (`ClassicReportPanel` + concrete reports)
 
-The original 1994 game's **Colony Advisor report** — its "KOLONIEBERATER-BERICHT"
-(design ref: the expert's `opening_014` military-garrison and `opening_015`
-Sons-of-Liberty shots). In Col1 one report pages through several column sets; this
-first report slice renders the per-colony overview both shots share. Same host
-model as the colony/Europe screens — a virtual **320×200** canvas up-scaled by the
-largest integer factor that fits, nearest-neighbour, in its own `JFrame`. The
-original sepia fort illustration (**`REPORT6.PIK`**, loaded by its pack key) is the
-backdrop, dimmed with a translucent plate so the table reads over it. Layout:
+The original 1994 game's full-screen **advisor reports** (design ref: the
+expert's `opening_014`/`opening_015` shots). Four are built so far — Colony,
+Military, Trade and Religious — all sharing one frame.
 
-- **Title bar** — the localized report name (`reportColonyAction.name`), gold on
-  black.
-- **Column heads** — Colony / SoL / Pop / Troops (hard-coded English for now; the
-  same localization follow-up the info panel carries — there are no FreeCol keys
-  for these short heads).
-- **One row per colony** (`player.getColonyList()`): the colony's flag/settlement
-  sprite (`getScaledSettlementImage`), name, `getSonsOfLiberty()` %, `getUnitCount()`
-  population, the garrisoned **military units** (`tile.getUnitList()` filtered by
-  `isOffensiveUnit() && !isNaval()`) as sprites, and the colony's two largest
-  positive `getNetProductionOf` goods as icon+amount. Rows that overflow the canvas
-  are clipped (no scroll yet). Empty → "No colonies yet."
-- **Exit** — the red **Okay** plate at the bottom right (mirrors the original art)
-  and **Escape** both close it.
+### The shared frame (`ClassicReportPanel`)
 
-Reached by the reused **Colony Advisor** report menu item (accelerator **F3**),
-enabled by the same `updateActions()` wiring the Europe menu item needed. Wired as
-`ClassicGUI.showReportColonyPanel` (own `JFrame`, one report at a time, guarded);
-the other eight `showReport*Panel` seams still no-op.
+`ClassicReportPanel` is the abstract base every report extends; it owns the
+framing so a concrete report only supplies its backdrop, title and body. Like the
+colony/Europe screens, everything is painted into a virtual **320×200** canvas
+up-scaled by the largest integer factor that fits, nearest-neighbour, hosted in
+its own `JFrame`. The base paints: the dimmed sepia `REPORTn.PIK` backdrop (loaded
+by pack key, with a flat-sepia fallback when the pack is absent), the gold-on-black
+**title bar** (localized report name), and the red **Okay** plate at the
+bottom-right; **Escape** and clicking Okay both close it. Subclasses implement
+`backgroundKey()`, `titleKey()` and `paintBody(Graphics2D)` (drawing the header +
+rows between `ROW_Y0` and `BODY_BOTTOM`), and may override `onBodyClick(vx,vy)` for
+clickable rows (default no-op). Shared drawing helpers (`drawFitted`, `clip`,
+`font`) and the palette/layout constants live on the base. Column heads are
+hard-coded English for now (there are no FreeCol keys for these short heads — the
+same localization follow-up the info panel carries).
 
-**Verified live (2026-07-14):** F3 renders the framed report — empty first ("No
-colonies yet."), then after founding *Nieuw Amsterdam* with **B** a live row (flag,
-name, `SoL 0%`, `Pop 1`, its net production `+2`); Escape closes. 0 SEVERE.
+**Wiring.** Every `showReport*Panel` override routes through one private
+`ClassicGUI.showReport(titleKey, factory)` helper: it disposes any open report
+(`closeReportPanel` — **one report window at a time**), builds the panel via the
+factory (passing the close callback), frames it, and is guarded so a failure
+degrades to a log line. Reached by the reused report menu items, enabled by the
+same `updateActions()` wiring the Europe menu item needed. The remaining
+`showReport*Panel` seams still no-op.
 
-**Follow-ups (later slices):** the other eight reports and the original's
-page-through between column sets (population / production / military / SoL / …);
-click-a-colony-row to open its colony screen; row scrolling for many colonies;
+### Colony Advisor (`ClassicReportColonyPanel`, F3)
+
+The "KOLONIEBERATER-BERICHT" over the sepia fort illustration (**`REPORT6.PIK`**).
+One row per colony (`player.getColonyList()`): the colony's flag/settlement sprite
+(`getScaledSettlementImage`), name, `getSonsOfLiberty()` %, `getUnitCount()`
+population, the garrisoned **military units** (`tile.getUnitList()` filtered by
+`isOffensiveUnit() && !isNaval()`) as sprites, and the colony's two largest
+positive `getNetProductionOf` goods as icon+amount. Rows that overflow are clipped
+(no scroll yet). Empty → "No colonies yet."
+
+### Military Advisor (`ClassicReportMilitaryPanel`, F7)
+
+The standing-army roster over the same fort illustration (**`REPORT6.PIK`** — the
+fortification is the garrison image; shared with the Colony Advisor, a framing the
+expert may re-assign once REPORT9 has a home). Where the Colony Advisor shows the
+garrison *per colony*, this groups **every** land military unit the player owns by
+type×role — the reportable set from FreeCol's own `ReportMilitaryPanel`
+(`!isNaval() && (hasAbility(EXPERT_SOLDIER) || isOffensiveUnit())`) — one row per
+group: sprite, the localized `Messages.getUnitLabel(...)` type/role label, and the
+count. Sorted by descending count then label (the player's unit set is unordered,
+so this keeps the roster stable). Empty → "No military units."
+
+### Trade Advisor (`ClassicReportTradePanel`, F9)
+
+The goods ledger over the scales/candle/hourglass illustration (**`REPORT5.PIK`**).
+Every storable good (`spec.getStorableGoodsTypeList()`) as **icon | name | Net |
+$**: `Net` is the empire-wide net production summed over all colonies
+(`Σ colony.getNetProductionOf(gt)`), `$` the market sale price
+(`market.getPaidForSale(gt)`). Two goods per row (each occupies one 160px half —
+the column origins are *within* a half, added to `col*HALF`) so the 21-good ledger
+fits the canvas.
+
+### Religious Advisor (`ClassicReportReligiousPanel`, F1)
+
+Crosses/immigration over the preacher-and-congregation illustration
+(**`REPORT2.PIK`**). A summary block at the top — accumulated immigration
+(`player.getImmigration()` / `getImmigrationRequired()`) and empire-wide cross
+output (`getTotalImmigrationProduction()`) with the cross goods icon — then one row
+per colony with the crosses it produces (`Σ colony.getNetProductionOf(gt)` over the
+`spec.getImmigrationGoodsTypeList()`). Empty → "No colonies yet."
+
+**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all four
+render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
+yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F9** the full 21-good
+two-column ledger with live sale prices; **F1** "Immigration: 0 / 19", "Crosses per
+turn: +0", "No colonies yet." All localize (German) via the reused message keys and
+`Messages.getName`/`getUnitLabel`. Escape/Okay close each; opening another report
+replaces the previous window.
+
+**Follow-ups (later slices):** the remaining reports (naval / foreign affairs /
+labour / production / …) and the original's page-through between column sets;
+click-a-colony-row to open its colony screen; row scrolling for many entities;
 localizing the column heads.
 
 ## Seam facts (for the remaining/next work)
