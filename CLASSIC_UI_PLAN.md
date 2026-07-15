@@ -21,9 +21,9 @@ Two independent axes (keep them separate):
 ## Status at a glance (2026-07-15)
 
 - **UI:** Phase 0 ✅ · **Phase 1 (map) ✅** · **Phase 2 (HUD & core screens) 🔨** — shipped: map
-  HUD (menu bar + info panel), colony screen, Europe screen, four advisor reports (Colony / Military /
-  Trade / Religious over a shared `ClassicReportPanel` frame), order buttons, in-panel minimap, wood
-  chrome; **Phase 3 (dialogs) ⬜** · **Phase 4 (pre-game/setup) ⬜**.
+  HUD (menu bar + info panel), colony screen, Europe screen, six advisor reports (Colony / Military /
+  Naval / Trade / Religious / Production over a shared `ClassicReportPanel` frame), order buttons,
+  in-panel minimap, wood chrome; **Phase 3 (dialogs) ⬜** · **Phase 4 (pre-game/setup) ⬜**.
 - **Assets (bring-your-own install):** A0/A1/A3 ✅ · **A2 🔨 growing** (alias curation) · A5/A6 ⬜.
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
@@ -38,11 +38,13 @@ Two independent axes (keep them separate):
   `aliases.properties`, and the README.
 - **Phase 2 so far** ✅ — map HUD (reused `InGameMenuBar` + `ClassicInfoPanel`); **colony screen**
   (`ClassicColonyPanel`, `COLONY.PIK`/`BUILDING.SS`/`WOODTILE.SS`); **Europe screen**
-  (`ClassicEuropePanel`, `EUROPE.PIK`, recruit/purchase/train via the real controllers); **four advisor
-  reports** over a shared `ClassicReportPanel` frame — Colony (`REPORT6.PIK`, F3), Military (F7), Trade
-  (`REPORT5.PIK`, F9), Religious (`REPORT2.PIK`, F1); **order buttons** (reuse `FreeColAction`
-  `BUTTON_IMAGE` art), **in-panel minimap**, **`WOODPANL.PIK` wood chrome**, and caption localization.
-  (README "Phase 2 HUD" / "Colony screen" / "Europe screen" / "Report screens".)
+  (`ClassicEuropePanel`, `EUROPE.PIK`, recruit/purchase/train via the real controllers); **six advisor
+  reports** over a shared `ClassicReportPanel` frame (unit rosters share a further
+  `ClassicReportRosterPanel`) — Colony (`REPORT6.PIK`, F3), Military (`REPORT6`, F7), Naval
+  (`REPORT7`, F8), Trade (`REPORT5`, F9), Religious (`REPORT2`, F1), Production (`REPORT4`, shift F4);
+  **order buttons** (reuse `FreeColAction` `BUTTON_IMAGE` art), **in-panel minimap**, **`WOODPANL.PIK`
+  wood chrome**, and caption localization. (README "Phase 2 HUD" / "Colony screen" / "Europe screen" /
+  "Report screens".)
   - **Key enabler:** `ClassicGUI.updateActions()` (called on `reconnectGUI` + every `changeView`)
     refreshes the reused actions' enabled state — the classic HUD has no `Canvas`, so without it the
     Europe/report menu items and the order buttons stay stuck disabled.
@@ -51,11 +53,13 @@ Two independent axes (keep them separate):
 
 ### Phase 2 — finish HUD & core screens 🔨
 
-1. **Remaining reports + page-through.** Four advisor reports ship (Colony/Military/Trade/Religious)
-   over the shared `ClassicReportPanel` frame; the rest of the `showReport*Panel` seams still no-op —
-   add them over their `REPORTn.PIK` backdrops (naval `REPORT7`, foreign/exploration `REPORT8`/`REPORT1`,
-   production `REPORT4`, labour/education/congress/indian/history/cargo/requirements — assign `REPORT9`
-   when inspected), plus the original's page-through between column sets. Extend `ClassicReportPanel`.
+1. **Remaining reports + page-through.** Six advisor reports ship
+   (Colony/Military/Naval/Trade/Religious/Production) over the shared `ClassicReportPanel` frame; the
+   rest of the `showReport*Panel` seams still no-op — add them over their `REPORTn.PIK` backdrops
+   (foreign affairs `REPORT3`/`REPORT8`, exploration `REPORT8`/`REPORT1`,
+   labour/education/congress/indian/history/cargo/requirements — assign `REPORT9` when inspected), plus
+   the original's page-through between column sets. Extend `ClassicReportPanel` (unit rosters:
+   `ClassicReportRosterPanel`).
 2. **HUD polish (remaining).** Menu-label contrast (reused menu is dark-on-parchment vs Col1's
    light-on-dark); a unit portrait in the info panel; localize the residual key-hint captions; refine
    the wood-chrome tiling seams.

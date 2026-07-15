@@ -1,0 +1,142 @@
+/**
+ *  Copyright (C) 2002-2024  The FreeCol Team
+ *
+ *  This file is part of FreeCol.
+ *
+ *  FreeCol is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  FreeCol is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with FreeCol.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package net.sf.freecol.client.gui.classic;
+
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.model.Player;
+import net.sf.freecol.common.model.Unit;
+
+
+/**
+ * Shared base for the classic-UI <b>unit-roster</b> reports — the ones that
+ * tally every unit of the player's the caller cares about by type&times;role
+ * (mirroring FreeCol's own {@code ReportUnitPanel}).  A subclass supplies its
+ * backdrop, title, the {@link #isReportable(Unit)} predicate and an empty-list
+ * caption; this base groups the units, keeps a sample for the sprite, sorts by
+ * descending count then label (the player's unit set is unordered, so this keeps
+ * the roster stable), and paints one row per group: sprite, the localized
+ * type/role label, and the count.  Concrete rosters: {@link ClassicReportMilitaryPanel}
+ * and {@link ClassicReportNavalPanel}.
+ */
+abstract class ClassicReportRosterPanel extends ClassicReportPanel {
+
+    private static final int COL_SPRITE = 6;
+    private static final int COL_NAME = 24;
+    private static final int COL_COUNT = 150;
+
+
+    ClassicReportRosterPanel(FreeColClient freeColClient, ImageLibrary lib,
+                             Runnable onClose) {
+        super(freeColClient, lib, onClose);
+    }
+
+
+    /** Whether a unit belongs in this roster. */
+    protected abstract boolean isReportable(Unit unit);
+
+    /** The caption shown when the roster is empty. */
+    protected abstract String emptyText();
+
+
+    @Override
+    protected void paintBody(Graphics2D g) {
+        final Player player = this.freeColClient.getMyPlayer();
+        if (player == null) return;
+
+        final List<Group> groups = collectGroups(player);
+        if (groups.isEmpty()) {
+            g.setFont(font(7f, Font.PLAIN));
+            g.setColor(FG);
+            g.drawString(emptyText(), COL_NAME, ROW_Y0 + 10);
+            return;
+        }
+
+        g.setFont(font(6f, Font.BOLD));
+        g.setColor(HEAD_FG);
+        g.drawString("Unit", COL_NAME, HEAD_Y);
+        g.drawString("Qty", COL_COUNT, HEAD_Y);
+
+        int y = ROW_Y0;
+        int i = 0;
+        for (Group grp : groups) {
+            if (y + ROW_H > BODY_BOTTOM) break;   // out of room; rest are clipped
+            if ((i & 1) == 1) {
+                g.setColor(ROW_ALT);
+                g.fillRect(0, y - ROW_H + 3, VW, ROW_H);
+            }
+            final BufferedImage img = this.lib.getScaledUnitImage(grp.sample);
+            if (img != null) drawFitted(g, img, COL_SPRITE, y - ROW_H + 4, 14);
+            g.setFont(font(6f, Font.BOLD));
+            g.setColor(FG);
+            g.drawString(clip(grp.label, 26), COL_NAME, y);
+            g.drawString("x" + grp.count, COL_COUNT, y);
+            y += ROW_H;
+            i++;
+        }
+    }
+
+    /**
+     * Group every reportable unit the player owns by type&times;role, keeping a
+     * sample unit for the sprite, sorted by descending count then label.
+     */
+    private List<Group> collectGroups(Player player) {
+        final Map<String, Group> byKind = new HashMap<>();
+        for (Unit u : (Iterable<Unit>) player.getUnits()::iterator) {
+            if (!isReportable(u)) continue;
+            final String key = u.getType().getId() + "|" + u.getRole().getId();
+            Group grp = byKind.get(key);
+            if (grp == null) {
+                final String label = Messages.message(Messages.getUnitLabel(
+                        null, u.getType().getId(), 1, null, u.getRole().getId(),
+                        null));
+                grp = new Group(u, label);
+                byKind.put(key, grp);
+            }
+            grp.count++;
+        }
+        final List<Group> groups = new ArrayList<>(byKind.values());
+        groups.sort(Comparator.comparingInt((Group grp) -> -grp.count)
+                    .thenComparing(grp -> grp.label));
+        return groups;
+    }
+
+    /** A type&times;role tally with a sample unit for the sprite. */
+    private static final class Group {
+        final Unit sample;
+        final String label;
+        int count;
+
+        Group(Unit sample, String label) {
+            this.sample = sample;
+            this.label = label;
+        }
+    }
+}

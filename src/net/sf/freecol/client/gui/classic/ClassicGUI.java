@@ -524,6 +524,33 @@ public class ClassicGUI extends GUI {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Naval Advisor report</b> — the fleet roster
+     * (accelerator {@code F8}).  See {@link ClassicReportNavalPanel}.
+     */
+    @Override
+    public FreeColPanel showReportNavalPanel() {
+        return showReport("reportNavalAction.name",
+            onClose -> new ClassicReportNavalPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Production Report</b> — per-colony production
+     * breakdown (accelerator {@code shift F4}).  See
+     * {@link ClassicReportProductionPanel}.
+     */
+    @Override
+    public FreeColPanel showReportProductionPanel() {
+        return showReport("reportProductionAction.name",
+            onClose -> new ClassicReportProductionPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
      * Show a classic advisor report in a window of its own, one report at a
      * time.  Every {@code showReport*Panel} override routes through here: it
      * disposes any open report, builds the panel via {@code factory} (passing the

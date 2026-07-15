@@ -519,17 +519,26 @@ population, the garrisoned **military units** (`tile.getUnitList()` filtered by
 positive `getNetProductionOf` goods as icon+amount. Rows that overflow are clipped
 (no scroll yet). Empty → "No colonies yet."
 
-### Military Advisor (`ClassicReportMilitaryPanel`, F7)
+### Unit rosters — Military & Naval (`ClassicReportRosterPanel`)
 
-The standing-army roster over the same fort illustration (**`REPORT6.PIK`** — the
-fortification is the garrison image; shared with the Colony Advisor, a framing the
-expert may re-assign once REPORT9 has a home). Where the Colony Advisor shows the
-garrison *per colony*, this groups **every** land military unit the player owns by
-type×role — the reportable set from FreeCol's own `ReportMilitaryPanel`
-(`!isNaval() && (hasAbility(EXPERT_SOLDIER) || isOffensiveUnit())`) — one row per
-group: sprite, the localized `Messages.getUnitLabel(...)` type/role label, and the
-count. Sorted by descending count then label (the player's unit set is unordered,
-so this keeps the roster stable). Empty → "No military units."
+`ClassicReportRosterPanel` is a second small base (over `ClassicReportPanel`) for
+the reports that tally units by type×role, mirroring FreeCol's own
+`ReportUnitPanel`. A subclass supplies backdrop, title, an `isReportable(Unit)`
+predicate and an empty caption; the base groups the player's units
+(`player.getUnits()`), keeps a sample for the sprite, **sorts by descending count
+then label** (the unit set is unordered, so this keeps the roster stable), and
+paints one row per group: sprite, the localized `Messages.getUnitLabel(...)`
+type/role label, and the count.
+
+- **Military Advisor** (`ClassicReportMilitaryPanel`, **F7**) — the standing army
+  over the fort illustration (**`REPORT6.PIK`** — the fortification is the garrison
+  image; shared with the Colony Advisor, a framing the expert may re-assign once
+  REPORT9 has a home). Reportable = FreeCol's `ReportMilitaryPanel` set:
+  `!isNaval() && (hasAbility(EXPERT_SOLDIER) || isOffensiveUnit())`. Empty → "No
+  military units."
+- **Naval Advisor** (`ClassicReportNavalPanel`, **F8**) — the fleet over the ship
+  illustration (**`REPORT7.PIK`**). Reportable = `unit.isNaval()`. Empty → "No
+  naval units."
 
 ### Trade Advisor (`ClassicReportTradePanel`, F9)
 
@@ -550,18 +559,30 @@ output (`getTotalImmigrationProduction()`) with the cross goods icon — then on
 per colony with the crosses it produces (`Σ colony.getNetProductionOf(gt)` over the
 `spec.getImmigrationGoodsTypeList()`). Empty → "No colonies yet."
 
-**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all four
-render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
-yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F9** the full 21-good
-two-column ledger with live sale prices; **F1** "Immigration: 0 / 19", "Crosses per
-turn: +0", "No colonies yet." All localize (German) via the reused message keys and
-`Messages.getName`/`getUnitLabel`. Escape/Okay close each; opening another report
-replaces the previous window.
+### Production Report (`ClassicReportProductionPanel`, shift F4)
 
-**Follow-ups (later slices):** the remaining reports (naval / foreign affairs /
-labour / production / …) and the original's page-through between column sets;
-click-a-colony-row to open its colony screen; row scrolling for many entities;
-localizing the column heads.
+The per-colony production breakdown over the colony-under-construction
+illustration (**`REPORT4.PIK`**). Where the Colony Advisor shows each colony's
+*two* largest outputs and the Trade Advisor sums production empire-wide, this
+lists **every** good a colony nets positively, as icon+amount along the row
+(`colony.getNetProductionOf(gt)` over the storable goods, clipped when the row
+fills). Empty → "No colonies yet."; a producing-nothing colony → "—". Its
+per-colony row logic is shared with the (data-verified) Colony Advisor.
+
+**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all six
+render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
+yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F8** the starting
+`Handelsschiff ×1`; **F9** the full 21-good two-column ledger with live sale prices;
+**F1** "Immigration: 0 / 19", "Crosses per turn: +0", "No colonies yet."; **shift
+F4** "No colonies yet." All localize (German) via the reused message keys and
+`Messages.getName`/`getUnitLabel`. Escape/Okay close each; opening another report
+replaces the previous window. (The colony-populated rows share the Colony Advisor's
+verified `getNetProductionOf`/`getScaledSettlementImage` path.)
+
+**Follow-ups (later slices):** the remaining reports (foreign affairs / exploration
+/ labour / education / congress / indian / history / cargo / requirements) and the
+original's page-through between column sets; click-a-colony-row to open its colony
+screen; row scrolling for many entities; localizing the column heads.
 
 ## Seam facts (for the remaining/next work)
 
