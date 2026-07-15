@@ -569,20 +569,43 @@ lists **every** good a colony nets positively, as icon+amount along the row
 fills). Empty → "No colonies yet."; a producing-nothing colony → "—". Its
 per-colony row logic is shared with the (data-verified) Colony Advisor.
 
-**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all six
+### Continental Congress (`ClassicReportCongressPanel`, F6)
+
+The founding-father standing over the two-men-at-a-desk illustration
+(**`REPORT3.PIK`**). A summary block — who is currently being recruited
+(`player.getCurrentFather()`) and the liberty-bell progress toward them
+(`getLiberty()` / `getTotalFoundingFatherCost()`, `+getLibertyProductionNextTurn()`
+/turn) — then the roster of fathers already in Congress
+(`player.getFoundingFathers()`): portrait (`lib.getFoundingFatherImage`), name and
+category (`father.getTypeKey()`), grouped by type. Empty → "No founding fathers
+yet."
+
+### Exploration Report (`ClassicReportExplorationPanel`, shift F2)
+
+The discovered regions over the map-and-wax-seal illustration (**`REPORT8.PIK`**) —
+the same data as FreeCol's own `ReportExplorationPanel`: every `map.getRegions()`
+with a non-null `getDiscoveredIn()`, as name | type | turn | score, newest first
+(by discovered turn then score). Unnamed regions fall back to their localized type
+name. Empty → "Nothing discovered yet."
+
+**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all eight
 render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
 yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F8** the starting
 `Handelsschiff ×1`; **F9** the full 21-good two-column ledger with live sale prices;
-**F1** "Immigration: 0 / 19", "Crosses per turn: +0", "No colonies yet."; **shift
-F4** "No colonies yet." All localize (German) via the reused message keys and
-`Messages.getName`/`getUnitLabel`. Escape/Okay close each; opening another report
-replaces the previous window. (The colony-populated rows share the Colony Advisor's
-verified `getNetProductionOf`/`getScaledSettlementImage` path.)
+**F1** "Immigration: 0 / 19", "Crosses per turn: +0"; **shift F4** "No colonies
+yet."; **F6** "Recruiting: (none)", "Bells: 0 / 40 (+0/turn)", "No founding fathers
+yet."; **shift F2** the three regions already discovered at the start (*Acadie* T2
+sc66, *Newfoundland* T2 sc38, *Chile* T1 sc74), newest first. All localize (German)
+via the reused message keys and `Messages.getName`/`getUnitLabel`. Escape/Okay close
+each; opening another report replaces the previous window. (The colony-populated
+Production/Colony rows share the same verified `getNetProductionOf`/
+`getScaledSettlementImage` path.)
 
-**Follow-ups (later slices):** the remaining reports (foreign affairs / exploration
-/ labour / education / congress / indian / history / cargo / requirements) and the
-original's page-through between column sets; click-a-colony-row to open its colony
-screen; row scrolling for many entities; localizing the column heads.
+**Follow-ups (later slices):** the remaining reports (foreign affairs — needs the
+async `nationSummary` fetch — labour / education / indian / history / cargo /
+requirements) and the original's page-through between column sets; click-a-colony-row
+to open its colony screen; row scrolling for many entities; localizing the column
+heads.
 
 ## Seam facts (for the remaining/next work)
 

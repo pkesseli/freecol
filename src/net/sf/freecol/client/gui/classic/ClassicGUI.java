@@ -551,6 +551,33 @@ public class ClassicGUI extends GUI {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Continental Congress</b> report — the
+     * founding-father standing (accelerator {@code F6}).  See
+     * {@link ClassicReportCongressPanel}.
+     */
+    @Override
+    public FreeColPanel showReportContinentalCongressPanel() {
+        return showReport("reportCongressAction.name",
+            onClose -> new ClassicReportCongressPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Exploration Report</b> — the discovered regions
+     * (accelerator {@code shift F2}).  See {@link ClassicReportExplorationPanel}.
+     */
+    @Override
+    public FreeColPanel showReportExplorationPanel() {
+        return showReport("reportExplorationAction.name",
+            onClose -> new ClassicReportExplorationPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
      * Show a classic advisor report in a window of its own, one report at a
      * time.  Every {@code showReport*Panel} override routes through here: it
      * disposes any open report, builds the panel via {@code factory} (passing the
