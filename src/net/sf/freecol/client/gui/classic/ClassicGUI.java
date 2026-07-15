@@ -591,6 +591,19 @@ public class ClassicGUI extends GUI {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Indian Advisor report</b> — the contacted native
+     * nations (accelerator {@code F5}).  See {@link ClassicReportIndianPanel}.
+     */
+    @Override
+    public FreeColPanel showReportIndianPanel() {
+        return showReport("reportIndianAction.name",
+            onClose -> new ClassicReportIndianPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
      * Show a classic advisor report in a window of its own, one report at a
      * time.  Every {@code showReport*Panel} override routes through here: it
      * disposes any open report, builds the panel via {@code factory} (passing the

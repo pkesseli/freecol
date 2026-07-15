@@ -615,7 +615,23 @@ it holds (`getCompactGoodsList()`, icon+amount) and the units aboard
 (`getUnitList()`, sprites), clipped when the row fills. Nothing aboard → "(empty)";
 no carriers → "No carriers."
 
-**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all nine
+### Indian Advisor (`ClassicReportIndianPanel`, F5)
+
+The contacted native nations, over the native-scout illustration
+(**`REPORT1.PIK`**). One row per native nation the player has **contacted**
+(`player.hasContacted`, the same filter FreeCol's own `ReportIndianPanel` applies):
+the tribe's capital settlement sprite
+(`lib.getScaledSettlementTypeImage(nationType.getCapitalType())`), its name, the
+number of its settlements the player knows of, and its tension toward the player
+(`tribe.getTension(player)`, via `model.tension.*.name`). Empty → "No tribes
+contacted yet."
+
+> Unlike FreeCol's panel this deliberately omits the tribe's *true* settlement
+> total: that comes from `igc().nationSummary()`, an **async network fetch** a
+> static paint cannot drive (the same reason the Foreign Affairs report is still
+> deferred). The locally-known count is shown instead.
+
+**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all ten
 render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
 yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F8** the starting
 `Handelsschiff ×1`; **F9** the full 21-good two-column ledger with live sale prices;
@@ -624,16 +640,24 @@ yet."; **F6** "Recruiting: (none)", "Bells: 0 / 40 (+0/turn)", "No founding fath
 yet."; **shift F2** the three regions already discovered at the start (*Acadie* T2
 sc66, *Newfoundland* T2 sc38, *Chile* T1 sc74), newest first; **shift F1** the
 starting ship *Salm (Handelsschiff)* with the colonist aboard (the other starting
-unit is the pioneer already ashore, so it is correctly absent from the hold). All
-localize (German) via the reused message keys and `Messages.getName`/`getUnitLabel`.
-Escape/Okay close each; opening another report replaces the previous window. (The
-colony-populated Production/Colony rows share the same verified `getNetProductionOf`/
-`getScaledSettlementImage` path.)
+unit is the pioneer already ashore, so it is correctly absent from the hold);
+**F5** "No tribes contacted yet." All localize (German) via the reused message keys
+and `Messages.getName`/`getUnitLabel`. Escape/Okay close each; opening another
+report replaces the previous window.
+
+> **Verification caveat — which row paths have run with real data.** The `--fast`
+> start has no colonies and no native contact, so the reports verified *populated*
+> are Military, Naval, Trade, Cargo and Exploration. The **Colony** Advisor's row
+> path was verified with a real colony on 2026-07-14, and **Production** reuses the
+> same `getNetProductionOf`/`getScaledSettlementImage` calls; the **Religious**,
+> **Congress** and **Indian** row loops have so far only run through their
+> empty-state branch. Populate them (found a colony / meet a tribe) when next
+> testing near that code.
 
 **Follow-ups (later slices):** the remaining reports (foreign affairs — needs the
-async `nationSummary` fetch — labour / education / indian / history / requirements)
-and the original's page-through between column sets; click-a-colony-row to open its
-colony screen; row scrolling for many entities; localizing the column heads.
+async `nationSummary` fetch — labour / education / history / requirements) and the
+original's page-through between column sets; click-a-colony-row to open its colony
+screen; row scrolling for many entities; localizing the column heads.
 
 ## Seam facts (for the remaining/next work)
 
