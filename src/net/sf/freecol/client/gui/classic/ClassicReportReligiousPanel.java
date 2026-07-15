@@ -47,7 +47,12 @@ final class ClassicReportReligiousPanel extends ClassicReportPanel {
 
     /** y of the immigration summary lines, above the per-colony table. */
     private static final int SUMMARY_Y0 = TITLE_H + 12;
-    private static final int TABLE_Y0 = TITLE_H + 44;
+
+    /** Baseline of this report's own column heads, below the summary block. */
+    private static final int TABLE_HEAD_Y = TITLE_H + 40;
+
+    /** Baseline of the first colony row; a row-pitch below the heads (see ROW_Y0). */
+    private static final int TABLE_Y0 = TABLE_HEAD_Y + ROW_H;
 
 
     ClassicReportReligiousPanel(FreeColClient freeColClient, ImageLibrary lib,
@@ -101,18 +106,18 @@ final class ClassicReportReligiousPanel extends ClassicReportPanel {
                                List<GoodsType> crossTypes) {
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Colony", COL_NAME, TABLE_Y0 - 4);
-        g.drawString("Crosses", COL_CROSSES, TABLE_Y0 - 4);
+        g.drawString("Colony", COL_NAME, TABLE_HEAD_Y);
+        g.drawString("Crosses", COL_CROSSES, TABLE_HEAD_Y);
 
         final List<Colony> colonies = player.getColonyList();
         if (colonies.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No colonies yet.", COL_NAME, TABLE_Y0 + 10);
+            g.drawString("No colonies yet.", COL_NAME, TABLE_Y0);
             return;
         }
 
-        int y = TABLE_Y0 + 8;
+        int y = TABLE_Y0;
         int i = 0;
         for (Colony colony : colonies) {
             if (y + ROW_H > BODY_BOTTOM) break;   // out of room; rest are clipped

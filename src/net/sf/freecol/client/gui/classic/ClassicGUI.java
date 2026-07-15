@@ -578,6 +578,19 @@ public class ClassicGUI extends GUI {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Cargo Report</b> — each carrier's load
+     * (accelerator {@code shift F1}).  See {@link ClassicReportCargoPanel}.
+     */
+    @Override
+    public FreeColPanel showReportCargoPanel() {
+        return showReport("reportCargoAction.name",
+            onClose -> new ClassicReportCargoPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
      * Show a classic advisor report in a window of its own, one report at a
      * time.  Every {@code showReport*Panel} override routes through here: it
      * disposes any open report, builds the panel via {@code factory} (passing the

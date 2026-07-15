@@ -75,7 +75,7 @@ abstract class ClassicReportRosterPanel extends ClassicReportPanel {
         if (groups.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString(emptyText(), COL_NAME, ROW_Y0 + 10);
+            g.drawString(emptyText(), COL_NAME, ROW_Y0);
             return;
         }
 

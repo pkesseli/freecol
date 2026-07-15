@@ -501,6 +501,23 @@ clickable rows (default no-op). Shared drawing helpers (`drawFitted`, `clip`,
 hard-coded English for now (there are no FreeCol keys for these short heads — the
 same localization follow-up the info panel carries).
 
+**Row geometry (the invariant to keep).** A row's cell spans `[y-ROW_H+3, y+3)`
+about its baseline `y`, and sprites are drawn from `y-ROW_H+4` — i.e. a row
+occupies space *above* its own baseline. So the first row's baseline must sit a
+full row-pitch below the column heads: `ROW_Y0 = HEAD_Y + ROW_H`. (An earlier
+`ROW_Y0 = TITLE_H + 12` put the first row's sprites *above* the head baseline, so
+every report's heads collided with its first row — most visibly the Cargo report's
+sprites.) The two reports with a summary block above their table
+(Religious, Congress) repeat the same relation locally with their own
+`TABLE_HEAD_Y` / `TABLE_Y0 = TABLE_HEAD_Y + ROW_H`.
+
+> ⚠️ **These layout constants are `static final int`, so javac *inlines* them into
+> every report class.** `ant compile` only recompiles changed sources, so changing a
+> constant on the base silently leaves untouched subclasses running the **old**
+> value (this bit us: after fixing `ROW_Y0`, `ClassicReportTradePanel` — the one
+> file not otherwise edited — still painted with the stale `21`). **Run
+> `ant clean compile` after touching any shared constant**, not just `ant compile`.
+
 **Wiring.** Every `showReport*Panel` override routes through one private
 `ClassicGUI.showReport(titleKey, factory)` helper: it disposes any open report
 (`closeReportPanel` — **one report window at a time**), builds the panel via the
@@ -588,24 +605,35 @@ with a non-null `getDiscoveredIn()`, as name | type | turn | score, newest first
 (by discovered turn then score). Unnamed regions fall back to their localized type
 name. Empty → "Nothing discovered yet."
 
-**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all eight
+### Cargo Report (`ClassicReportCargoPanel`, shift F1)
+
+Each carrier's load, over the ship illustration (**`REPORT7.PIK`**, shared with the
+Naval Advisor). Where the Naval Advisor tallies the fleet *by type*, this is one row
+per carrier — the reportable set from FreeCol's own `ReportCargoPanel`
+(`isCarrier() || canCarryTreasure()`) — showing its sprite and name, then the goods
+it holds (`getCompactGoodsList()`, icon+amount) and the units aboard
+(`getUnitList()`, sprites), clipped when the row fills. Nothing aboard → "(empty)";
+no carriers → "No carriers."
+
+**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all nine
 render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
 yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F8** the starting
 `Handelsschiff ×1`; **F9** the full 21-good two-column ledger with live sale prices;
 **F1** "Immigration: 0 / 19", "Crosses per turn: +0"; **shift F4** "No colonies
 yet."; **F6** "Recruiting: (none)", "Bells: 0 / 40 (+0/turn)", "No founding fathers
 yet."; **shift F2** the three regions already discovered at the start (*Acadie* T2
-sc66, *Newfoundland* T2 sc38, *Chile* T1 sc74), newest first. All localize (German)
-via the reused message keys and `Messages.getName`/`getUnitLabel`. Escape/Okay close
-each; opening another report replaces the previous window. (The colony-populated
-Production/Colony rows share the same verified `getNetProductionOf`/
+sc66, *Newfoundland* T2 sc38, *Chile* T1 sc74), newest first; **shift F1** the
+starting ship *Salm (Handelsschiff)* with the colonist aboard (the other starting
+unit is the pioneer already ashore, so it is correctly absent from the hold). All
+localize (German) via the reused message keys and `Messages.getName`/`getUnitLabel`.
+Escape/Okay close each; opening another report replaces the previous window. (The
+colony-populated Production/Colony rows share the same verified `getNetProductionOf`/
 `getScaledSettlementImage` path.)
 
 **Follow-ups (later slices):** the remaining reports (foreign affairs — needs the
-async `nationSummary` fetch — labour / education / indian / history / cargo /
-requirements) and the original's page-through between column sets; click-a-colony-row
-to open its colony screen; row scrolling for many entities; localizing the column
-heads.
+async `nationSummary` fetch — labour / education / indian / history / requirements)
+and the original's page-through between column sets; click-a-colony-row to open its
+colony screen; row scrolling for many entities; localizing the column heads.
 
 ## Seam facts (for the remaining/next work)
 

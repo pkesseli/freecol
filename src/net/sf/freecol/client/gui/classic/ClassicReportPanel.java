@@ -70,9 +70,19 @@ abstract class ClassicReportPanel extends JPanel {
     protected static final int VH = 200;
 
     protected static final int TITLE_H = 9;
+
+    /** Baseline of the column heads. */
     protected static final int HEAD_Y = TITLE_H + 8;
-    protected static final int ROW_Y0 = TITLE_H + 12;
+
+    /** Row pitch; a row's cell spans {@code [y-ROW_H+3, y+3)} about its baseline. */
     protected static final int ROW_H = 15;
+
+    /**
+     * Baseline of the first body row.  A full row-pitch below {@link #HEAD_Y} so
+     * the first row's cell (sprites included, which start at
+     * {@code y-ROW_H+4}) clears the column heads rather than colliding with them.
+     */
+    protected static final int ROW_Y0 = HEAD_Y + ROW_H;
 
     private static final int OK_W = 24;
     private static final int OK_H = 11;

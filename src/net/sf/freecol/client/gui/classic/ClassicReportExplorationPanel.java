@@ -88,7 +88,7 @@ final class ClassicReportExplorationPanel extends ClassicReportPanel {
         if (regions.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("Nothing discovered yet.", COL_NAME, ROW_Y0 + 10);
+            g.drawString("Nothing discovered yet.", COL_NAME, ROW_Y0);
             return;
         }
         regions.sort(BY_RECENT);

@@ -80,7 +80,7 @@ final class ClassicReportProductionPanel extends ClassicReportPanel {
         if (colonies.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No colonies yet.", COL_NAME, ROW_Y0 + 10);
+            g.drawString("No colonies yet.", COL_NAME, ROW_Y0);
             return;
         }
 

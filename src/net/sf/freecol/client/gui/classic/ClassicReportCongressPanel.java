@@ -49,7 +49,12 @@ final class ClassicReportCongressPanel extends ClassicReportPanel {
 
     /** y of the summary lines, above the father roster. */
     private static final int SUMMARY_Y0 = TITLE_H + 12;
-    private static final int TABLE_Y0 = TITLE_H + 40;
+
+    /** Baseline of this report's own column heads, below the summary block. */
+    private static final int TABLE_HEAD_Y = TITLE_H + 36;
+
+    /** Baseline of the first father row; a row-pitch below the heads (see ROW_Y0). */
+    private static final int TABLE_Y0 = TABLE_HEAD_Y + ROW_H;
 
 
     ClassicReportCongressPanel(FreeColClient freeColClient, ImageLibrary lib,
@@ -100,21 +105,21 @@ final class ClassicReportCongressPanel extends ClassicReportPanel {
     private void paintFathers(Graphics2D g, Player player) {
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Founding Father", COL_NAME, TABLE_Y0 - 4);
-        g.drawString("Category", COL_TYPE, TABLE_Y0 - 4);
+        g.drawString("Founding Father", COL_NAME, TABLE_HEAD_Y);
+        g.drawString("Category", COL_TYPE, TABLE_HEAD_Y);
 
         final List<FoundingFather> fathers
             = new ArrayList<>(player.getFoundingFathers());
         if (fathers.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No founding fathers yet.", COL_NAME, TABLE_Y0 + 10);
+            g.drawString("No founding fathers yet.", COL_NAME, TABLE_Y0);
             return;
         }
         fathers.sort(Comparator.comparing((FoundingFather f) -> f.getType())
                      .thenComparing(Messages::getName));
 
-        int y = TABLE_Y0 + 8;
+        int y = TABLE_Y0;
         int i = 0;
         for (FoundingFather father : fathers) {
             if (y + ROW_H > BODY_BOTTOM) break;   // out of room; rest are clipped

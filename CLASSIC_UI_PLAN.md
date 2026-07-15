@@ -21,10 +21,10 @@ Two independent axes (keep them separate):
 ## Status at a glance (2026-07-15)
 
 - **UI:** Phase 0 ✅ · **Phase 1 (map) ✅** · **Phase 2 (HUD & core screens) 🔨** — shipped: map
-  HUD (menu bar + info panel), colony screen, Europe screen, eight advisor reports (Colony / Military /
-  Naval / Trade / Religious / Production / Congress / Exploration over a shared `ClassicReportPanel`
-  frame), order buttons, in-panel minimap, wood chrome; **Phase 3 (dialogs) ⬜** · **Phase 4
-  (pre-game/setup) ⬜**.
+  HUD (menu bar + info panel), colony screen, Europe screen, nine advisor reports (Colony / Military /
+  Naval / Trade / Religious / Production / Congress / Exploration / Cargo over a shared
+  `ClassicReportPanel` frame), order buttons, in-panel minimap, wood chrome; **Phase 3 (dialogs) ⬜** ·
+  **Phase 4 (pre-game/setup) ⬜**.
 - **Assets (bring-your-own install):** A0/A1/A3 ✅ · **A2 🔨 growing** (alias curation) · A5/A6 ⬜.
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
@@ -39,11 +39,12 @@ Two independent axes (keep them separate):
   `aliases.properties`, and the README.
 - **Phase 2 so far** ✅ — map HUD (reused `InGameMenuBar` + `ClassicInfoPanel`); **colony screen**
   (`ClassicColonyPanel`, `COLONY.PIK`/`BUILDING.SS`/`WOODTILE.SS`); **Europe screen**
-  (`ClassicEuropePanel`, `EUROPE.PIK`, recruit/purchase/train via the real controllers); **eight advisor
+  (`ClassicEuropePanel`, `EUROPE.PIK`, recruit/purchase/train via the real controllers); **nine advisor
   reports** over a shared `ClassicReportPanel` frame (unit rosters share a further
   `ClassicReportRosterPanel`) — Colony (`REPORT6.PIK`, F3), Military (`REPORT6`, F7), Naval
   (`REPORT7`, F8), Trade (`REPORT5`, F9), Religious (`REPORT2`, F1), Production (`REPORT4`, shift F4),
-  Congress (`REPORT3`, F6), Exploration (`REPORT8`, shift F2); **order buttons** (reuse `FreeColAction`
+  Congress (`REPORT3`, F6), Exploration (`REPORT8`, shift F2), Cargo (`REPORT7`, shift F1);
+  **order buttons** (reuse `FreeColAction`
   `BUTTON_IMAGE` art), **in-panel minimap**, **`WOODPANL.PIK` wood chrome**, and caption localization.
   (README "Phase 2 HUD" / "Colony screen" / "Europe screen" / "Report screens".)
   - **Key enabler:** `ClassicGUI.updateActions()` (called on `reconnectGUI` + every `changeView`)
@@ -54,13 +55,14 @@ Two independent axes (keep them separate):
 
 ### Phase 2 — finish HUD & core screens 🔨
 
-1. **Remaining reports + page-through.** Eight advisor reports ship
-   (Colony/Military/Naval/Trade/Religious/Production/Congress/Exploration) over the shared
+1. **Remaining reports + page-through.** Nine advisor reports ship
+   (Colony/Military/Naval/Trade/Religious/Production/Congress/Exploration/Cargo) over the shared
    `ClassicReportPanel` frame; the rest of the `showReport*Panel` seams still no-op — add them over
    their `REPORTn.PIK` backdrops (**foreign affairs** — needs the async `nationSummary` fetch, so more
-   than a static paint — plus labour/education/indian/history/cargo/requirements; `REPORT1`/`REPORT9`
-   the native-scout art still unassigned), plus the original's page-through between column sets. Extend
-   `ClassicReportPanel` (unit rosters: `ClassicReportRosterPanel`).
+   than a static paint — plus labour/education/indian/history/requirements; `REPORT1`/`REPORT9` the
+   native-scout art still unassigned, an obvious fit for the Indian advisor), plus the original's
+   page-through between column sets. Extend `ClassicReportPanel` (unit rosters:
+   `ClassicReportRosterPanel`).
 2. **HUD polish (remaining).** Menu-label contrast (reused menu is dark-on-parchment vs Col1's
    light-on-dark); a unit portrait in the info panel; localize the residual key-hint captions; refine
    the wood-chrome tiling seams.
