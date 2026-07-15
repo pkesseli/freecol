@@ -23,8 +23,9 @@ Two independent axes (keep them separate):
 - **UI:** Phase 0 ✅ · **Phase 1 (map) ✅** · **Phase 2 (HUD & core screens) 🔨** — shipped: map
   HUD (menu bar + info panel), colony screen, Europe screen, ten advisor reports (Colony / Military /
   Naval / Trade / Religious / Production / Congress / Exploration / Cargo / Indian over a shared
-  `ClassicReportPanel` frame), order buttons, in-panel minimap, wood chrome; **Phase 3 (dialogs) ⬜** ·
-  **Phase 4 (pre-game/setup) ⬜**.
+  `ClassicReportPanel` frame, the Colony Advisor **paging** through its column sets as the original
+  does), order buttons, in-panel minimap, wood chrome; **Phase 3 (dialogs) ⬜** · **Phase 4
+  (pre-game/setup) ⬜**.
 - **Assets (bring-your-own install):** A0/A1/A3 ✅ · **A2 🔨 growing** (alias curation) · A5/A6 ⬜.
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
@@ -55,14 +56,16 @@ Two independent axes (keep them separate):
 
 ### Phase 2 — finish HUD & core screens 🔨
 
-1. **Remaining reports + page-through.** Ten advisor reports ship
+1. **Remaining reports.** Ten advisor reports ship
    (Colony/Military/Naval/Trade/Religious/Production/Congress/Exploration/Cargo/Indian) over the shared
-   `ClassicReportPanel` frame; the rest of the `showReport*Panel` seams still no-op — add them over
-   their `REPORTn.PIK` backdrops (**foreign affairs** — needs the async `nationSummary` fetch, so more
-   than a static paint — plus labour/education/history/requirements; `REPORT9`, a duplicate of the
-   `REPORT1` native-scout art, is still unassigned), plus the original's page-through between column
-   sets. Extend `ClassicReportPanel` (unit rosters: `ClassicReportRosterPanel`). Several row loops have
-   only run through their empty-state branch — see the README's verification caveat.
+   `ClassicReportPanel` frame, and the **Colony Advisor now pages** through its column sets as the
+   original does (Sons of Liberty / Military Garrison — the two the expert's shots document; the paging
+   *keys* are a guess awaiting sign-off). The rest of the `showReport*Panel` seams still no-op — add
+   them over their `REPORTn.PIK` backdrops (**foreign affairs** — needs the async `nationSummary`
+   fetch, so more than a static paint — plus labour/education/history/requirements; `REPORT9`, a
+   duplicate of the `REPORT1` native-scout art, is still unassigned). Extend `ClassicReportPanel` (unit
+   rosters: `ClassicReportRosterPanel`). The Congress and Indian row loops have only run their
+   empty-state branch — see the README's verification caveat.
 2. **HUD polish (remaining).** Menu-label contrast (reused menu is dark-on-parchment vs Col1's
    light-on-dark); a unit portrait in the info panel; localize the residual key-hint captions; refine
    the wood-chrome tiling seams.

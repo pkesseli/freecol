@@ -526,15 +526,37 @@ degrades to a log line. Reached by the reused report menu items, enabled by the
 same `updateActions()` wiring the Europe menu item needed. The remaining
 `showReport*Panel` seams still no-op.
 
-### Colony Advisor (`ClassicReportColonyPanel`, F3)
+### Colony Advisor (`ClassicReportColonyPanel`, F3) — the paged report
 
 The "KOLONIEBERATER-BERICHT" over the sepia fort illustration (**`REPORT6.PIK`**).
-One row per colony (`player.getColonyList()`): the colony's flag/settlement sprite
-(`getScaledSettlementImage`), name, `getSonsOfLiberty()` %, `getUnitCount()`
-population, the garrisoned **military units** (`tile.getUnitList()` filtered by
-`isOffensiveUnit() && !isNaval()`) as sprites, and the colony's two largest
-positive `getNetProductionOf` goods as icon+amount. Rows that overflow are clipped
-(no scroll yet). Empty → "No colonies yet."
+This is the one report that, as in the original, **pages through several column
+sets** — the behaviour the expert's two shots document (`opening_014`,
+`opening_015` are the *same* report on different pages, not different reports).
+
+Every page keeps the same **left column** — the colony's flag sprite
+(`getScaledSettlementImage`), a **population badge** (the boxed `getUnitCount()`
+number, as in the original) and its name — and swaps what is drawn to the right,
+with a **subtitle** naming the current page. The pages (the `Page` enum):
+
+- **Sons of Liberty** (`opening_015`, the original's "Söhne der Freiheit") —
+  `getSonsOfLiberty()` %, the building producing the colony's bells
+  (`getWorkLocationForProducing(liberty)`, the original's "Druckerei" column; a new
+  colony shows its *Rathaus*/Town Hall), the bells per turn
+  (`getNetProductionOf(liberty)`) as icon+amount, and one colonist figure per SoL
+  member.
+- **Military Garrison** (`opening_014`, "Militärgarnision") — the offensive land
+  units standing in the colony (`tile.getUnitList()` filtered by
+  `isOffensiveUnit() && !isNaval()`) as sprites; none → "—".
+
+> **The original shows no column heads** — the subtitle names the page and the
+> columns are self-evident — so this panel deliberately paints none (and starts its
+> rows a row-pitch below the *subtitle* via its own `PAGE_ROW_Y0`, keeping the same
+> "a row's cell is drawn above its baseline" invariant).
+
+**Paging interaction is provisional:** the shots show the layouts, not the keys, so
+**Left**/**Right**/**Space** cycle the pages (wrapping) pending the expert's
+sign-off on how the original actually pages. Okay/Escape close as everywhere else.
+Rows that overflow are clipped (no scroll yet); empty → "No colonies yet."
 
 ### Unit rosters — Military & Naval (`ClassicReportRosterPanel`)
 
@@ -645,19 +667,29 @@ unit is the pioneer already ashore, so it is correctly absent from the hold);
 and `Messages.getName`/`getUnitLabel`. Escape/Okay close each; opening another
 report replaces the previous window.
 
-> **Verification caveat — which row paths have run with real data.** The `--fast`
-> start has no colonies and no native contact, so the reports verified *populated*
-> are Military, Naval, Trade, Cargo and Exploration. The **Colony** Advisor's row
-> path was verified with a real colony on 2026-07-14, and **Production** reuses the
-> same `getNetProductionOf`/`getScaledSettlementImage` calls; the **Religious**,
-> **Congress** and **Indian** row loops have so far only run through their
-> empty-state branch. Populate them (found a colony / meet a tribe) when next
-> testing near that code.
+**Verified with a live colony (2026-07-15).** The `--fast` start put the active
+unit ashore as a **Pionier** (the documented variant), so **B** → confirm the site
+warnings founded *Nieuw Amsterdam* directly, no sailing needed. With it standing:
+
+- **F3** both pages, with the row data matching `opening_015`'s shape — *Sons of
+  Liberty*: flag, pop badge `1`, `Nieuw Amst…`, `0%`, **`Rathaus`**, bells `4`; then
+  **Right** → *Military Garrison*: same left column, `—` (the colonist works inside,
+  so it is correctly not a garrison unit); **Right** again wraps back.
+- **shift F4** *Nieuw Amster…* with its furs `+2`; **F1** *Nieuw Amsterdam* `+1`
+  crosses — closing those two row loops' verification gap. 0 SEVERE throughout.
+
+> **Verification caveat — the row loops still unproven with data.** **Congress**
+> (needs a founding father) and **Indian** (needs native contact) have so far only
+> run through their empty-state branch. Populate them when next testing near that
+> code. Note founding a colony also puts a road on its tile and turns the founding
+> pioneer into a plain colonist — that is the engine's own behaviour, not a bug.
 
 **Follow-ups (later slices):** the remaining reports (foreign affairs — needs the
-async `nationSummary` fetch — labour / education / history / requirements) and the
-original's page-through between column sets; click-a-colony-row to open its colony
-screen; row scrolling for many entities; localizing the column heads.
+async `nationSummary` fetch — labour / education / history / requirements); the
+expert's sign-off on the Colony Advisor's **paging keys** and whether it wants more
+pages (population / production were mentioned but are not in the two shots);
+click-a-colony-row to open its colony screen; row scrolling for many entities;
+localizing the column heads and the page subtitles.
 
 ## Seam facts (for the remaining/next work)
 
