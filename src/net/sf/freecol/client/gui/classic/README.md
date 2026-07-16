@@ -336,10 +336,16 @@ excluded); it is functional, not yet pixel-faithful chrome.
     items still reaches `GUI` methods the classic UI no-ops.
 - **`ClassicInfoPanel` — the right strip.** A fixed-width (240px) `Graphics2D`-
   painted panel echoing the original's right column, backed by the original's
-  **`WOODPANL.PIK`** wood-panel texture (`paintWoodChrome` scales it to the strip
-  width, tiles it down the height and washes it slightly darker so the gold/
-  parchment text keeps contrast; it falls back to the flat dark ground when the
-  pack is absent). It
+  **`WOODPANL.PIK`** wood-panel texture (`paintWoodChrome`, washed slightly darker
+  so the gold/parchment text keeps contrast; flat dark ground when the pack is
+  absent). `WOODPANL.PIK` has a dark ornamental border on all four edges, so
+  tiling the whole image repeats its top/bottom border mid-strip as hard
+  horizontal seams; instead `paintWoodChrome` tiles only the **central grain band**
+  (the borderless middle 40% of the source) — the left/right border *columns* are
+  full-height so they stay continuous and keep the framed look, while the seams
+  fall in uninterrupted wood — and **flips every other copy vertically** so
+  adjacent copies meet at a matching grain edge (a mirror fold) rather than a hard
+  discontinuity. It
   reads live state directly from the model (`game.getTurn()`, `player.getGold()`
   / `getTax()`) and from the `ClassicMapViewer`'s view state (`getActiveUnit` /
   `getSelectedTile`), showing top-to-bottom: the **minimap** (at the very top, as

@@ -24,8 +24,8 @@ Two independent axes (keep them separate):
   HUD (menu bar + info panel), colony screen, Europe screen, ten advisor reports (Colony / Military /
   Naval / Trade / Religious / Production / Congress / Exploration / Cargo / Indian over a shared
   `ClassicReportPanel` frame, the Colony Advisor **paging** through its column sets as the original
-  does), order buttons, in-panel minimap + unit portrait, wood chrome, Col1's light-on-dark menu bar,
-  localized report captions; **Phase 3 (dialogs) ⬜** · **Phase 4 (pre-game/setup) ⬜**.
+  does), order buttons, in-panel minimap + unit portrait, seam-free wood chrome, Col1's light-on-dark
+  menu bar, localized report captions; **Phase 3 (dialogs) ⬜** · **Phase 4 (pre-game/setup) ⬜**.
 - **Assets (bring-your-own install):** A0/A1/A3 ✅ · **A2 🔨 growing** (alias curation) · A5/A6 ⬜.
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
@@ -71,8 +71,10 @@ Two independent axes (keep them separate):
    ~~Unit portrait in the info panel~~ ✅ (`ClassicInfoPanel.paintUnitPortrait`). ~~Localize the
    key-hint captions, report column heads and Colony Advisor subtitles~~ ✅ (new isolated
    `classic.report.*` keys in `FreeColMessages[_de].properties`, German subtitles matching the
-   original; info-panel hints reuse the action `.name` keys — README "Caption localization"). Remaining:
-   the colony/Europe screens' own few hard-coded captions; refine the wood-chrome tiling seams.
+   original; info-panel hints reuse the action `.name` keys — README "Caption localization").
+   ~~Wood-chrome tiling seams~~ ✅ (`paintWoodChrome` tiles the borderless central grain band with a
+   vertical flip-flop — README `ClassicInfoPanel`). Remaining: only the colony/Europe screens' own few
+   hard-coded captions — **HUD polish is otherwise done**; the bulk of what's left is item 3.
 3. **Screen-interaction polish.** *Colony:* validate the provisional `BUILDING.SS` frame map, place
    buildings at the original fixed ground-slots (vs. our flow layout), and add interaction (drag
    colonists between tiles/buildings, build queue, cargo). *Europe:* drag-to-board / load-cargo /

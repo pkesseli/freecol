@@ -259,19 +259,36 @@ final class ClassicInfoPanel extends JPanel {
 
     /**
      * The original's wood-panel chrome ({@code WOODPANL.PIK}) behind the strip,
-     * scaled to the panel width and tiled down its height, with a light dark wash
-     * so the gold/parchment text keeps its contrast.  Falls back to the flat
-     * {@code GROUND} colour (already painted by {@code super}) when the pack is
-     * absent.
+     * with a light dark wash so the gold/parchment text keeps its contrast.  Falls
+     * back to the flat {@code GROUND} colour (already painted by {@code super})
+     * when the pack is absent.
+     *
+     * <p>{@code WOODPANL.PIK} has a dark ornamental <b>border</b> on all four
+     * edges.  Naively tiling the whole image down the strip repeats the dark
+     * <em>top/bottom</em> border mid-panel, which reads as hard horizontal seams.
+     * Instead we tile only a central <b>grain band</b> (the borderless middle of
+     * the source): its left/right border columns are full-height, so they stay
+     * continuous down the strip and keep the framed look, while the seams now fall
+     * in uninterrupted wood.  Each copy is <b>flipped vertically</b> from the last
+     * ({@code flip}), so adjacent copies meet at a <em>matching</em> grain edge — a
+     * mirror fold — rather than a hard grain discontinuity.
      */
     private void paintWoodChrome(Graphics2D g) {
         final BufferedImage wood
             = ImageLibrary.getUnscaledImage("image.classic_original.pik.WOODPANL.PIK");
         if (wood == null || wood.getWidth() <= 0) return;
+        final int sw = wood.getWidth();
+        final int sh = wood.getHeight();
+        final int sy1 = sh * 3 / 10;     // crop out the top ~30% ...
+        final int sy2 = sh * 7 / 10;     // ... and bottom ~30% ornamental borders
         final int tw = getWidth();
-        final int th = Math.max(1, wood.getHeight() * tw / wood.getWidth());
-        for (int yy = 0; yy < getHeight(); yy += th) {
-            g.drawImage(wood, 0, yy, tw, th, null);
+        final int th = Math.max(1, (sy2 - sy1) * tw / sw);
+        boolean flip = false;
+        for (int yy = 0; yy < getHeight(); yy += th, flip = !flip) {
+            // Flip vertically by swapping the source top/bottom edges.
+            final int a = flip ? sy2 : sy1;
+            final int b = flip ? sy1 : sy2;
+            g.drawImage(wood, 0, yy, tw, yy + th, 0, a, sw, b, null);
         }
         g.setColor(new Color(0x18, 0x10, 0x0A, 0x66));
         g.fillRect(0, 0, getWidth(), getHeight());
