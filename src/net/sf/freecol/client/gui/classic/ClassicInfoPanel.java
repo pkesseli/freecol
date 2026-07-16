@@ -110,10 +110,19 @@ final class ClassicInfoPanel extends JPanel {
         "waitAction", "skipUnitAction", "disbandUnitAction",
     };
 
+    /** Size (px) of the active unit's portrait box. */
+    private static final int PORTRAIT = 36;
+
+    /** Plate behind the unit portrait. */
+    private static final Color PORTRAIT_BG = new Color(0x14, 0x10, 0x0a);
+
     private final FreeColClient freeColClient;
 
     /** Source of the live view state (active unit / selected tile / mode). */
     private final ClassicMapViewer mapViewer;
+
+    /** For the active unit's portrait sprite. */
+    private final ImageLibrary lib;
 
     /** Order-button hit targets, rebuilt each paint. */
     private final List<Rectangle> buttonBounds = new ArrayList<>();
@@ -127,9 +136,11 @@ final class ClassicInfoPanel extends JPanel {
     private double minimapScale = 1.0;
 
 
-    ClassicInfoPanel(FreeColClient freeColClient, ClassicMapViewer mapViewer) {
+    ClassicInfoPanel(FreeColClient freeColClient, ClassicMapViewer mapViewer,
+                     ImageLibrary lib) {
         this.freeColClient = freeColClient;
         this.mapViewer = mapViewer;
+        this.lib = lib;
         setOpaque(true);
         setBackground(GROUND);
         setPreferredSize(new Dimension(PANEL_WIDTH, 100));
@@ -201,14 +212,26 @@ final class ClassicInfoPanel extends JPanel {
             g.setColor(HEAD);
             g.setFont(head);
             y = line(g, msg(unit.getLabel()), y);
+
+            // The portrait sits left of the unit's moves/terrain, as the original
+            // puts a sprite beside each unit (design ref: opening_006/008).  The
+            // name keeps its own full-width line above: our localized labels
+            // ("Pionier (Freier Kolonist)") are far longer than the original's and
+            // would not fit beside a portrait in a 240px strip.
+            final int top = y - 6;
+            paintUnitPortrait(g, unit, PAD, top);
+            final int tx = PAD + PORTRAIT + 8;
+
             g.setColor(TEXT);
             g.setFont(base);
-            y = line(g, Messages.message("infoPanel.moves") + " " + safeMoves(unit), y);
+            int ty = lineAt(g, Messages.message("infoPanel.moves") + " "
+                            + safeMoves(unit), tx, y + 8);
             final Tile ut = unit.getTile();
             if (ut != null && ut.getType() != null) {
                 g.setColor(DIM);
-                y = line(g, msg(ut.getLabel()), y);
+                ty = lineAt(g, msg(ut.getLabel()), tx, ty);
             }
+            y = Math.max(ty, top + PORTRAIT + 6);
         } else if (selected != null && selected.getType() != null) {
             g.setColor(HEAD);
             g.setFont(head);
@@ -380,8 +403,46 @@ final class ClassicInfoPanel extends JPanel {
 
     /** Draw one text line at {@code (PAD, y)} and return the next baseline. */
     private int line(Graphics2D g, String s, int y) {
-        if (s != null && !s.isEmpty()) g.drawString(s, PAD, y);
+        return lineAt(g, s, PAD, y);
+    }
+
+    /** Draw one text line at {@code (x, y)} and return the next baseline. */
+    private int lineAt(Graphics2D g, String s, int x, int y) {
+        if (s != null && !s.isEmpty()) g.drawString(s, x, y);
         return y + g.getFontMetrics().getHeight() + 2;
+    }
+
+    /**
+     * The active unit's map sprite, on a dark plate, as the info panel's portrait.
+     *
+     * <p>The original {@code ICONS.SS} unit sprites are ~16px, so they are
+     * up-scaled into the box <b>nearest-neighbour</b> — the same crisp-pixels
+     * treatment {@code ClassicMapViewer.drawCentered} gives them on the map (a
+     * plain scale would blur them to mush).  Guarded: with no pack the base art is
+     * larger and simply shrinks to fit instead.
+     */
+    private void paintUnitPortrait(Graphics2D g, Unit unit, int x, int y) {
+        g.setColor(PORTRAIT_BG);
+        g.fillRect(x, y, PORTRAIT, PORTRAIT);
+        g.setColor(RULE);
+        g.drawRect(x, y, PORTRAIT - 1, PORTRAIT - 1);
+
+        final BufferedImage img = this.lib.getScaledUnitImage(unit);
+        if (img == null || img.getWidth() <= 0 || img.getHeight() <= 0) return;
+
+        final Object old = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                           RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        final int inner = PORTRAIT - 6;
+        final double s = Math.min((double) inner / img.getWidth(),
+                                  (double) inner / img.getHeight());
+        final int w = Math.max(1, (int) Math.round(img.getWidth() * s));
+        final int h = Math.max(1, (int) Math.round(img.getHeight() * s));
+        g.drawImage(img, x + (PORTRAIT - w) / 2, y + (PORTRAIT - h) / 2, w, h,
+                    null);
+        if (old != null) {
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, old);
+        }
     }
 
     /** Draw a horizontal separator and return the y below it. */

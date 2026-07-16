@@ -246,7 +246,8 @@ public class ClassicGUI extends GUI {
                 this.mapViewer = new ClassicMapViewer(getFreeColClient(),
                                                       this, this.imageLibrary);
                 this.infoPanel = new ClassicInfoPanel(getFreeColClient(),
-                                                      this.mapViewer);
+                                                      this.mapViewer,
+                                                      this.imageLibrary);
                 // Phase 2 HUD: the map fills the centre, the classic info/orders
                 // strip sits on the right, and the reused InGameMenuBar (wired to
                 // the real FreeColActions) is the top menu bar.

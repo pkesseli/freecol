@@ -24,8 +24,8 @@ Two independent axes (keep them separate):
   HUD (menu bar + info panel), colony screen, Europe screen, ten advisor reports (Colony / Military /
   Naval / Trade / Religious / Production / Congress / Exploration / Cargo / Indian over a shared
   `ClassicReportPanel` frame, the Colony Advisor **paging** through its column sets as the original
-  does), order buttons, in-panel minimap, wood chrome, Col1's light-on-dark menu bar; **Phase 3
-  (dialogs) ⬜** · **Phase 4 (pre-game/setup) ⬜**.
+  does), order buttons, in-panel minimap + unit portrait, wood chrome, Col1's light-on-dark menu bar;
+  **Phase 3 (dialogs) ⬜** · **Phase 4 (pre-game/setup) ⬜**.
 - **Assets (bring-your-own install):** A0/A1/A3 ✅ · **A2 🔨 growing** (alias curation) · A5/A6 ⬜.
 - **Rules fidelity:** R0–R3 ⬜ — a separate track that does **not** block the UI.
 
@@ -68,9 +68,10 @@ Two independent axes (keep them separate):
    empty-state branch — see the README's verification caveat.
 2. **HUD polish (remaining).** ~~Menu-label contrast~~ ✅ (the bar is now Col1's light-on-dark — see the
    README's "Menu-bar contrast"; the **dropdown popups** are still default Swing, folded into the
-   Phase-3 reskin). Remaining: a unit portrait in the info panel; localize the residual key-hint
-   captions (Enter/Space/W), the report column heads and the Colony Advisor's page subtitles (none of
-   these have FreeCol message keys — needs new ones); refine the wood-chrome tiling seams.
+   Phase-3 reskin). ~~Unit portrait in the info panel~~ ✅ (`ClassicInfoPanel.paintUnitPortrait`).
+   Remaining: localize the residual key-hint captions (Enter/Space/W), the report column heads and the
+   Colony Advisor's page subtitles (none of these have FreeCol message keys — needs new ones); refine
+   the wood-chrome tiling seams.
 3. **Screen-interaction polish.** *Colony:* validate the provisional `BUILDING.SS` frame map, place
    buildings at the original fixed ground-slots (vs. our flow layout), and add interaction (drag
    colonists between tiles/buildings, build queue, cargo). *Europe:* drag-to-board / load-cargo /

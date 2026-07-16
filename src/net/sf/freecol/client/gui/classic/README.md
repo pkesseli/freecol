@@ -346,9 +346,16 @@ excluded); it is functional, not yet pixel-faithful chrome.
   in the original — `paintMinimap` draws the map viewer's cached raster scaled to
   the strip width, framed, with the viewport box, and recentres the map on a
   click; see "Minimap raster" above); turn (season+year), gold, tax; then
-  the active unit (localized `getLabel`, `getMovesAsString`, the terrain it stands
-  on) or, in TERRAIN mode, the selected tile's terrain; then the **order buttons**
-  (below); and a bottom reminder of the classic order keys (Enter / Space / W). It
+  the active unit — its localized `getLabel` on its own line, then a **portrait**
+  (`paintUnitPortrait`: the unit's map sprite on a dark plate, left of the
+  `getMovesAsString` / terrain lines, as the original puts a sprite beside each
+  unit — design ref `opening_006`/`opening_008`; the name keeps a full-width line
+  because our localized labels, "Pionier (Freier Kolonist)", are far longer than
+  Col1's and would not fit beside a 36px portrait in a 240px strip). The `ICONS.SS`
+  sprites are ~16px, so the portrait up-scales them **nearest-neighbour**, the same
+  crisp-pixels treatment the map gives them. In TERRAIN mode the selected tile's
+  terrain shows instead; then the **order buttons** (below); and a bottom reminder
+  of the classic order keys (Enter / Space / W). It
   is repainted by `ClassicGUI`'s `repaintInfo()` on every
   `changeView`/`refresh`/`refreshTile`, so it tracks the active unit and treasury
   live (verified: moving the ship updated Moves 5/5 → 3/5 and the terrain line). The
