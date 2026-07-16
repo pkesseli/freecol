@@ -518,9 +518,18 @@ by pack key, with a flat-sepia fallback when the pack is absent), the gold-on-bl
 bottom-right; **Escape** and clicking Okay both close it. Subclasses implement
 `backgroundKey()`, `titleKey()` and `paintBody(Graphics2D)` (drawing the header +
 rows between `ROW_Y0` and `BODY_BOTTOM`), and may override `onBodyClick(vx,vy)` for
-clickable rows (default no-op). Shared drawing helpers (`drawFitted`, `clip`,
-`font`, and `cap(key)` for captions) and the palette/layout constants live on the
-base.
+extra click behaviour (default no-op). Shared drawing helpers (`drawFitted`,
+`clip`, `font`, and `cap(key)` for captions) and the palette/layout constants live
+on the base.
+
+**Clickable colony rows.** A report that lists colonies calls
+`addColonyRow(yBaseline, colony)` per row during paint (the base clears the hit
+list each paint, before `paintBody`); the base then handles the rest — a click in a
+row band closes the report and opens that colony's screen via
+`getGUI().showColonyPanel(colony, null)` (a jump-to, as the original advisor does),
+and the cursor turns to a hand over a clickable row. Wired in the Colony Advisor,
+Production and Religious reports (the three that list colonies). The Okay-plate and
+Escape close paths take priority over a row hit.
 
 **Caption localization.** The reports' short captions — column heads, the Colony
 Advisor's page subtitles, the Religious/Congress summary labels, the empty-state
@@ -728,9 +737,9 @@ warnings founded *Nieuw Amsterdam* directly, no sailing needed. With it standing
 **Follow-ups (later slices):** the remaining reports (foreign affairs — needs the
 async `nationSummary` fetch — labour / education / history / requirements); the
 expert's sign-off on the Colony Advisor's **paging keys** and whether it wants more
-pages (population / production were mentioned but are not in the two shots);
-click-a-colony-row to open its colony screen; row scrolling for many entities. (The
-captions are localized now — see "Caption localization" above.)
+pages (population / production were mentioned but are not in the two shots); row
+scrolling for many entities. (Captions are localized and colony rows are clickable
+now — see "Caption localization" and "Clickable colony rows" above.)
 
 ## Seam facts (for the remaining/next work)
 

@@ -26,10 +26,14 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Cursor;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
@@ -40,6 +44,7 @@ import javax.swing.KeyStroke;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.model.Colony;
 
 
 /**
@@ -112,6 +117,14 @@ abstract class ClassicReportPanel extends JPanel {
     private int originX;
     private int originY;
 
+    /**
+     * Clickable colony rows (a virtual-space row band &rarr; its colony),
+     * rebuilt every paint by the reports that list colonies.  A click in a band
+     * jumps to that colony's screen, as the original advisor does; the cursor
+     * turns to a hand over one.
+     */
+    private final List<ColonyHit> colonyHits = new ArrayList<>();
+
 
     ClassicReportPanel(FreeColClient freeColClient, ImageLibrary lib,
                        Runnable onClose) {
@@ -127,6 +140,12 @@ abstract class ClassicReportPanel extends JPanel {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     handleClick(e);
+                }
+            });
+        addMouseMotionListener(new MouseMotionAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    updateCursor(e);
                 }
             });
     }
@@ -148,10 +167,33 @@ abstract class ClassicReportPanel extends JPanel {
 
     /**
      * Handle a click in the report body, in virtual coordinates.  The default
-     * is a no-op (only the Okay plate / Escape close); reports that want
-     * clickable rows override this.
+     * is a no-op (only the Okay plate / Escape / colony-row jumps are handled by
+     * the base); reports that want other click behaviour override this.
      */
     protected void onBodyClick(int vx, int vy) {}
+
+    /**
+     * Record a full-width clickable row for {@code colony} at text baseline
+     * {@code y} — a report that lists colonies calls this per row during paint so
+     * a click there jumps to the colony's screen.  Cleared each paint.
+     */
+    protected void addColonyRow(int y, Colony colony) {
+        this.colonyHits.add(new ColonyHit(y - ROW_H + 3, ROW_H, colony));
+    }
+
+    /** The colony whose row band contains virtual {@code vy}, or null. */
+    private Colony colonyAt(int vy) {
+        for (ColonyHit h : this.colonyHits) {
+            if (vy >= h.y && vy < h.y + h.h) return h.colony;
+        }
+        return null;
+    }
+
+    /** Close this report and open {@code colony}'s screen (jump-to). */
+    private void openColony(Colony colony) {
+        close();
+        this.freeColClient.getGUI().showColonyPanel(colony, null);
+    }
 
 
     // Input
@@ -177,7 +219,21 @@ abstract class ClassicReportPanel extends JPanel {
             close();
             return;
         }
+        final Colony colony = colonyAt(vy);
+        if (colony != null) {
+            openColony(colony);
+            return;
+        }
         onBodyClick(vx, vy);
+    }
+
+    /** Hand cursor over a clickable colony row, default cursor elsewhere. */
+    private void updateCursor(MouseEvent e) {
+        if (this.scale <= 0) return;
+        final int vy = (e.getY() - this.originY) / this.scale;
+        final boolean hand = colonyAt(vy) != null;
+        setCursor(Cursor.getPredefinedCursor(
+            hand ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }
 
     protected void close() {
@@ -205,6 +261,7 @@ abstract class ClassicReportPanel extends JPanel {
 
         paintBackground(g);
         paintTitle(g);
+        this.colonyHits.clear();   // rebuilt by paintBody via addColonyRow
         paintBody(g);
         paintOk(g);
         g.dispose();
@@ -273,5 +330,18 @@ abstract class ClassicReportPanel extends JPanel {
 
     protected Font font(float size, int style) {
         return getFont().deriveFont(style, size);
+    }
+
+    /** A clickable colony row: a virtual-space y-band and its colony. */
+    private static final class ColonyHit {
+        final int y;
+        final int h;
+        final Colony colony;
+
+        ColonyHit(int y, int h, Colony colony) {
+            this.y = y;
+            this.h = h;
+            this.colony = colony;
+        }
     }
 }

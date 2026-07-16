@@ -65,7 +65,9 @@ Two independent axes (keep them separate):
    fetch, so more than a static paint — plus labour/education/history/requirements; `REPORT9`, a
    duplicate of the `REPORT1` native-scout art, is still unassigned). Extend `ClassicReportPanel` (unit
    rosters: `ClassicReportRosterPanel`). The Congress and Indian row loops have only run their
-   empty-state branch — see the README's verification caveat.
+   empty-state branch — see the README's verification caveat. **Colony rows are clickable** — a click
+   in the Colony/Production/Religious reports jumps to that colony's screen (README "Clickable colony
+   rows").
 2. **HUD polish (remaining).** ~~Menu-label contrast~~ ✅ (Col1's light-on-dark bar — README "Menu-bar
    contrast"; the **dropdown popups** are still default Swing, folded into the Phase-3 reskin).
    ~~Unit portrait in the info panel~~ ✅ (`ClassicInfoPanel.paintUnitPortrait`). ~~Localize the

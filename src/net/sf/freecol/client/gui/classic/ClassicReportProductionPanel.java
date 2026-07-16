@@ -99,6 +99,7 @@ final class ClassicReportProductionPanel extends ClassicReportPanel {
             g.setColor(ROW_ALT);
             g.fillRect(0, y - ROW_H + 3, VW, ROW_H);
         }
+        addColonyRow(y, colony);   // click a row to jump to the colony's screen
         final BufferedImage flag = this.lib.getScaledSettlementImage(colony);
         if (flag != null) drawFitted(g, flag, COL_FLAG, y - ROW_H + 4, 14);
 

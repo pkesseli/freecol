@@ -206,6 +206,7 @@ final class ClassicReportColonyPanel extends ClassicReportPanel {
             g.setColor(ROW_ALT);
             g.fillRect(0, y - ROW_H + 3, VW, ROW_H);
         }
+        addColonyRow(y, colony);   // click a row to jump to the colony's screen
         paintColonyCell(g, colony, y);
         switch (this.page) {
         case SONS_OF_LIBERTY:
