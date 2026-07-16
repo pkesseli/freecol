@@ -82,7 +82,7 @@ final class ClassicReportCargoPanel extends ClassicReportPanel {
         if (carriers.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No carriers.", COL_NAME, ROW_Y0);
+            g.drawString(cap("empty.carriers"), COL_NAME, ROW_Y0);
             return;
         }
         carriers.sort(Comparator.comparing(
@@ -90,8 +90,8 @@ final class ClassicReportCargoPanel extends ClassicReportPanel {
 
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Carrier", COL_NAME, HEAD_Y);
-        g.drawString("Cargo", COL_CARGO, HEAD_Y);
+        g.drawString(cap("head.carrier"), COL_NAME, HEAD_Y);
+        g.drawString(cap("head.cargo"), COL_CARGO, HEAD_Y);
 
         int y = ROW_Y0;
         int i = 0;
@@ -137,7 +137,7 @@ final class ClassicReportCargoPanel extends ClassicReportPanel {
         if (carrier.getCompactGoodsList().isEmpty()
             && carrier.getUnitList().isEmpty()) {
             g.setColor(HEAD_FG);
-            g.drawString("(empty)", COL_CARGO, y);
+            g.drawString(cap("cargo.empty"), COL_CARGO, y);
         }
     }
 }

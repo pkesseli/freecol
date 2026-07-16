@@ -262,6 +262,15 @@ abstract class ClassicReportPanel extends JPanel {
         return (s.length() <= n) ? s : s.substring(0, n - 1) + "…";
     }
 
+    /**
+     * A localized classic-report caption — {@code key} is the tail under the
+     * {@code classic.report.} namespace (e.g. {@code "head.colony"}), added in the
+     * isolated block of {@code FreeColMessages[_de].properties}.
+     */
+    protected static String cap(String key) {
+        return Messages.message("classic.report." + key);
+    }
+
     protected Font font(float size, int style) {
         return getFont().deriveFont(style, size);
     }

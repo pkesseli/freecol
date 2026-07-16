@@ -76,10 +76,10 @@ final class ClassicReportExplorationPanel extends ClassicReportPanel {
 
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Region", COL_NAME, HEAD_Y);
-        g.drawString("Type", COL_TYPE, HEAD_Y);
-        g.drawString("Turn", COL_TURN, HEAD_Y);
-        g.drawString("Score", COL_SCORE, HEAD_Y);
+        g.drawString(cap("head.region"), COL_NAME, HEAD_Y);
+        g.drawString(cap("head.type"), COL_TYPE, HEAD_Y);
+        g.drawString(cap("head.turn"), COL_TURN, HEAD_Y);
+        g.drawString(cap("head.score"), COL_SCORE, HEAD_Y);
 
         final List<Region> regions = new ArrayList<>();
         for (Region r : map.getRegions()) {
@@ -88,7 +88,7 @@ final class ClassicReportExplorationPanel extends ClassicReportPanel {
         if (regions.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("Nothing discovered yet.", COL_NAME, ROW_Y0);
+            g.drawString(cap("empty.regions"), COL_NAME, ROW_Y0);
             return;
         }
         regions.sort(BY_RECENT);

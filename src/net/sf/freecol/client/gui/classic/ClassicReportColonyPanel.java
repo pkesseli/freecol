@@ -74,18 +74,19 @@ final class ClassicReportColonyPanel extends ClassicReportPanel {
 
     /** The column sets this report pages through (design refs in the class doc). */
     private enum Page {
-        SONS_OF_LIBERTY("Sons of Liberty"),
-        MILITARY("Military Garrison");
+        SONS_OF_LIBERTY("colony.sol"),
+        MILITARY("colony.military");
 
         /**
-         * The page's subtitle.  Hard-coded English: the original's own captions
-         * ("Söhne der Freiheit" / "Militärgarnision") have no FreeCol message
-         * keys — the same localization follow-up the other reports' heads carry.
+         * The message-key tail for the page's subtitle, under the classic.report.
+         * namespace.  In German these resolve to the original's own captions —
+         * "Söhne der Freiheit" / "Militärgarnision" — matching {@code opening_015}
+         * / {@code opening_014}.
          */
-        final String subtitle;
+        final String subtitleKey;
 
-        Page(String subtitle) {
-            this.subtitle = subtitle;
+        Page(String subtitleKey) {
+            this.subtitleKey = subtitleKey;
         }
     }
 
@@ -178,7 +179,7 @@ final class ClassicReportColonyPanel extends ClassicReportPanel {
         if (colonies.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No colonies yet.", COL_NAME, PAGE_ROW_Y0);
+            g.drawString(cap("empty.colonies"), COL_NAME, PAGE_ROW_Y0);
             return;
         }
 
@@ -196,7 +197,7 @@ final class ClassicReportColonyPanel extends ClassicReportPanel {
     private void paintSubtitle(Graphics2D g) {
         g.setFont(font(6f, Font.BOLD));
         g.setColor(SUBTITLE_FG);
-        final String s = this.page.subtitle;
+        final String s = cap(this.page.subtitleKey);
         g.drawString(s, (VW - g.getFontMetrics().stringWidth(s)) / 2, SUBTITLE_Y);
     }
 

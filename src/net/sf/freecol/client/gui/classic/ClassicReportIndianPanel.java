@@ -79,9 +79,9 @@ final class ClassicReportIndianPanel extends ClassicReportPanel {
 
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Tribe", COL_NAME, HEAD_Y);
-        g.drawString("Villages", COL_SETTLEMENTS, HEAD_Y);
-        g.drawString("Attitude", COL_TENSION, HEAD_Y);
+        g.drawString(cap("head.tribe"), COL_NAME, HEAD_Y);
+        g.drawString(cap("head.villages"), COL_SETTLEMENTS, HEAD_Y);
+        g.drawString(cap("head.attitude"), COL_TENSION, HEAD_Y);
 
         final List<Player> tribes = new ArrayList<>();
         for (Player p : (Iterable<Player>)
@@ -91,7 +91,7 @@ final class ClassicReportIndianPanel extends ClassicReportPanel {
         if (tribes.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No tribes contacted yet.", COL_NAME, ROW_Y0);
+            g.drawString(cap("empty.tribes"), COL_NAME, ROW_Y0);
             return;
         }
         tribes.sort(Comparator.comparing(

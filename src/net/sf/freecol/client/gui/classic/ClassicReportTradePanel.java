@@ -80,11 +80,14 @@ final class ClassicReportTradePanel extends ClassicReportPanel {
 
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
+        final String hGoods = cap("head.goods");
+        final String hNet = cap("head.net");
+        final String hPrice = cap("head.price");
         for (int c = 0; c < COLUMNS; c++) {
             final int dx = c * HALF;
-            g.drawString("Goods", COL_NAME + dx, HEAD_Y);
-            g.drawString("Net", COL_PROD + dx, HEAD_Y);
-            g.drawString("$", COL_PRICE + dx, HEAD_Y);
+            g.drawString(hGoods, COL_NAME + dx, HEAD_Y);
+            g.drawString(hNet, COL_PROD + dx, HEAD_Y);
+            g.drawString(hPrice, COL_PRICE + dx, HEAD_Y);
         }
 
         int i = 0;

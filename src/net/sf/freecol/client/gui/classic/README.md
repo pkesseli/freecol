@@ -355,12 +355,13 @@ excluded); it is functional, not yet pixel-faithful chrome.
   sprites are ~16px, so the portrait up-scales them **nearest-neighbour**, the same
   crisp-pixels treatment the map gives them. In TERRAIN mode the selected tile's
   terrain shows instead; then the **order buttons** (below); and a bottom reminder
-  of the classic order keys (Enter / Space / W). It
+  of the classic order keys (Enter / Space / W, each followed by its **localized**
+  action name via the reused `endTurnAction`/`skipUnitAction`/`waitAction` `.name`
+  keys). It
   is repainted by `ClassicGUI`'s `repaintInfo()` on every
   `changeView`/`refresh`/`refreshTile`, so it tracks the active unit and treasury
   live (verified: moving the ship updated Moves 5/5 → 3/5 and the terrain line). The
-  Gold/Tax/Moves/end-of-turn captions are localized (`gold`/`tax`/`infoPanel.moves`/
-  `endTurnAction.name`).
+  Gold/Tax/Moves captions are localized (`gold`/`tax`/`infoPanel.moves`).
 - **Order buttons (the "orders" half).** The panel's lower half hosts the original's
   unit-order buttons by **reusing the real `FreeColAction`s** (the sanctioned "reuse
   `action/`" path). Each order action carries its own four-state order-button art
@@ -512,9 +513,20 @@ bottom-right; **Escape** and clicking Okay both close it. Subclasses implement
 `backgroundKey()`, `titleKey()` and `paintBody(Graphics2D)` (drawing the header +
 rows between `ROW_Y0` and `BODY_BOTTOM`), and may override `onBodyClick(vx,vy)` for
 clickable rows (default no-op). Shared drawing helpers (`drawFitted`, `clip`,
-`font`) and the palette/layout constants live on the base. Column heads are
-hard-coded English for now (there are no FreeCol keys for these short heads — the
-same localization follow-up the info panel carries).
+`font`, and `cap(key)` for captions) and the palette/layout constants live on the
+base.
+
+**Caption localization.** The reports' short captions — column heads, the Colony
+Advisor's page subtitles, the Religious/Congress summary labels, the empty-state
+lines — have no equivalent in the standard FreeCol UI, so they get their own keys
+in an isolated `classic.report.*` block appended to
+`FreeColMessages[_de].properties`, fetched through the base's `cap(tail)` helper
+(`Messages.message("classic.report." + tail)`). The German block deliberately
+gives the Colony Advisor its **original captions** — `classic.report.colony.sol`
+= "Söhne der Freiheit", `classic.report.colony.military` = "Militärgarnision" —
+matching `opening_015` / `opening_014`. The info panel's key-hint captions reuse
+the existing `endTurnAction`/`skipUnitAction`/`waitAction` `.name` keys (the key
+tokens Enter/Space/W stay literal, being our actual bindings).
 
 **Row geometry (the invariant to keep).** A row's cell spans `[y-ROW_H+3, y+3)`
 about its baseline `y`, and sprites are drawn from `y-ROW_H+4` — i.e. a row
@@ -703,8 +715,8 @@ warnings founded *Nieuw Amsterdam* directly, no sailing needed. With it standing
 async `nationSummary` fetch — labour / education / history / requirements); the
 expert's sign-off on the Colony Advisor's **paging keys** and whether it wants more
 pages (population / production were mentioned but are not in the two shots);
-click-a-colony-row to open its colony screen; row scrolling for many entities;
-localizing the column heads and the page subtitles.
+click-a-colony-row to open its colony screen; row scrolling for many entities. (The
+captions are localized now — see "Caption localization" above.)
 
 ## Seam facts (for the remaining/next work)
 

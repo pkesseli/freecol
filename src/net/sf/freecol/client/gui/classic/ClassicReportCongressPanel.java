@@ -89,15 +89,15 @@ final class ClassicReportCongressPanel extends ClassicReportPanel {
 
         final FoundingFather current = player.getCurrentFather();
         final String recruiting = (current == null)
-            ? "(none)" : Messages.getName(current);
-        g.drawString("Recruiting: " + clip(recruiting, 24), COL_NAME - 2,
-                     SUMMARY_Y0);
+            ? "—" : Messages.getName(current);
+        g.drawString(cap("congress.recruiting") + ": " + clip(recruiting, 22),
+                     COL_NAME - 2, SUMMARY_Y0);
 
         final int liberty = Math.max(0, player.getLiberty());
         final int total = player.getTotalFoundingFatherCost();
-        final String bells = "Bells: " + liberty
+        final String bells = cap("congress.bells") + ": " + liberty
             + ((total > 0) ? " / " + total : "")
-            + "  (+" + player.getLibertyProductionNextTurn() + "/turn)";
+            + "  (+" + player.getLibertyProductionNextTurn() + ")";
         g.drawString(bells, COL_NAME - 2, SUMMARY_Y0 + 12);
     }
 
@@ -105,15 +105,15 @@ final class ClassicReportCongressPanel extends ClassicReportPanel {
     private void paintFathers(Graphics2D g, Player player) {
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Founding Father", COL_NAME, TABLE_HEAD_Y);
-        g.drawString("Category", COL_TYPE, TABLE_HEAD_Y);
+        g.drawString(cap("head.foundingFather"), COL_NAME, TABLE_HEAD_Y);
+        g.drawString(cap("head.category"), COL_TYPE, TABLE_HEAD_Y);
 
         final List<FoundingFather> fathers
             = new ArrayList<>(player.getFoundingFathers());
         if (fathers.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No founding fathers yet.", COL_NAME, TABLE_Y0);
+            g.drawString(cap("empty.fathers"), COL_NAME, TABLE_Y0);
             return;
         }
         fathers.sort(Comparator.comparing((FoundingFather f) -> f.getType())

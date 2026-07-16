@@ -81,8 +81,8 @@ abstract class ClassicReportRosterPanel extends ClassicReportPanel {
 
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Unit", COL_NAME, HEAD_Y);
-        g.drawString("Qty", COL_COUNT, HEAD_Y);
+        g.drawString(cap("head.unit"), COL_NAME, HEAD_Y);
+        g.drawString(cap("head.qty"), COL_COUNT, HEAD_Y);
 
         int y = ROW_Y0;
         int i = 0;

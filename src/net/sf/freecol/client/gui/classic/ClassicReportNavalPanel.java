@@ -56,6 +56,6 @@ final class ClassicReportNavalPanel extends ClassicReportRosterPanel {
 
     @Override
     protected String emptyText() {
-        return "No naval units.";
+        return cap("empty.naval");
     }
 }

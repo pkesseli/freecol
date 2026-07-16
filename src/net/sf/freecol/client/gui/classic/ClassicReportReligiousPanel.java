@@ -93,10 +93,10 @@ final class ClassicReportReligiousPanel extends ClassicReportPanel {
             final BufferedImage icon = this.lib.getScaledGoodsTypeImage(crosses);
             if (icon != null) drawFitted(g, icon, COL_ICON, SUMMARY_Y0 - 10, 12);
         }
-        g.drawString("Immigration: " + player.getImmigration() + " / "
-                     + player.getImmigrationRequired(),
+        g.drawString(cap("religion.immigration") + ": " + player.getImmigration()
+                     + " / " + player.getImmigrationRequired(),
                      COL_NAME, SUMMARY_Y0);
-        g.drawString("Crosses per turn: +"
+        g.drawString(cap("religion.crossesPerTurn") + ": +"
                      + player.getTotalImmigrationProduction(),
                      COL_NAME, SUMMARY_Y0 + 12);
     }
@@ -106,14 +106,14 @@ final class ClassicReportReligiousPanel extends ClassicReportPanel {
                                List<GoodsType> crossTypes) {
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Colony", COL_NAME, TABLE_HEAD_Y);
-        g.drawString("Crosses", COL_CROSSES, TABLE_HEAD_Y);
+        g.drawString(cap("head.colony"), COL_NAME, TABLE_HEAD_Y);
+        g.drawString(cap("head.crosses"), COL_CROSSES, TABLE_HEAD_Y);
 
         final List<Colony> colonies = player.getColonyList();
         if (colonies.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No colonies yet.", COL_NAME, TABLE_Y0);
+            g.drawString(cap("empty.colonies"), COL_NAME, TABLE_Y0);
             return;
         }
 

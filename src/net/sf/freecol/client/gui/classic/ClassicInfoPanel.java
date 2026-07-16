@@ -250,9 +250,11 @@ final class ClassicInfoPanel extends JPanel {
         g.setColor(DIM);
         int yb = getHeight() - 74;
         yb = rule(g, yb);
-        yb = line(g, "Enter: end turn", yb);
-        yb = line(g, "Space: skip unit", yb);
-        line(g, "W: wait", yb);
+        // Localize the action names (reusing the real action keys); the key
+        // tokens are our actual classic bindings, so they stay literal.
+        yb = line(g, "Enter: " + Messages.message("endTurnAction.name"), yb);
+        yb = line(g, "Space: " + Messages.message("skipUnitAction.name"), yb);
+        line(g, "W: " + Messages.message("waitAction.name"), yb);
     }
 
     /**

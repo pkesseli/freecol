@@ -73,14 +73,14 @@ final class ClassicReportProductionPanel extends ClassicReportPanel {
 
         g.setFont(font(6f, Font.BOLD));
         g.setColor(HEAD_FG);
-        g.drawString("Colony", COL_NAME, HEAD_Y);
-        g.drawString("Production", COL_PROD, HEAD_Y);
+        g.drawString(cap("head.colony"), COL_NAME, HEAD_Y);
+        g.drawString(cap("head.production"), COL_PROD, HEAD_Y);
 
         final List<Colony> colonies = player.getColonyList();
         if (colonies.isEmpty()) {
             g.setFont(font(7f, Font.PLAIN));
             g.setColor(FG);
-            g.drawString("No colonies yet.", COL_NAME, ROW_Y0);
+            g.drawString(cap("empty.colonies"), COL_NAME, ROW_Y0);
             return;
         }
 
