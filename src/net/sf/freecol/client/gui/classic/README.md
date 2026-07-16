@@ -528,6 +528,14 @@ matching `opening_015` / `opening_014`. The info panel's key-hint captions reuse
 the existing `endTurnAction`/`skipUnitAction`/`waitAction` `.name` keys (the key
 tokens Enter/Space/W stay literal, being our actual bindings).
 
+**Verified live (2026-07-16, German locale, 0 SEVERE):** Trade heads render
+"Waren / Netto / $"; Exploration "Region / Typ / Runde / Punkte"; Congress
+"Rekrutierung / Glocken", "Gründervater / Kategorie", "Noch keine Gründerväter.";
+the info-panel hints "Enter: Zug beenden / Space: Überspringen / W: Warten/Nächste
+Einheit"; and the Colony Advisor pages between the two original captions —
+**"Söhne der Freiheit"** and **"Militärgarnision"** — over "Noch keine Kolonien.".
+Umlauts render correctly throughout.
+
 **Row geometry (the invariant to keep).** A row's cell spans `[y-ROW_H+3, y+3)`
 about its baseline `y`, and sprites are drawn from `y-ROW_H+4` — i.e. a row
 occupies space *above* its own baseline. So the first row's baseline must sit a
