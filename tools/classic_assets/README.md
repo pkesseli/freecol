@@ -2,7 +2,8 @@
 
 One-time, run-once tooling that converts **your own** legally-owned original
 *Sid Meier's Colonization* (1994) art into a local FreeCol mod pack for the
-classic UI. See `CLASSIC_UI_PLAN.md` → "Asset strategy" for the rationale.
+classic UI. See [`classic_ui_plan/assets.md`](../../classic_ui_plan/assets.md) for
+the rationale.
 
 **Nothing copyrighted is committed.** The tooling reads your install and writes
 a **git-ignored** `data/mods/classic_original/` pack; FreeCol loads it like any
