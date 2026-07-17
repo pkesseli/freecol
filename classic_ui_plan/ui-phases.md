@@ -8,6 +8,22 @@ shipped code works lives in
 per slice. Reference screenshots live in git-excluded `screenshots/` (never commit; `git add` explicit
 paths). Sub-states matter as much as idle layouts (open menus, in-progress drag, mid-dialog).
 
+## Open questions for the expert
+
+What is blocked on his ruling rather than on more code. Each is a **guess we shipped** or a **scope
+call we cannot make from the repo** — the detail lives in the phase item linked; this list is just the
+queue to take to him.
+
+| # | Question | Blocks | Cost of guessing wrong |
+|---|---|---|---|
+| **Q1** | **Which reports did Col1 actually have?** Backdrop count says at most one of the five unbuilt ones is real (probably foreign affairs); the rest look like FreeCol inventions to leave un-built. | [Phase 2 §1](#remaining) | Building four screens the original never had — worse than leaving them no-op. |
+| **Q2** | **The Colony Advisor's paging keys**, and whether it wants pages beyond Sons of Liberty / Military Garrison (population / production were mentioned but are in neither shot). | [Phase 2 §1](#remaining) | Shipped and wrong: keys nobody would press. |
+| **Q3** | **The popup look** — `ClassicDialog`'s metrics and green-on-wood palette are read off screenshots by eye, not measured from the art. `WOODPAN2.PIK` is unused; should it be? | [Phase 3 §2](#remaining-1) | Every popup in the game inherits the error. |
+| **Q4** | **Reference shots for the choice-list and text-input popups**, whose original look we have never seen. | [Phase 3 §1](#remaining-1) | Cannot start; they stay Swing stopgaps. |
+| **Q5** | **The colony screen's fixed building ground-slots** — the original places buildings at set positions; we flow-layout them. | [Phase 2 §3](#remaining) | Rework of the biggest remaining slice. |
+
+Q1 and Q4 are the cheap ones to ask first: Q1 can *delete* work, and Q4 unblocks a whole seam.
+
 ## Phase 0 — scaffold & launch ✅
 
 `ClassicGUI extends GUI`, `--classic` flag, selector, auto-launch lobby stopgap.
@@ -41,11 +57,19 @@ screens".)
 
 ### Remaining
 
-1. **Remaining reports.** The rest of the `showReport*Panel` seams still no-op — add them over their
-   `REPORTn.PIK` backdrops: **foreign affairs** (needs the async `nationSummary` fetch, so more than
-   a static paint), plus labour/education/history/requirements. `REPORT9`, a duplicate of the
-   `REPORT1` native-scout art, is still unassigned. Extend `ClassicReportPanel` (unit rosters:
-   `ClassicReportRosterPanel`).
+1. **Remaining reports — scope in question, see [Q1](#open-questions-for-the-expert).** The rest of
+   the `showReport*Panel` seams still no-op: **foreign affairs** (needs the async `nationSummary`
+   fetch, so more than a static paint), plus labour/education/history/requirements. Add them over
+   their `REPORTn.PIK` backdrops by extending `ClassicReportPanel` (unit rosters:
+   `ClassicReportRosterPanel`) — *but first settle how many are actually in scope.*
+   - **The original has nine report backdrops** (`REPORT1`–`REPORT9`); the ten reports we ship
+     already cover eight of them, and `REPORT9` is a duplicate of `REPORT1`'s native-scout art. So at
+     most **one** unbuilt report has original art behind it — plausibly foreign affairs, which Col1
+     does have. That suggests labour/education/history/requirements are **FreeCol inventions**, and
+     per [rules fidelity](rules-fidelity.md) §C ("FreeCol additions to keep out of the classic
+     experience") leaving those seams no-op would be the *correct* end state, not an unfinished one.
+     This is an inference from the backdrop count, not a fact — the expert's ruling decides whether
+     this item is one report or none.
    - The Colony Advisor **pages** through its column sets as the original does (Sons of Liberty /
      Military Garrison — the two the expert's shots document); the paging *keys* are a guess awaiting
      sign-off.
@@ -76,14 +100,15 @@ every popup routing through it. Live-verified 2026-07-17 (README "Popups"). Over
 
 ### Remaining
 
-1. **The other dialog seams.** `modalChoiceDialog` and `modalInputDialog` are still plain Swing
-   stopgaps — they need a list widget and a text field, whose original look wants the expert's
-   reference shots first. Then the event popups sharing these seams (meeting natives, king's demands,
-   learn-skill, lost-city rumours, disembark). Negotiation (`DiplomacyPanel`) and the end-turn "units
-   still active" prompt are the larger bespoke ones.
-2. **Expert sign-off on the popup look.** The metrics and the green-on-wood palette are read off the
-   original's screenshots by eye, not measured — a considered guess, like the Colony Advisor's paging
-   keys. `WOODPAN2.PIK` is not used yet.
+1. **The other dialog seams — blocked on [Q4](#open-questions-for-the-expert).** `modalChoiceDialog`
+   and `modalInputDialog` are still plain Swing stopgaps: they need a list widget and a text field,
+   and we have never seen the original's look for either. Then the event popups sharing these seams
+   (meeting natives, king's demands, learn-skill, lost-city rumours, disembark). Negotiation
+   (`DiplomacyPanel`) and the end-turn "units still active" prompt are the larger bespoke ones.
+2. **The popup look is a guess — see [Q3](#open-questions-for-the-expert).** `ClassicDialog`'s
+   metrics and green-on-wood palette are read off the original's screenshots by eye, not measured
+   from the art. Every popup inherits whatever is wrong, so this wants sign-off before the seams
+   above multiply it. `WOODPAN2.PIK` is not used yet.
 3. **The menu dropdowns** are still default Swing (deferred here from Phase 2's HUD polish).
 4. **Audit the other no-op seams.** The dispatch bug is the general hazard of a no-op base class: an
    un-overridden seam fails silently and invisibly, and dispatch seams strand *other* seams. Worth a

@@ -23,12 +23,13 @@ Two independent axes (keep them separate):
 Phase 0 scaffold ✅ · Phase 1 map ✅ · **Phase 2 HUD & core screens 🔨** — the map HUD, colony and
 Europe screens, and ten advisor reports ship; HUD polish is done. Left: **screen interaction** (drag
 colonists, build queue, cargo, set-sail) — the bulk of the phase — plus the remaining reports, whose
-scope is in question: the original has nine report backdrops and we have already covered eight, so
-labour/education/history/requirements may be FreeCol inventions to leave un-built (**awaiting the
-expert's ruling**). **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog` ships, and with it
-the in-game message channel, which the classic UI had been discarding silently; left are the
-choice/input seams and the bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch stopgap keeps
-the game reachable, so this is lower urgency). Cinematics are deliberately out of scope.
+scope is itself an open question. **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog`
+ships, and with it the in-game message channel, which the classic UI had been discarding silently;
+left are the choice/input seams and the bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch
+stopgap keeps the game reachable, so this is lower urgency). Cinematics are deliberately out of scope.
+
+> **Five open questions are blocked on the expert**, not on code — including one (Q1) that could
+> *delete* work. See [Open questions for the expert](classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
 
 ### [Assets](classic_ui_plan/assets.md) — bring-your-own original install (DECIDED)
 
