@@ -16,7 +16,7 @@ queue to take to him.
 
 | # | Question | Blocks | Cost of guessing wrong |
 |---|---|---|---|
-| **Q1** | **Which reports did Col1 actually have?** Backdrop count says at most one of the five unbuilt ones is real (probably foreign affairs); the rest look like FreeCol inventions to leave un-built. | [Phase 2 §1](#remaining) | Building four screens the original never had — worse than leaving them no-op. |
+| **Q1** | **May the classic UI surface information the original never aggregated?** The unbuilt reports add no Col1-absent *concepts* — it is an information-availability call, not a rules one. Two sub-calls: **Requirements** is an advisor Col1 never gave, and **History** would log two §C concepts. | [Phase 2 §1](#remaining) | Mild — conveniences, not rules breaks. The cost is handing the player aggregate views Col1 made you track by hand. |
 | **Q2** | **The Colony Advisor's paging keys**, and whether it wants pages beyond Sons of Liberty / Military Garrison (population / production were mentioned but are in neither shot). | [Phase 2 §1](#remaining) | Shipped and wrong: keys nobody would press. |
 | **Q3** | **The popup look** — `ClassicDialog`'s metrics and green-on-wood palette are read off screenshots by eye, not measured from the art. `WOODPAN2.PIK` is unused; should it be? | [Phase 3 §2](#remaining-1) | Every popup in the game inherits the error. |
 | **Q4** | **Reference shots for the choice-list and text-input popups**, whose original look we have never seen. | [Phase 3 §1](#remaining-1) | Cannot start; they stay Swing stopgaps. |
@@ -57,19 +57,31 @@ screens".)
 
 ### Remaining
 
-1. **Remaining reports — scope in question, see [Q1](#open-questions-for-the-expert).** The rest of
-   the `showReport*Panel` seams still no-op: **foreign affairs** (needs the async `nationSummary`
-   fetch, so more than a static paint), plus labour/education/history/requirements. Add them over
-   their `REPORTn.PIK` backdrops by extending `ClassicReportPanel` (unit rosters:
-   `ClassicReportRosterPanel`) — *but first settle how many are actually in scope.*
-   - **The original has nine report backdrops** (`REPORT1`–`REPORT9`); the ten reports we ship
-     already cover eight of them, and `REPORT9` is a duplicate of `REPORT1`'s native-scout art. So at
-     most **one** unbuilt report has original art behind it — plausibly foreign affairs, which Col1
-     does have. That suggests labour/education/history/requirements are **FreeCol inventions**, and
-     per [rules fidelity](rules-fidelity.md) §C ("FreeCol additions to keep out of the classic
-     experience") leaving those seams no-op would be the *correct* end state, not an unfinished one.
-     This is an inference from the backdrop count, not a fact — the expert's ruling decides whether
-     this item is one report or none.
+1. **Remaining reports — a scope question first, code second. See
+   [Q1](#open-questions-for-the-expert).** Five `showReport*Panel` seams still no-op: foreign
+   affairs, labour, education, history, requirements. Building one means extending
+   `ClassicReportPanel` over its `REPORTn.PIK` backdrop (unit rosters: `ClassicReportRosterPanel`) —
+   but *whether four of them belong in a faithful classic UI at all* is a design call, not a coding
+   one.
+   - **The original has no screen for four of them.** Nine report backdrops ship (`REPORT1`–
+     `REPORT9`); the ten reports we already show cover eight, and `REPORT9` duplicates `REPORT1`'s
+     native-scout art. So at most **one** unbuilt report has original art behind it — plausibly
+     foreign affairs, which Col1 does have.
+   - **But they are not FreeCol *inventions*** — the distinction that matters, and the one that makes
+     this the expert's call ([Q1](#open-questions-for-the-expert)) rather than ours. The concepts are
+     all Col1: **education** is a core original mechanic (the classic ruleset ships
+     schoolhouse/college/university and `allowStudentSelection`, itself listed Col1-faithful in
+     [rules fidelity](rules-fidelity.md) table A); **labour** is a census of unit types you own;
+     **history** logs `HistoryEvent`s that are almost all Col1 (discover New World, meet nation, city
+     of gold, found colony, founding father, declare independence, war/peace). So §C ("FreeCol
+     additions to keep out") does **not** settle this: the divergence is *informational* — aggregate
+     views the original made you track by hand — not conceptual, and it does not touch the rules axis.
+   - **Two genuine §C snags if we do build them.** **Requirements** is FreeCol's own advisor (its
+     Javadoc calls it "the Advanced Colony Report") telling you what your colonies lack — advice Col1
+     never gave, the one item here that adds a *capability* rather than a view. And **history** would
+     log `ABANDON_COLONY` and `DESTROY_NATION`, which map onto the two additions §C says to keep out.
+   - **Foreign affairs** is the one to build regardless of the ruling — Col1 has it, and it needs the
+     async `nationSummary` fetch, so it is more than a static paint.
    - The Colony Advisor **pages** through its column sets as the original does (Sons of Liberty /
      Military Garrison — the two the expert's shots document); the paging *keys* are a guess awaiting
      sign-off.
