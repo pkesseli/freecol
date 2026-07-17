@@ -25,6 +25,7 @@ import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -53,6 +54,7 @@ import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
+import net.sf.freecol.common.model.ModelMessage;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Tile;
@@ -686,6 +688,64 @@ public class ClassicGUI extends GUI {
         if (f != null) f.dispose();
     }
 
+
+    // Model messages
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 3: the in-game notices — a colony starving, a colonist born, a
+     * founding father joining, a unit demoted — as classic wood-framed popups.
+     *
+     * <p>Until this override existed the classic UI <em>silently discarded every
+     * notice in the game</em>: the base {@code GUI} no-ops this seam, so the
+     * whole channel went to the floor.  (It could not have worked anyway — the
+     * controller posts the display task through {@code invokeNowOrWait}, itself a
+     * base-class no-op until {@link #invokeNowOrWait} above overrode it.)
+     */
+    @Override
+    public FreeColPanel showModelMessages(List<ModelMessage> modelMessages) {
+        showMessagePopup(modelMessages, "classic.dialog.messages");
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The end-of-turn batch of the same notices, over the same popup.  FreeCol
+     * gathers these into one scrolling <em>turn report</em> panel; the original
+     * has no such screen, showing each notice in turn, so page through them
+     * ({@link ClassicDialog#showMessages}) rather than rebuild the report.
+     */
+    @Override
+    public FreeColPanel showReportTurnPanel(List<ModelMessage> messages) {
+        showMessagePopup(messages, "classic.dialog.turnMessages");
+        return null;
+    }
+
+    /**
+     * Show {@code messages} as a paged classic popup titled {@code titleKey}.
+     * Each notice keeps the illustration FreeCol associates with it (the colony,
+     * unit or goods the message is about).
+     */
+    private void showMessagePopup(List<ModelMessage> messages, String titleKey) {
+        if (messages == null || messages.isEmpty()) return;
+        final Game game = getGame();
+        if (game == null) return;
+        final List<ClassicDialog.Page> pages = new ArrayList<>();
+        for (ModelMessage m : messages) {
+            final ImageIcon icon = this.imageLibrary
+                .getObjectImageIcon(game.getMessageDisplay(m));
+            pages.add(new ClassicDialog.Page(Messages.message(m),
+                    (icon == null) ? null : icon.getImage()));
+        }
+        onEventThread(() -> {
+                ClassicDialog.showMessages(this.frame,
+                    Messages.message(titleKey), pages);
+                return null;
+            }, null);
+    }
+
     /**
      * {@inheritDoc}
      *
@@ -721,26 +781,29 @@ public class ClassicGUI extends GUI {
     /**
      * {@inheritDoc}
      *
-     * The classic dialogs are Phase 3, but the base {@code GUI} <em>declines</em>
-     * every confirmation, which silently aborts the controller flows that gate on
-     * one — notably {@code buildColony}, which confirms the site warnings before
-     * founding a colony.  So show a plain Swing confirmation for now: unstyled,
-     * but it puts the real question (and the real choice) in front of the player.
-     * Phase 3 replaces it with classic chrome.
+     * The base {@code GUI} <em>declines</em> every confirmation, which silently
+     * aborts the controller flows that gate on one — notably {@code buildColony},
+     * which confirms the site warnings before founding a colony.
+     *
+     * <p>Phase 3: put the question in the classic wood-framed popup shared with
+     * every other classic dialog ({@link ClassicDialog}), replacing the plain
+     * Swing stopgap this shipped as.  A dismissed popup ({@code -1}) is neither
+     * option, so fall back to {@code defaultOk} — the same answer Escape gave
+     * before.
      */
     @Override
     public boolean modalConfirmDialog(Tile tile, StringTemplate template,
                                       ImageIcon icon, String okKey,
                                       String cancelKey, boolean defaultOk) {
-        final String text = Messages.message(template);
-        final String ok = Messages.message(okKey);
-        final String cancel = Messages.message(cancelKey);
-        final Object[] options = { ok, cancel };
-        return onEventThread(() -> JOptionPane.showOptionDialog(this.frame, text,
-                colony(tile), JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE, icon, options,
-                (defaultOk ? ok : cancel)) == JOptionPane.YES_OPTION,
-            defaultOk);
+        final String[] options = {
+            Messages.message(okKey), Messages.message(cancelKey)
+        };
+        final ClassicDialog.Page page = new ClassicDialog.Page(
+            Messages.message(template), (icon == null) ? null : icon.getImage());
+        final int chosen = onEventThread(() -> ClassicDialog.ask(this.frame,
+                colony(tile), page, options, (defaultOk ? 0 : 1)),
+            -1);
+        return (chosen < 0) ? defaultOk : (chosen == 0);
     }
 
     /**
@@ -773,6 +836,50 @@ public class ClassicGUI extends GUI {
     private static String colony(Tile tile) {
         final Colony c = (tile == null) ? null : tile.getColony();
         return (c == null) ? "FreeCol" : c.getName();
+    }
+
+    // UI-task dispatch
+
+    /**
+     * {@inheritDoc}
+     *
+     * The controllers hand the view work that must reach the event dispatch
+     * thread through this seam and its {@link #invokeNowOrWait} sibling.  Both
+     * are <em>no-ops</em> in the base {@code GUI} (headless has no EDT to reach),
+     * so a {@code GUI} subclass that does not override them silently drops every
+     * task routed through them — the classic UI did, which is why no in-game
+     * message ever appeared: {@code InGameController.displayModelMessages} posts
+     * its display task here, and {@code Message.clientGeneric} posts the
+     * server-driven message flush.  Mirror {@code SwingGUI}: run inline when
+     * already on the EDT, else hand off.
+     */
+    @Override
+    public void invokeNowOrLater(Runnable runnable) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            runnable.run();
+        } else {
+            SwingUtilities.invokeLater(runnable);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The waiting variant of {@link #invokeNowOrLater} — see there for why this
+     * must be overridden at all.  Callers rely on the task having finished when
+     * this returns, so off the EDT this blocks.
+     */
+    @Override
+    public void invokeNowOrWait(Runnable runnable) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            runnable.run();
+        } else {
+            try {
+                SwingUtilities.invokeAndWait(runnable);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "ClassicGUI: UI task failed.", e);
+            }
+        }
     }
 
     /**

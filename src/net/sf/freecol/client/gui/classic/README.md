@@ -741,6 +741,71 @@ pages (population / production were mentioned but are not in the two shots); row
 scrolling for many entities. (Captions are localized and colony rows are clickable
 now — see "Caption localization" and "Clickable colony rows" above.)
 
+## Popups (`ClassicDialog`) — and the dispatch seams that stranded them
+
+The shared wood-framed popup every classic dialog routes through — the plan's
+"build it once" for Phase 3. Like the reports it paints a virtual pixel canvas
+(240 wide, height computed from the content) up-scaled ×3 nearest-neighbour, over
+`ClassicWood` grain: an optional illustration at the left, wrapped green-on-wood
+text, a centred row of raised option plates. Hosted in a modal `JDialog` (the
+classic UI has no `Canvas`). Two entry points share the painting:
+
+- `showMessages(owner, title, pages)` — pages through *n* notices one at a time
+  with a single **Okay** plate and an `i/n` counter. The original has no batched
+  turn-report screen, so both message seams page rather than list.
+- `ask(owner, title, page, options, defaultIndex)` — a question with *n* plates,
+  returning the index chosen (`-1` if dismissed). `Escape` dismisses, `Enter`
+  takes the default.
+
+Multi-page + multi-option is not meaningful (a page step consumes the plate), and
+neither entry point builds one.
+
+**`ClassicWood`** holds the seam-free grain tiling — the mirror-fold described
+under `ClassicInfoPanel` — shared by the info strip and these popups.
+
+### The dead dispatch seams (the actual bug)
+
+`invokeNowOrLater` / `invokeNowOrWait` are **no-ops in the base `GUI`** (headless
+has no EDT to reach), and `ClassicGUI` never overrode them. Every task routed
+through them was therefore dropped on the floor, so the classic UI **silently
+discarded every in-game notice**: `InGameController.displayModelMessages` posts
+its display task through `invokeNowOrWait`, and `Message.clientGeneric` posts the
+server-driven message flush (and sound) through `invokeNowOrLater`. Overriding
+`showModelMessages`/`showReportTurnPanel` alone would have changed nothing —
+they were never called. Both seams now mirror `SwingGUI`: run inline on the EDT,
+else hand off.
+
+This is the general hazard of building on a no-op base class: a seam you never
+override fails *silently and invisibly*, and the two dispatch seams are
+especially costly because they strand other seams rather than losing one screen.
+Worth grepping for other `GUI` methods the classic UI depends on transitively.
+
+### Wired seams
+
+- `showModelMessages(List<ModelMessage>)` — in-turn notices.
+- `showReportTurnPanel(List<ModelMessage>)` — the end-of-turn batch.
+  Each notice keeps FreeCol's own illustration for it
+  (`ImageLibrary.getObjectImageIcon(game.getMessageDisplay(m))`).
+- `modalConfirmDialog(Tile, StringTemplate, ImageIcon, …)` — replaces the plain
+  `JOptionPane` stopgap. The `(…, Unit, …)` and `(…, FreeColObject, …)`
+  overloads in `GUI` are `final` and delegate here, so every confirm in the game
+  lands on this one override. A dismissed popup falls back to `defaultOk`.
+  Window title is `colony(tile)` — the tile's colony, else **"FreeCol"**.
+
+`modalChoiceDialog` / `modalInputDialog` remain plain Swing stopgaps: they need a
+list widget and a text field, whose original look wants the expert's reference
+shots first.
+
+**Verified live** (2026-07-17): an end-of-turn notice (*Sons of Liberty at 10%*,
+title "Rundenende") and the **high-seas confirm** (title "FreeCol", ship
+portrait, "Jawohl, setzt alle Segel!" / "Nein, verweilt in diesen Gewässern.")
+both render in the wood frame, 0 SEVERE. Reaching them needs a *populated* save —
+an idle unit generates no notices, which is why the first attempt saw nothing.
+
+> **Awaiting expert sign-off.** The popup metrics and the green-on-wood palette
+> are read off the original's screenshots by eye, not measured from the art —
+> a considered guess, like the Colony Advisor's paging keys.
+
 ## Seam facts (for the remaining/next work)
 
 **`GUI` methods** (all no-ops in the base class; each Javadoc names its callers):
@@ -771,3 +836,22 @@ frontmost with a minimize(6)→restore(9)→`SetForegroundWindow` bounce (a plai
 `CopyFromScreen` over `GetWindowRect`. Note `$pid` is a read-only automatic
 variable — use another name. **Kill the game process as soon as verification is
 done** (the window stealing foreground interrupts parallel work).
+
+Hard-won details, each of which silently wastes a run:
+
+- **`--fast` resumes the last save**, so the start state is whatever you left —
+  and your test turns get autosaved back. The "starts at sea" start only happens
+  on a profile with no saves.
+- **The window takes ~30–55 s.** Poll `MainWindowHandle` for a couple of minutes;
+  a 30 s timeout reports "no window" on a perfectly healthy launch.
+- **Drive states that actually produce output.** An idle unit generates no
+  notices at all. Populated saves, ending turns, `B` (found colony) and sailing
+  a ship east into the high seas (fires the `highseas.text` confirm) do.
+- **Screenshot a popup by the handle you enumerated**, not by re-finding it by
+  title: `GetWindowText` raced against dialog creation returns a truncated title
+  (a "FreeCol" dialog read as "F"), and the re-find then misses.
+- **Log lives in `%USERPROFILE%\OneDrive\Dokumente\freecol\FreeCol.log`**
+  (`getUserCacheDirectory()`, OneDrive-redirected Documents) — *not* the repo root.
+- In PowerShell, `Write-Output` inside a function becomes part of its **return
+  value**; a logging line will silently corrupt an `if (Check ...)` boolean. Use
+  `Write-Host`.

@@ -16,17 +16,19 @@ Two independent axes (keep them separate):
 > [`src/net/sf/freecol/client/gui/classic/README.md`](src/net/sf/freecol/client/gui/classic/README.md).
 > Completed-slice detail and the asset-decoder history are in that README + the git log.
 
-## Chapters & status (2026-07-16)
+## Chapters & status (2026-07-17)
 
 ### [UI phases](classic_ui_plan/ui-phases.md) — our `ClassicGUI` build-out, phase by phase
 
 Phase 0 scaffold ✅ · Phase 1 map ✅ · **Phase 2 HUD & core screens 🔨** — the map HUD, colony and
-Europe screens, and ten advisor reports ship; HUD polish is done. Left: the remaining reports
-(foreign affairs, labour, education, history, requirements) and **screen interaction** (drag
-colonists, build queue, cargo, set-sail) — the bulk of the phase. Then Phase 3 dialogs ⬜ (plain-Java
-stopgaps are wired; they need one shared wood-framed component) · Phase 4 pre-game/setup ⬜
-(auto-launch stopgap keeps the game reachable, so this is lower urgency). Cinematics are deliberately
-out of scope.
+Europe screens, and ten advisor reports ship; HUD polish is done. Left: **screen interaction** (drag
+colonists, build queue, cargo, set-sail) — the bulk of the phase — plus the remaining reports, whose
+scope is in question: the original has nine report backdrops and we have already covered eight, so
+labour/education/history/requirements may be FreeCol inventions to leave un-built (**awaiting the
+expert's ruling**). **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog` ships, and with it
+the in-game message channel, which the classic UI had been discarding silently; left are the
+choice/input seams and the bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch stopgap keeps
+the game reachable, so this is lower urgency). Cinematics are deliberately out of scope.
 
 ### [Assets](classic_ui_plan/assets.md) — bring-your-own original install (DECIDED)
 
@@ -56,7 +58,13 @@ java -Xmx2G -cp "build;jars/*" net.sf.freecol.FreeCol --classic --fast --no-intr
 
 - `;` is the Windows classpath separator; `jars/*` pulls in all dependency jars.
 - `--fast --no-intro` auto-starts a single-player game with **no GUI clicks** — the fastest way to
-  the in-game view. It starts **at sea** (ship on an ocean patch).
+  the in-game view.
+- ⚠️ **`--fast` resumes the last save** ([`FreeCol.java`](src/net/sf/freecol/FreeCol.java), the
+  `fastStart` branch: it takes `getLastSaveGameFile()` when no savegame is named). It only starts a
+  *fresh* game — the ship-at-sea start — on a profile with no saves, so the state you land in is
+  whatever you last left, and turns you play get autosaved back. Never assume a clean board; check
+  the year/unit before reading anything into a test run.
+- The window takes **~30–55 s** to appear. Poll for it rather than assuming a fixed wait.
 - The `options.xml NoSuchFileException` / "Special options unavailable" on first launch is a benign
   pre-existing warning. Confirm **0 SEVERE** in `FreeCol.log`.
 - The non-interactive live-test harness recipe (drive/screenshot the window from PowerShell) is in
