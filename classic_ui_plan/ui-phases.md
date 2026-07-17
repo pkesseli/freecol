@@ -76,10 +76,15 @@ screens".)
      of gold, found colony, founding father, declare independence, war/peace). So §C ("FreeCol
      additions to keep out") does **not** settle this: the divergence is *informational* — aggregate
      views the original made you track by hand — not conceptual, and it does not touch the rules axis.
-   - **Two genuine §C snags if we do build them.** **Requirements** is FreeCol's own advisor (its
-     Javadoc calls it "the Advanced Colony Report") telling you what your colonies lack — advice Col1
-     never gave, the one item here that adds a *capability* rather than a view. And **history** would
-     log `ABANDON_COLONY` and `DESTROY_NATION`, which map onto the two additions §C says to keep out.
+   - **Two genuine §C snags if we do build them.** **Requirements** (menu label "Requirements"; its
+     Javadoc calls it "the Advanced Colony Report") is not a view at all — it is an **optimisation
+     coach**. Its own strings: *"%colony% has a %expert% currently working as %expertWork%, while a
+     %nonExpert% is working as %nonExpertWork%. Production would be greater if the colonists swapped
+     jobs"*, *"%location% would benefit from exploration"*, *"All requirements are met"*. Col1 never
+     advised you — noticing your Master Carpenter was stuck farming *was* the game. This is the one
+     item that adds a **capability** rather than an information view, so it is the strongest keep-out
+     candidate of the five even if the other three are waved through. And **history** would log
+     `ABANDON_COLONY` and `DESTROY_NATION`, which map onto the two additions §C says to keep out.
    - **Foreign affairs** is the one to build regardless of the ruling — Col1 has it, and it needs the
      async `nationSummary` fetch, so it is more than a static paint.
    - The Colony Advisor **pages** through its column sets as the original does (Sons of Liberty /
