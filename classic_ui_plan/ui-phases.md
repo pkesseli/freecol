@@ -73,12 +73,10 @@ screens".)
      strength, gold, continental congress, tax, Sons of Liberty. Which of those Col1 surfaces is a
      question for the shots — showing *more* than the original is the same information-availability
      call we just settled for the other four, so do not carry fields over unexamined.
-   - ⚠️ **`nationSummary` is a blocking server round-trip, not an async callback** — despite what
-     this plan said before. `InGameController.nationSummary(player)` reads a cache and, on a miss,
-     does `askServer().nationSummary(…)` and waits. So it must **never** be called from
-     `paintComponent` (network I/O on every repaint) and must not run on the EDT. Fetch every
-     player's summary **once, off the EDT, when the report opens**, stash the results, and paint from
-     the stash — a different shape from every report so far, which paints straight off the model.
+   - ⚠️ **The `nationSummary` trap — the main structural work here.** It is a *blocking server
+     round-trip*, not the async callback this plan used to claim, so it cannot be driven from
+     `paintComponent` and must be fetched once off the EDT on open, then painted from a stash — a
+     different shape from every report so far. Full note in the README, "The `nationSummary` trap".
    - **What we need from the expert before writing it** ([Q1](#open-questions-for-the-expert)) — all
      of it unguessable from the repo:
      1. **Which backdrop.** The spare `REPORT9` duplicates `REPORT1`'s native-scout art, which reads

@@ -699,9 +699,9 @@ number of its settlements the player knows of, and its tension toward the player
 contacted yet."
 
 > Unlike FreeCol's panel this deliberately omits the tribe's *true* settlement
-> total: that comes from `igc().nationSummary()`, an **async network fetch** a
-> static paint cannot drive (the same reason the Foreign Affairs report is still
-> deferred). The locally-known count is shown instead.
+> total: that comes from `igc().nationSummary()`, which a static paint must not
+> drive — see "The `nationSummary` trap" below (the same reason the Foreign
+> Affairs report is still unbuilt). The locally-known count is shown instead.
 
 **Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all ten
 render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
@@ -734,12 +734,36 @@ warnings founded *Nieuw Amsterdam* directly, no sailing needed. With it standing
 > code. Note founding a colony also puts a road on its tile and turns the founding
 > pioneer into a plain colonist — that is the engine's own behaviour, not a bug.
 
-**Follow-ups (later slices):** the remaining reports (foreign affairs — needs the
-async `nationSummary` fetch — labour / education / history / requirements); the
-expert's sign-off on the Colony Advisor's **paging keys** and whether it wants more
-pages (population / production were mentioned but are not in the two shots); row
-scrolling for many entities. (Captions are localized and colony rows are clickable
-now — see "Caption localization" and "Clickable colony rows" above.)
+### The `nationSummary` trap
+
+`InGameController.nationSummary(player)` is **a blocking server round-trip, not an
+async callback** — an earlier note here and in the plan said otherwise. It reads
+`myPlayer.getNationSummary(other)` and, **on a cache miss, calls
+`askServer().nationSummary(…)` and waits** for the reply before returning.
+
+So it must never be called from `paintComponent`: that is network I/O on the EDT,
+on every repaint. Any report needing it has to fetch **once, off the EDT, when the
+screen opens**, stash the results, and paint from the stash — a different shape
+from every report shipped so far, all of which paint straight off the model. This
+is why the Indian Advisor shows the locally-known settlement count, and it is the
+main structural work in the unbuilt Foreign Affairs report.
+
+### Follow-ups (later slices)
+
+**Foreign affairs** — the last report the original actually has, and the only
+unbuilt one with original art unaccounted for. Blocked on the expert's reference
+shots (which backdrop, layout, which per-nation fields, key, sub-states), and
+subject to the `nationSummary` trap above, which is its main structural work.
+
+**Labour / education / history / requirements are decided out** — Col1 has no
+screen for them, so they are deferred to
+[`classic_ui_plan/optional-reports.md`](../../../../../../../classic_ui_plan/optional-reports.md)
+as possible later additions of our own, not missing work.
+
+Also: the expert's sign-off on the Colony Advisor's **paging keys** and whether it
+wants more pages (population / production were mentioned but are not in the two
+shots); row scrolling for many entities. (Captions are localized and colony rows
+are clickable now — see "Caption localization" and "Clickable colony rows" above.)
 
 ## Popups (`ClassicDialog`) — and the dispatch seams that stranded them
 
