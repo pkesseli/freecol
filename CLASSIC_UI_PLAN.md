@@ -22,14 +22,23 @@ Two independent axes (keep them separate):
 
 Phase 0 scaffold ✅ · Phase 1 map ✅ · **Phase 2 HUD & core screens 🔨** — the map HUD, colony and
 Europe screens, and ten advisor reports ship; HUD polish is done. Left: **screen interaction** (drag
-colonists, build queue, cargo, set-sail) — the bulk of the phase — plus the remaining reports, whose
-scope is itself an open question. **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog`
-ships, and with it the in-game message channel, which the classic UI had been discarding silently;
-left are the choice/input seams and the bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch
-stopgap keeps the game reachable, so this is lower urgency). Cinematics are deliberately out of scope.
+colonists, build queue, cargo, set-sail) — the bulk of the phase — plus **foreign affairs**, the last
+report the original actually has (the other four unbuilt ones are decided out; see below).
+**Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog` ships, and with it the in-game message
+channel, which the classic UI had been discarding silently; left are the choice/input seams and the
+bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch stopgap keeps the game reachable, so this
+is lower urgency). Cinematics are deliberately out of scope.
 
-> **Five open questions are blocked on the expert**, not on code — including one (Q1) that could
-> *delete* work. See [Open questions for the expert](classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
+> **Five open questions are blocked on the expert**, not on code — Q1 (reference shots for foreign
+> affairs) and Q4 (shots for the choice/input popups) each block a seam outright. See
+> [Open questions for the expert](classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
+
+### [Optional reports](classic_ui_plan/optional-reports.md) — additions of our own ⬜ deferred
+
+Labour / education / history / requirements: **the original has no screen for these**, so they are out
+of Phase 2 by decision — but their concepts are all Col1, so they are not FreeCol contamination
+either. To be built later as genuine contributions of our own, in the original's visual style over the
+shared report frame. Requirements needs its own call: it is an optimisation *coach*, not a view.
 
 ### [Assets](classic_ui_plan/assets.md) — bring-your-own original install (DECIDED)
 

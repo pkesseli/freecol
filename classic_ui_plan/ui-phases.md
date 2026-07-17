@@ -10,19 +10,24 @@ paths). Sub-states matter as much as idle layouts (open menus, in-progress drag,
 
 ## Open questions for the expert
 
-What is blocked on his ruling rather than on more code. Each is a **guess we shipped** or a **scope
-call we cannot make from the repo** — the detail lives in the phase item linked; this list is just the
-queue to take to him.
+What is blocked on him rather than on more code: **reference material only he has**, a **guess we
+shipped** that needs sign-off, or a **call we cannot make from the repo**. The detail lives in the
+phase item linked; this list is just the queue to take to him.
 
 | # | Question | Blocks | Cost of guessing wrong |
 |---|---|---|---|
-| **Q1** | **May the classic UI surface information the original never aggregated?** The unbuilt reports add no Col1-absent *concepts* — it is an information-availability call, not a rules one. Two sub-calls: **Requirements** is an advisor Col1 never gave, and **History** would log two §C concepts. | [Phase 2 §1](#remaining) | Mild — conveniences, not rules breaks. The cost is handing the player aggregate views Col1 made you track by hand. |
+| **Q1** | **Reference shots of Col1's Foreign Affairs report** — the last report the original has that we have not built. Needed: which **backdrop**, the **layout**, **which fields** per nation, the **key**, **sub-states**, and shots with **several rivals met** (see the phase item for why each). | [Phase 2 §1](#remaining) | Cannot start — every one of those is unguessable from the repo. |
 | **Q2** | **The Colony Advisor's paging keys**, and whether it wants pages beyond Sons of Liberty / Military Garrison (population / production were mentioned but are in neither shot). | [Phase 2 §1](#remaining) | Shipped and wrong: keys nobody would press. |
 | **Q3** | **The popup look** — `ClassicDialog`'s metrics and green-on-wood palette are read off screenshots by eye, not measured from the art. `WOODPAN2.PIK` is unused; should it be? | [Phase 3 §2](#remaining-1) | Every popup in the game inherits the error. |
 | **Q4** | **Reference shots for the choice-list and text-input popups**, whose original look we have never seen. | [Phase 3 §1](#remaining-1) | Cannot start; they stay Swing stopgaps. |
 | **Q5** | **The colony screen's fixed building ground-slots** — the original places buildings at set positions; we flow-layout them. | [Phase 2 §3](#remaining) | Rework of the biggest remaining slice. |
 
-Q1 and Q4 are the cheap ones to ask first: Q1 can *delete* work, and Q4 unblocks a whole seam.
+**Q1 and Q4 are the ones to ask first** — each is pure reference material (shots), cheap for him to
+answer, and each unblocks a seam that cannot be started without it. Q2/Q3/Q5 are sign-off on work
+that already runs, so they can wait for a review pass.
+
+*Resolved:* whether the four Col1-less reports belong in a faithful classic UI — **no**, deferred to
+[optional reports](optional-reports.md) as later additions of our own (2026-07-17).
 
 ## Phase 0 — scaffold & launch ✅
 
@@ -57,36 +62,45 @@ screens".)
 
 ### Remaining
 
-1. **Remaining reports — a scope question first, code second. See
-   [Q1](#open-questions-for-the-expert).** Five `showReport*Panel` seams still no-op: foreign
-   affairs, labour, education, history, requirements. Building one means extending
-   `ClassicReportPanel` over its `REPORTn.PIK` backdrop (unit rosters: `ClassicReportRosterPanel`) —
-   but *whether four of them belong in a faithful classic UI at all* is a design call, not a coding
-   one.
-   - **The original has no screen for four of them.** Nine report backdrops ship (`REPORT1`–
-     `REPORT9`); the ten reports we already show cover eight, and `REPORT9` duplicates `REPORT1`'s
-     native-scout art. So at most **one** unbuilt report has original art behind it — plausibly
-     foreign affairs, which Col1 does have.
-   - **But they are not FreeCol *inventions*** — the distinction that matters, and the one that makes
-     this the expert's call ([Q1](#open-questions-for-the-expert)) rather than ours. The concepts are
-     all Col1: **education** is a core original mechanic (the classic ruleset ships
-     schoolhouse/college/university and `allowStudentSelection`, itself listed Col1-faithful in
-     [rules fidelity](rules-fidelity.md) table A); **labour** is a census of unit types you own;
-     **history** logs `HistoryEvent`s that are almost all Col1 (discover New World, meet nation, city
-     of gold, found colony, founding father, declare independence, war/peace). So §C ("FreeCol
-     additions to keep out") does **not** settle this: the divergence is *informational* — aggregate
-     views the original made you track by hand — not conceptual, and it does not touch the rules axis.
-   - **Two genuine §C snags if we do build them.** **Requirements** (menu label "Requirements"; its
-     Javadoc calls it "the Advanced Colony Report") is not a view at all — it is an **optimisation
-     coach**. Its own strings: *"%colony% has a %expert% currently working as %expertWork%, while a
-     %nonExpert% is working as %nonExpertWork%. Production would be greater if the colonists swapped
-     jobs"*, *"%location% would benefit from exploration"*, *"All requirements are met"*. Col1 never
-     advised you — noticing your Master Carpenter was stuck farming *was* the game. This is the one
-     item that adds a **capability** rather than an information view, so it is the strongest keep-out
-     candidate of the five even if the other three are waved through. And **history** would log
-     `ABANDON_COLONY` and `DESTROY_NATION`, which map onto the two additions §C says to keep out.
-   - **Foreign affairs** is the one to build regardless of the ruling — Col1 has it, and it needs the
-     async `nationSummary` fetch, so it is more than a static paint.
+1. **Foreign affairs — the last report the original actually has.** ⬜ The other four unbuilt
+   `showReport*Panel` seams (labour / education / history / requirements) are **decided out of this
+   phase**: Col1 has no screen for them, so they are deferred to
+   [optional reports](optional-reports.md) as later additions of our own. Foreign affairs is the one
+   Col1 *does* have, and the only unbuilt report with original art unaccounted for — so it finishes
+   the report set. Blocked on reference shots ([Q1](#open-questions-for-the-expert)).
+   - **What it shows** (FreeCol's `ReportForeignAffairPanel`, per live European player): coat of
+     arms, country, **stance**, number of colonies, number of units, military strength, naval
+     strength, gold, continental congress, tax, Sons of Liberty. Which of those Col1 surfaces is a
+     question for the shots — showing *more* than the original is the same information-availability
+     call we just settled for the other four, so do not carry fields over unexamined.
+   - ⚠️ **`nationSummary` is a blocking server round-trip, not an async callback** — despite what
+     this plan said before. `InGameController.nationSummary(player)` reads a cache and, on a miss,
+     does `askServer().nationSummary(…)` and waits. So it must **never** be called from
+     `paintComponent` (network I/O on every repaint) and must not run on the EDT. Fetch every
+     player's summary **once, off the EDT, when the report opens**, stash the results, and paint from
+     the stash — a different shape from every report so far, which paints straight off the model.
+   - **What we need from the expert before writing it** ([Q1](#open-questions-for-the-expert)) — all
+     of it unguessable from the repo:
+     1. **Which backdrop.** The spare `REPORT9` duplicates `REPORT1`'s native-scout art, which reads
+        wrong for a European-powers screen. So either foreign affairs owns one of the backdrops we
+        have **double-booked** — `REPORT6` (Colony + Military) or `REPORT7` (Naval + Cargo), meaning
+        one of those pairings is our mistake — or `REPORT9` really is it. One shot settles it, and it
+        may correct an existing assignment.
+     2. **The layout**, to read constants straight off into the 320×200 canvas: are nations a table
+        of rows, a panel each, or one nation per page? Where does the coat of arms sit?
+     3. **Which fields the original shows**, of FreeCol's stance / colonies / units / military /
+        naval / gold / congress / tax / SoL — plus their captions, for the isolated
+        `classic.report.*` block (EN + DE). Carrying all nine over unexamined would re-introduce the
+        very information-availability question the other four reports were just deferred over.
+     4. **The accelerator key.** Our mapping leaves **F2 and F4 unclaimed** (F1 Religious, F3 Colony,
+        F5 Indian, F6 Congress, F7 Military, F8 Naval, F9 Trade, shift-F1 Cargo, shift-F2
+        Exploration, shift-F4 Production), so foreign affairs plausibly owns one of them — worth
+        confirming rather than assuming.
+     5. **Sub-states, not just the idle screen** — does it page per nation, as the Colony Advisor
+        pages its column sets?
+     6. **Shots with several rivals met, at war and at peace.** The Congress and Indian row loops
+        have only ever run their empty-state branch (README verification caveat); populated shots
+        stop foreign affairs joining them.
    - The Colony Advisor **pages** through its column sets as the original does (Sons of Liberty /
      Military Garrison — the two the expert's shots document); the paging *keys* are a guess awaiting
      sign-off.
