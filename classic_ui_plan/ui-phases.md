@@ -126,6 +126,10 @@ every popup routing through it. Live-verified 2026-07-17 (README "Popups"). Over
   The original has no batched turn report, so notices page one at a time rather than list.
 - **`modalConfirmDialog`** — off `JOptionPane` onto the shared frame. The `Unit`/`FreeColObject`
   overloads in `GUI` are `final` and delegate here, so every confirm in the game lands on it.
+- **`showErrorPanel`** — the no-op seam audit's find (item 4 below), same silent-loss class as the
+  messages: all five overloads funnel into one non-final seam that no-op'd, so **every error
+  vanished**, and errors carrying a `System.exit` callback left the app hung. Now routes through the
+  shared popup and runs the callback on dismiss. Live-verified 2026-07-18 (README "Wired seams").
 
 ### Remaining
 
@@ -139,9 +143,14 @@ every popup routing through it. Live-verified 2026-07-17 (README "Popups"). Over
    from the art. Every popup inherits whatever is wrong, so this wants sign-off before the seams
    above multiply it. `WOODPAN2.PIK` is not used yet.
 3. **The menu dropdowns** are still default Swing (deferred here from Phase 2's HUD polish).
-4. **Audit the other no-op seams.** The dispatch bug is the general hazard of a no-op base class: an
-   un-overridden seam fails silently and invisibly, and dispatch seams strand *other* seams. Worth a
-   sweep for `GUI` methods the classic UI depends on transitively.
+4. **Audit the other no-op seams — done 2026-07-18, one fix + one sub-audit.** Cross-referenced every
+   `getGUI().X` call in `client/control/*` against `ClassicGUI`'s overrides. Found and fixed
+   **`showErrorPanel`** (see Shipped above). Otherwise reassuring: the combat/leave/stop confirms
+   already delegate to the overridden `modalConfirmDialog`. **Remaining sub-audit:** the event dialogs
+   (`showMonarchDialog`, `showEmigrationDialog`, `showNamingDialog`, `showFirstContactDialog`,
+   `showNativeDemandDialog`) no-op today and some *return a flow-gating value* — check their base
+   returns don't strand anything when those dialogs are built (overlaps [Q4](#open-questions-for-the-expert)
+   / item 1). Details in README "The no-op seam audit".
 
 ## Phase 4 — pre-game & setup screens ⬜
 

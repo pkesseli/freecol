@@ -802,7 +802,25 @@ else hand off.
 This is the general hazard of building on a no-op base class: a seam you never
 override fails *silently and invisibly*, and the two dispatch seams are
 especially costly because they strand other seams rather than losing one screen.
-Worth grepping for other `GUI` methods the classic UI depends on transitively.
+
+### The no-op seam audit (2026-07-18)
+
+Following that hazard to its conclusion: cross-referencing every `getGUI().X`
+call in `client/control/*` against what `ClassicGUI` overrides turned up one
+more silent-loss bug of the same class — **`showErrorPanel`** (below) — and
+otherwise a reassuring picture:
+
+- **Most confirms already work.** `confirmHostileAction` / `confirmLeaveColony`
+  / `confirmStopGame` / `confirmClearTradeRoute` all delegate to
+  `modalConfirmDialog`, which we override — so e.g. attacking an ally now
+  prompts. `confirmPreCombat` hits a Phase-3 dialog no-op but is gated behind a
+  client option that is off by default, so it degrades to "proceed".
+- **Event dialogs are a genuine open sub-audit, deferred to Phase 3.**
+  `showMonarchDialog`, `showEmigrationDialog`, `showNamingDialog`,
+  `showFirstContactDialog`, `showNativeDemandDialog` no-op today, and some
+  *return a value that gates flow* (which emigrant boards, what a colony is
+  named). Whether their base no-op returns strand anything wants checking when
+  those dialogs are built — they overlap the Q4 choice/input work.
 
 ### Wired seams
 
@@ -815,16 +833,28 @@ Worth grepping for other `GUI` methods the classic UI depends on transitively.
   overloads in `GUI` are `final` and delegate here, so every confirm in the game
   lands on this one override. A dismissed popup falls back to `defaultOk`.
   Window title is `colony(tile)` — the tile's colony, else **"FreeCol"**.
+- `showErrorPanel(String, Runnable)` — the audit's find. All five `showErrorPanel`
+  overloads are `final` and funnel into this one non-final seam, so a no-op meant
+  **every error in the classic UI vanished**. Worse, some errors carry a
+  `callback` due to run on close — the uncaught-exception handler in
+  `FreeColClient` shows a *serious* error with a `System.exit` callback, so the
+  no-op left the app hung, neither warning nor exiting. Now routes the message
+  through the shared popup and runs the callback in a `finally` (so the exit path
+  fires even if the popup throws). Error text currently uses the same green as a
+  message — whether the original styled errors distinctly is an open expert
+  question.
 
 `modalChoiceDialog` / `modalInputDialog` remain plain Swing stopgaps: they need a
 list widget and a text field, whose original look wants the expert's reference
 shots first.
 
-**Verified live** (2026-07-17): an end-of-turn notice (*Sons of Liberty at 10%*,
-title "Rundenende") and the **high-seas confirm** (title "FreeCol", ship
+**Verified live** (2026-07-17 / -18): an end-of-turn notice (*Sons of Liberty at
+10%*, title "Rundenende") and the **high-seas confirm** (title "FreeCol", ship
 portrait, "Jawohl, setzt alle Segel!" / "Nein, verweilt in diesen Gewässern.")
-both render in the wood frame, 0 SEVERE. Reaching them needs a *populated* save —
-an idle unit generates no notices, which is why the first attempt saw nothing.
+both render in the wood frame; the **error popup** (title "Fehler") renders and
+its callback fires on dismiss (driven via a temporary key hook, reverted). 0
+SEVERE throughout. Reaching the notices needs a *populated* save — an idle unit
+generates none, which is why the first attempt saw nothing.
 
 > **Awaiting expert sign-off.** The popup metrics and the green-on-wood palette
 > are read off the original's screenshots by eye, not measured from the art —

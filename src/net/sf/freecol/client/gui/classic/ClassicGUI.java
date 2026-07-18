@@ -749,6 +749,38 @@ public class ClassicGUI extends GUI {
     /**
      * {@inheritDoc}
      *
+     * Every {@code showErrorPanel} overload is {@code final} and funnels into
+     * this one non-final seam, which the base {@code GUI} no-ops — so until now
+     * <em>every error in the classic UI vanished silently</em>, the same class of
+     * bug as the dropped model messages.  Worse, some errors carry a
+     * {@code callback} the caller relies on running when the panel closes: the
+     * uncaught-exception handler in {@code FreeColClient} shows a serious error
+     * with a {@code System.exit} callback, so a no-op left the app hung in a
+     * broken state, neither warning the player nor exiting.
+     *
+     * <p>Show the message in the shared classic popup and run the callback on
+     * dismiss — in a {@code finally}, so the exit path fires even if the popup
+     * itself throws.
+     */
+    @Override
+    public FreeColPanel showErrorPanel(String message, Runnable callback) {
+        final String text = (message == null) ? "" : message;
+        onEventThread(() -> {
+                try {
+                    ClassicDialog.showMessages(this.frame,
+                        Messages.message("classic.dialog.error"),
+                        List.of(new ClassicDialog.Page(text, null)));
+                } finally {
+                    if (callback != null) callback.run();
+                }
+                return null;
+            }, null);
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
      * The controllers call this after a recruit / train / purchase so any open
      * Europe view refreshes; repaint the classic Europe screen if it is showing.
      */
