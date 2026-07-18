@@ -130,27 +130,37 @@ every popup routing through it. Live-verified 2026-07-17 (README "Popups"). Over
   messages: all five overloads funnel into one non-final seam that no-op'd, so **every error
   vanished**, and errors carrying a `System.exit` callback left the app hung. Now routes through the
   shared popup and runs the callback on dismiss. Live-verified 2026-07-18 (README "Wired seams").
+- **The three event confirm dialogs** — `showMonarchDialog` (king's demands), `showFirstContactDialog`
+  (meeting natives), `showNativeDemandDialog` (native tribute). Also silent-loss bugs the audit
+  surfaced, not just missing screens: each hands the player's yes/no back over the wire, so a no-op
+  dropped the exchange (a tax hike accepted by omission). These seams are *async*
+  (`DialogHandler<Boolean>`); a shared `askEvent` helper mirrors the matching FreeCol dialog's
+  message/labels/icon over the popup and fires the handler. Monarch tax dialog live-verified
+  2026-07-18 (README "Event confirm dialogs").
 
 ### Remaining
 
-1. **The other dialog seams — blocked on [Q4](#open-questions-for-the-expert).** `modalChoiceDialog`
-   and `modalInputDialog` are still plain Swing stopgaps: they need a list widget and a text field,
-   and we have never seen the original's look for either. Then the event popups sharing these seams
-   (meeting natives, king's demands, learn-skill, lost-city rumours, disembark). Negotiation
-   (`DiplomacyPanel`) and the end-turn "units still active" prompt are the larger bespoke ones.
+1. **The choice / input dialogs — blocked on [Q4](#open-questions-for-the-expert).** What is left of
+   the dialog seams needs a **list widget** (`modalChoiceDialog`, and `showEmigrationDialog` — choose
+   1 of 3 recruits) or a **text field** (`modalInputDialog`, and `showNamingDialog` — name a
+   colony/region), both still plain Swing stopgaps whose original look we have never seen. The
+   confirm-shaped popups these used to be grouped with (meeting natives, king's demands, native
+   tribute) are **done** — see Shipped. Learn-skill and lost-city-rumour choosers ride on the list
+   widget too. Negotiation (`DiplomacyPanel`) and the end-turn "units still active" prompt are the
+   larger bespoke ones.
 2. **The popup look is a guess — see [Q3](#open-questions-for-the-expert).** `ClassicDialog`'s
    metrics and green-on-wood palette are read off the original's screenshots by eye, not measured
    from the art. Every popup inherits whatever is wrong, so this wants sign-off before the seams
    above multiply it. `WOODPAN2.PIK` is not used yet.
 3. **The menu dropdowns** are still default Swing (deferred here from Phase 2's HUD polish).
-4. **Audit the other no-op seams — done 2026-07-18, one fix + one sub-audit.** Cross-referenced every
-   `getGUI().X` call in `client/control/*` against `ClassicGUI`'s overrides. Found and fixed
-   **`showErrorPanel`** (see Shipped above). Otherwise reassuring: the combat/leave/stop confirms
-   already delegate to the overridden `modalConfirmDialog`. **Remaining sub-audit:** the event dialogs
-   (`showMonarchDialog`, `showEmigrationDialog`, `showNamingDialog`, `showFirstContactDialog`,
-   `showNativeDemandDialog`) no-op today and some *return a flow-gating value* — check their base
-   returns don't strand anything when those dialogs are built (overlaps [Q4](#open-questions-for-the-expert)
-   / item 1). Details in README "The no-op seam audit".
+4. **Audit the other no-op seams — done 2026-07-18, four fixes total.** Cross-referenced every
+   `getGUI().X` call in `client/control/*` against `ClassicGUI`'s overrides. Fixed **`showErrorPanel`**
+   and, chasing the event-dialog sub-audit, the **three confirm-shaped event dialogs** (monarch /
+   first-contact / native-demand) — all silent-loss bugs (see Shipped above), all now confirm-popup
+   fixes needing no expert input. Reassuring otherwise: the combat/leave/stop confirms already
+   delegate to the overridden `modalConfirmDialog`. **What's left** are the two *non*-confirm event
+   dialogs — `showEmigrationDialog` (choice of 3 recruits) and `showNamingDialog` (text) — which need
+   the Q4 widgets, folded into item 1 below. Details in README "The no-op seam audit".
 
 ## Phase 4 — pre-game & setup screens ⬜
 

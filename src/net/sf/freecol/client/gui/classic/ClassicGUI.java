@@ -44,6 +44,7 @@ import javax.swing.WindowConstants;
 
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
+import net.sf.freecol.client.gui.DialogHandler;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.FontLibrary;
@@ -54,7 +55,10 @@ import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
+import net.sf.freecol.common.model.GoodsType;
+import net.sf.freecol.common.model.IndianNationType;
 import net.sf.freecol.common.model.ModelMessage;
+import net.sf.freecol.common.model.Monarch.MonarchAction;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Tile;
@@ -776,6 +780,149 @@ public class ClassicGUI extends GUI {
                 return null;
             }, null);
         return null;
+    }
+
+    // Event confirm dialogs (async Boolean handlers)
+
+    /**
+     * {@inheritDoc}
+     *
+     * The king's demands — raise tax, offer/impose mercenaries, declare war on
+     * our behalf.  A no-op here was a real flow bug, not just a missing screen:
+     * {@code monarchActionHandler} passes the player's yes/no to
+     * {@code answerMonarch} over the wire, so without a dialog a tax hike was
+     * silently accepted-by-omission (the exchange dropped) and the player never
+     * got to hold a Tea Party.  Mirror the standard {@code MonarchDialog}: the
+     * message and per-action button labels come off the {@link MonarchAction}
+     * (a null {@code yesKey} = an acknowledge-only notice), over the monarch's
+     * portrait.
+     */
+    @Override
+    public void showMonarchDialog(MonarchAction action, StringTemplate template,
+                                  String monarchKey,
+                                  DialogHandler<Boolean> handler) {
+        if (action == null) {
+            if (handler != null) handler.handle(false);
+            return;
+        }
+        final String messageId = action.getTextKey();
+        String yesKey = action.getYesKey();
+        if (!Messages.containsKey(yesKey)) yesKey = null;
+        String noKey = action.getNoKey();
+        if (!Messages.containsKey(noKey)) noKey = "close";
+        String hdrKey = action.getHeaderKey();
+        if (!Messages.containsKey(hdrKey)) hdrKey = "monarchDialog.default";
+        final StringTemplate msg = (template == null)
+            ? StringTemplate.key(messageId)
+            : StringTemplate.copy(messageId, template);
+        askEvent(ImageLibrary.getMonarchImage(monarchKey),
+                 Messages.message(hdrKey), msg, yesKey, noKey, handler);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Meeting a native nation for the first time.  The handler carries the
+     * player's response back to {@code firstContact}, so — like the monarch and
+     * demand dialogs — a no-op dropped the exchange.  Mirrors
+     * {@code FirstContactDialog}: the welcome text (offer variant when a
+     * {@code tile} is on the table), a per-nation meeting header, over the
+     * meeting illustration.
+     */
+    @Override
+    public void showFirstContactDialog(Player player, Player other, Tile tile,
+                                       int settlementCount,
+                                       DialogHandler<Boolean> handler) {
+        final String messageId = (tile != null)
+            ? "firstContactDialog.welcomeOffer.text"
+            : "firstContactDialog.welcomeSimple.text";
+        final String type = ((IndianNationType) other.getNationType())
+            .getSettlementTypeKey(true);
+        final StringTemplate msg = StringTemplate.template(messageId)
+            .addStringTemplate("%nation%", other.getNationLabel())
+            .addName("%camps%", Integer.toString(settlementCount))
+            .add("%settlementType%", type);
+        String hdrKey = "firstContactDialog.meeting."
+            + other.getNation().getSuffix();
+        if (!Messages.containsKey(hdrKey)) {
+            hdrKey = "firstContactDialog.meeting.natives";
+        }
+        askEvent(ImageLibrary.getMeetingImage(other), Messages.message(hdrKey),
+                 msg, "yes", "no", handler);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * A native unit demanding tribute (gold / food / other goods) from a
+     * colony.  The handler sends accept/reject to {@code indianDemand}, so a
+     * no-op left the demand unanswered.  Mirrors {@code NativeDemandDialog}:
+     * the demand text and yes/no labels vary by what is demanded, over the
+     * colony's settlement sprite.
+     */
+    @Override
+    public void showNativeDemandDialog(Unit unit, Colony colony, GoodsType type,
+                                       int amount,
+                                       DialogHandler<Boolean> handler) {
+        final String nation = Messages.message(unit.getOwner().getNationLabel());
+        final StringTemplate msg;
+        final String yes, no;
+        if (type == null) {
+            msg = StringTemplate.template("indianDemand.gold.text")
+                .addName("%nation%", nation).addName("%colony%", colony.getName())
+                .addAmount("%amount%", amount);
+            yes = "accept"; no = "indianDemand.gold.no";
+        } else if (type.isFoodType()) {
+            msg = StringTemplate.template("indianDemand.food.text")
+                .addName("%nation%", nation).addName("%colony%", colony.getName())
+                .addAmount("%amount%", amount);
+            yes = "indianDemand.food.yes"; no = "indianDemand.food.no";
+        } else {
+            msg = StringTemplate.template("indianDemand.other.text")
+                .addName("%nation%", nation).addName("%colony%", colony.getName())
+                .addAmount("%amount%", amount).addNamed("%goods%", type);
+            yes = "accept"; no = "indianDemand.other.no";
+        }
+        final StringTemplate title = StringTemplate
+            .template("nativeDemandDialog.name").addName("%colony%", colony.getName());
+        askEvent(this.imageLibrary.getSmallSettlementImage(colony),
+                 Messages.message(title), msg, yes, no, handler);
+    }
+
+    /**
+     * Shared body of the event-confirm dialogs above: show {@code message} (with
+     * {@code icon}) in the classic popup with a Yes/No pair (or a lone No/close
+     * plate when {@code yesKey} is null, for acknowledge-only notices), and hand
+     * the choice to {@code handler} as a {@code Boolean}.
+     *
+     * <p>These {@code GUI} seams are asynchronous ({@link DialogHandler}), but
+     * the shared {@link ClassicDialog#ask} is modal-blocking — which is right
+     * for a demand that must be answered.  The controllers already post them via
+     * {@code invokeLater}, so blocking the classic popup on the EDT (which pumps
+     * events) is fine; the handler fires with the result the instant it closes.
+     * The handler runs in a {@code finally} so the server exchange still resolves
+     * (as a reject) if the popup throws, rather than dangling.
+     */
+    private void askEvent(java.awt.Image icon, String title,
+                          StringTemplate message, String yesKey, String noKey,
+                          DialogHandler<Boolean> handler) {
+        final String[] options = (yesKey == null)
+            ? new String[] { Messages.message(noKey) }
+            : new String[] { Messages.message(yesKey), Messages.message(noKey) };
+        final ClassicDialog.Page page
+            = new ClassicDialog.Page(Messages.message(message), icon);
+        final String yes = yesKey;   // effectively-final capture
+        onEventThread(() -> {
+                int chosen = -1;
+                try {
+                    chosen = ClassicDialog.ask(this.frame, title, page, options,
+                                               options.length - 1);
+                } finally {
+                    final boolean accept = (yes != null && chosen == 0);
+                    if (handler != null) handler.handle(accept);
+                }
+                return null;
+            }, null);
     }
 
     /**

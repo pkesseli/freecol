@@ -816,11 +816,11 @@ otherwise a reassuring picture:
   prompts. `confirmPreCombat` hits a Phase-3 dialog no-op but is gated behind a
   client option that is off by default, so it degrades to "proceed".
 - **Event dialogs are a genuine open sub-audit, deferred to Phase 3.**
-  `showMonarchDialog`, `showEmigrationDialog`, `showNamingDialog`,
-  `showFirstContactDialog`, `showNativeDemandDialog` no-op today, and some
-  *return a value that gates flow* (which emigrant boards, what a colony is
-  named). Whether their base no-op returns strand anything wants checking when
-  those dialogs are built — they overlap the Q4 choice/input work.
+  the event dialogs (monarch, emigration, naming, first-contact, native-demand)
+  no-op'd today, and some *return a value that gates flow*. **Chasing this down
+  found three real bugs, now fixed** — see "Event confirm dialogs" below. Two
+  remain, tied to the Q4 widgets: `showEmigrationDialog` (pick 1 of 3 recruits —
+  a choice) and `showNamingDialog` (name a colony/region — text input).
 
 ### Wired seams
 
@@ -848,12 +848,41 @@ otherwise a reassuring picture:
 list widget and a text field, whose original look wants the expert's reference
 shots first.
 
+### Event confirm dialogs (async `DialogHandler<Boolean>`)
+
+`showMonarchDialog` (the king's demands), `showFirstContactDialog` (meeting a
+native nation) and `showNativeDemandDialog` (native tribute demand) — the three
+event dialogs whose response is a yes/no. **Each was a real flow bug while it
+no-op'd, not a missing screen:** the handler carries the player's answer back
+over the wire (`answerMonarch` / `firstContact` / `indianDemand`), so with no
+dialog the exchange silently dropped — a tax hike accepted by omission, the
+player never offered a Tea Party.
+
+Unlike `modalConfirmDialog` these seams are *asynchronous* (a `DialogHandler`
+callback, not a return). They all share one private helper, `askEvent`: build the
+message + icon + a Yes/No plate pair (or a lone acknowledge plate when the action
+has no yes-key) exactly as the matching FreeCol dialog does — `MonarchDialog`,
+`FirstContactDialog`, `NativeDemandDialog` — show it on the shared popup, and hand
+the choice to the handler. `ClassicDialog.ask` is modal-blocking, which is right
+for a demand that *must* be answered; the controllers already post these via
+`invokeLater`, so blocking the EDT (which pumps events) is fine. The handler runs
+in a `finally`, so a popup failure still resolves the exchange (as a reject)
+rather than leaving it dangling.
+
+The remaining two event dialogs, `showEmigrationDialog` (choose 1 of 3 recruits)
+and `showNamingDialog` (name a colony/region), need the choice-list and
+text-field widgets — the same Q4-blocked work as `modalChoiceDialog` /
+`modalInputDialog`.
+
 **Verified live** (2026-07-17 / -18): an end-of-turn notice (*Sons of Liberty at
 10%*, title "Rundenende") and the **high-seas confirm** (title "FreeCol", ship
 portrait, "Jawohl, setzt alle Segel!" / "Nein, verweilt in diesen Gewässern.")
-both render in the wood frame; the **error popup** (title "Fehler") renders and
-its callback fires on dismiss (driven via a temporary key hook, reverted). 0
-SEVERE throughout. Reaching the notices needs a *populated* save — an idle unit
+render in the wood frame; the **error popup** (title "Fehler") renders and its
+callback fires on dismiss; the **monarch tax dialog** (title "Eine Nachricht von
+der Krone", per-action labels "Wir akzeptieren" / "Gebt mir Freiheit oder den
+Tod!") renders and its handler fires with the mapped boolean. The error and
+monarch checks were driven via a temporary key hook (reverted). 0 SEVERE
+throughout. Reaching the notices needs a *populated* save — an idle unit
 generates none, which is why the first attempt saw nothing.
 
 > **Awaiting expert sign-off.** The popup metrics and the green-on-wood palette
