@@ -59,6 +59,24 @@ public class NationSummary extends FreeColObject {
     /** The tax rate of this (European) player. */
     private int tax;
 
+    /**
+     * The (European) player's merchant-marine strength: total cargo capacity
+     * of its naval units, regardless of combat role.  Unlike {@link #soL},
+     * {@link #foundingFathers} and {@link #tax} this is never gated behind
+     * {@code Ability.BETTER_FOREIGN_AFFAIRS_REPORT} — the classic-UI's Foreign
+     * Affairs report needs it unconditionally (see
+     * {@code net.sf.freecol.client.gui.classic.ClassicReportForeignAffairPanel}).
+     */
+    private int mercantileMarine;
+
+    /**
+     * The (European) player's rebel/loyalist head counts, derived from its
+     * population ({@link #numberOfUnits}) and {@link Player#getSoL()}.  Also
+     * unconditional, for the same reason as {@link #mercantileMarine}.
+     */
+    private int rebels;
+    private int loyalists;
+
 
     /**
      * Trivial constructor allowing creation by Game.newInstance().
@@ -86,6 +104,10 @@ public class NationSummary extends FreeColObject {
             militaryStrength = player.calculateStrength(false);
             navalStrength = player.calculateStrength(true);
             gold = player.getGold();
+            mercantileMarine = computeMercantileMarine(player);
+            final int sol = player.getSoL();
+            rebels = (numberOfUnits * sol) / 100;
+            loyalists = numberOfUnits - rebels;
             if (player == requester || requester
                 .hasAbility(Ability.BETTER_FOREIGN_AFFAIRS_REPORT)) {
                 soL = player.getSoL();
@@ -96,8 +118,25 @@ public class NationSummary extends FreeColObject {
             }
         } else {
             numberOfUnits = militaryStrength = navalStrength = gold = soL
-                = foundingFathers = tax = -1;
+                = foundingFathers = tax = mercantileMarine = rebels
+                = loyalists = -1;
         }
+    }
+
+    /**
+     * Total cargo capacity of {@code player}'s naval units, regardless of
+     * combat role — the merchant-marine strength shown in the classic UI's
+     * Foreign Affairs report.
+     *
+     * @param player The {@code Player} to sum the fleet capacity of.
+     * @return The total cargo capacity.
+     */
+    public static int computeMercantileMarine(Player player) {
+        int total = 0;
+        for (Unit u : player.getUnitSet()) {
+            if (u.isNaval()) total += u.getCargoCapacity();
+        }
+        return total;
     }
 
 
@@ -138,6 +177,18 @@ public class NationSummary extends FreeColObject {
         return tax;
     }
 
+    public int getMercantileMarine() {
+        return mercantileMarine;
+    }
+
+    public int getRebels() {
+        return rebels;
+    }
+
+    public int getLoyalists() {
+        return loyalists;
+    }
+
 
     // Overide FreeColObject
 
@@ -157,6 +208,9 @@ public class NationSummary extends FreeColObject {
         this.soL = o.getSoL();
         this.foundingFathers = o.getFoundingFathers();
         this.tax = o.getTax();
+        this.mercantileMarine = o.getMercantileMarine();
+        this.rebels = o.getRebels();
+        this.loyalists = o.getLoyalists();
         return true;
     }
 
@@ -172,6 +226,9 @@ public class NationSummary extends FreeColObject {
     private static final String SOL_TAG = "SoL";
     private static final String STANCE_TAG = "stance";
     private static final String TAX_TAG = "tax";
+    private static final String MERCANTILE_MARINE_TAG = "mercantileMarine";
+    private static final String REBELS_TAG = "rebels";
+    private static final String LOYALISTS_TAG = "loyalists";
 
 
     /**
@@ -192,6 +249,12 @@ public class NationSummary extends FreeColObject {
         xw.writeAttribute(STANCE_TAG, stance);
 
         xw.writeAttribute(GOLD_TAG, gold);
+
+        xw.writeAttribute(MERCANTILE_MARINE_TAG, mercantileMarine);
+
+        xw.writeAttribute(REBELS_TAG, rebels);
+
+        xw.writeAttribute(LOYALISTS_TAG, loyalists);
 
         if (soL >= 0) {
             xw.writeAttribute(SOL_TAG, soL);
@@ -224,6 +287,12 @@ public class NationSummary extends FreeColObject {
         navalStrength = xr.getAttribute(NAVAL_STRENGTH_TAG, -1);
 
         gold = xr.getAttribute(GOLD_TAG, -1);
+
+        mercantileMarine = xr.getAttribute(MERCANTILE_MARINE_TAG, -1);
+
+        rebels = xr.getAttribute(REBELS_TAG, -1);
+
+        loyalists = xr.getAttribute(LOYALISTS_TAG, -1);
 
         soL = xr.getAttribute(SOL_TAG, -1);
 

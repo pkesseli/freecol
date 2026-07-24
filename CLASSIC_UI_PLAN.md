@@ -16,29 +16,35 @@ Two independent axes (keep them separate):
 > [`src/net/sf/freecol/client/gui/classic/README.md`](src/net/sf/freecol/client/gui/classic/README.md).
 > Completed-slice detail and the asset-decoder history are in that README + the git log.
 
-## Chapters & status (2026-07-17)
+## Chapters & status (2026-07-24)
 
 ### [UI phases](classic_ui_plan/ui-phases.md) — our `ClassicGUI` build-out, phase by phase
 
 Phase 0 scaffold ✅ · Phase 1 map ✅ · **Phase 2 HUD & core screens 🔨** — the map HUD, colony and
-Europe screens, and ten advisor reports ship; HUD polish is done. Left: **screen interaction** (drag
-colonists, build queue, cargo, set-sail) — the bulk of the phase — plus **foreign affairs**, the last
-report the original actually has (the other four unbuilt ones are decided out; see below).
+Europe screens ship, and the **report set is now complete**: all twelve (the original ten, plus
+Labour and Foreign Affairs — both reversed-in/built 2026-07-24), keyed to the *observed* original
+F-key scheme rather than FreeCol's own arbitrary one (in-memory remap only, see
+[Q6](classic_ui_plan/ui-phases.md#open-questions-for-the-expert) for the one live key collision this
+surfaced). Left: **screen interaction** (drag colonists, build queue, cargo, set-sail) — now the
+entire remainder of the phase.
 **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog` ships, and with it the in-game message
 channel, which the classic UI had been discarding silently; left are the choice/input seams and the
 bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch stopgap keeps the game reachable, so this
 is lower urgency). Cinematics are deliberately out of scope.
 
-> **Five open questions are blocked on the expert**, not on code — Q1 (reference shots for foreign
-> affairs) and Q4 (shots for the choice/input popups) each block a seam outright. See
+> **Four open questions remain, blocked on the expert**, not on code — Q4 (shots for the choice/input
+> popups) blocks a seam outright; Q6 (four shipped reports with no confirmed Col1 counterpart, one now
+> a live key collision) is a call only the user/expert should make. See
 > [Open questions for the expert](classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
 
 ### [Optional reports](classic_ui_plan/optional-reports.md) — additions of our own ⬜ deferred
 
-Labour / education / history / requirements: **the original has no screen for these**, so they are out
-of Phase 2 by decision — but their concepts are all Col1, so they are not FreeCol contamination
-either. To be built later as genuine contributions of our own, in the original's visual style over the
-shared report frame. Requirements needs its own call: it is an optimisation *coach*, not a view.
+Education / history / requirements: **the original has no screen for these**, so they are out of
+Phase 2 by decision — but their concepts are all Col1, so they are not FreeCol contamination either.
+To be built later as genuine contributions of our own, in the original's visual style over the shared
+report frame. Requirements needs its own call: it is an optimisation *coach*, not a view. (Labour was
+in this chapter too until the expert's capture showed the original does have that screen — see
+[UI phases](classic_ui_plan/ui-phases.md).)
 
 ### [Assets](classic_ui_plan/assets.md) — bring-your-own original install (DECIDED)
 

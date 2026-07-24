@@ -58,17 +58,20 @@ import net.sf.freecol.common.model.WorkLocation;
  *   <li>{@link Page#SONS_OF_LIBERTY} — "Söhne der Freiheit" ({@code opening_015}):
  *       the Sons-of-Liberty percentage, the building producing the colony's bells,
  *       the bells produced per turn, and the member/tory figures.</li>
- *   <li>{@link Page#MILITARY} — "Militärgarnision" ({@code opening_014}): the
+ *   <li>{@link Page#MILITARY} — "Militärgarnison" ({@code opening_014}): the
  *       military units garrisoned in the colony, as sprites.</li>
  * </ul>
  *
  * <p>Note the original shows <b>no column heads</b> — the subtitle names the page
  * and the columns are self-evident — so this panel deliberately paints none.
  *
- * <p><b>Paging interaction is provisional</b> (the shots show only the layouts, not
- * the keys): <b>Left</b>/<b>Right</b>/<b>Space</b> cycle the pages, and — as on
- * every report — the Okay plate and <b>Escape</b> close.  Pending the expert's
- * sign-off on how the original actually pages.
+ * <p><b>Paging interaction — confirmed live.</b> The expert's capture
+ * ({@code 00_BERICHTE-Menu_Tastenbelegung} + the F6 accelerator note) shows the
+ * original cycles pages by <b>pressing F6 again</b>, not arrow keys/Space (an
+ * earlier guess, now falsified). As on every report the Okay plate and
+ * <b>Escape</b> close. The <em>per-view</em> paging key for &gt;9 colonies
+ * (documented in the expert's two-page military-view capture) is still
+ * unconfirmed — rows past the ninth are simply clipped for now.
  */
 final class ClassicReportColonyPanel extends ClassicReportPanel {
 
@@ -80,7 +83,7 @@ final class ClassicReportColonyPanel extends ClassicReportPanel {
         /**
          * The message-key tail for the page's subtitle, under the classic.report.
          * namespace.  In German these resolve to the original's own captions —
-         * "Söhne der Freiheit" / "Militärgarnision" — matching {@code opening_015}
+         * "Söhne der Freiheit" / "Militärgarnison" — matching {@code opening_015}
          * / {@code opening_014}.
          */
         final String subtitleKey;
@@ -139,22 +142,21 @@ final class ClassicReportColonyPanel extends ClassicReportPanel {
 
     // Paging
 
+    /**
+     * Pressing <b>F6 again</b> (confirmed live, see the class doc) cycles the
+     * page. This is a *local*, report-window-only binding — the report is
+     * hosted in its own {@code JFrame}, separate from the main frame that
+     * holds the menu bar's global F6 accelerator, so the two never contend
+     * for the keystroke.
+     */
     private void installPagingKeys() {
         final InputMap im = getInputMap(WHEN_IN_FOCUSED_WINDOW);
         final ActionMap am = getActionMap();
-        im.put(KeyStroke.getKeyStroke("RIGHT"), "classic_reportNextPage");
-        im.put(KeyStroke.getKeyStroke("SPACE"), "classic_reportNextPage");
+        im.put(KeyStroke.getKeyStroke("F6"), "classic_reportNextPage");
         am.put("classic_reportNextPage", new AbstractAction() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     turnPage(1);
-                }
-            });
-        im.put(KeyStroke.getKeyStroke("LEFT"), "classic_reportPrevPage");
-        am.put("classic_reportPrevPage", new AbstractAction() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    turnPage(-1);
                 }
             });
     }

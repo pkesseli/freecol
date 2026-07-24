@@ -503,8 +503,60 @@ against the original; localizing the few captions.
 ## Report screens (`ClassicReportPanel` + concrete reports)
 
 The original 1994 game's full-screen **advisor reports** (design ref: the
-expert's `opening_014`/`opening_015` shots). Four are built so far — Colony,
-Military, Trade and Religious — all sharing one frame.
+expert's `opening_014`/`opening_015` shots, plus the dedicated report-shot batch
+in `screenshots/Berichte_fuer_Pascal/`). All **twelve** are built — the
+original's ten, plus Labour and Foreign Affairs (both reversed-in / newly built
+2026-07-24, see their own sections below) — sharing one frame.
+
+**Key scheme (2026-07-24).** Report accelerators now follow the *observed*
+original F-key layout (`00_BERICHTE-Menu_Tastenbelegung`: F2 Religious, F3
+Congress, F4 Labour, F5 Trade, F6 Colony, F7 Naval, F8 Foreign Affairs, F9
+Indian — no shift-F* layer at all) rather than FreeCol's own arbitrary one
+(that file's F1 Religious, F3 Colony, F4 Foreign Affairs, F2 Labour, etc. — a
+layout with nothing to do with Col1). `ClassicGUI.remapClassicReportAccelerators`
+does this **at runtime only**, mutating the shared `FreeColAction` objects'
+`ACCELERATOR_KEY` in memory — it never touches `FreeColMessages.properties`,
+which is shared with `SwingGUI` and would silently re-map the standard game's
+shortcuts too. Safe because `--classic` exclusively selects `ClassicGUI` for
+the whole process (`FreeColClient`'s GUI selector), so a standard-UI session
+never shares a process — or these mutated objects — with a classic one. Same
+trick as `styleClassicMenuBar` below: reuse the shared component, restyle only
+this process's copy.
+
+Covers only the **six reports with a confirmed Col1 counterpart** plus the two
+new ones — eight remaps. **Deliberately leaves Military / Production /
+Exploration / Cargo's keys untouched**: none of those four has a confirmed
+original counterpart (see "Which reports are actually Col1's" below), so
+reassigning them is a call for the user/expert, not this fix.
+
+> ⚠️ **Live, confirmed key collision.** Naval's confirmed key F7 is already
+> occupied by Military (left alone per the above), so both menu items now show
+> "F7" but only one actually responds — verified live: pressing F7 opens
+> **Militärberater** (Military), not Naval. Swing's shared keystroke-to-action
+> input map only keeps the most recently registered binding for a given
+> keystroke. Tracked as Q6 in `classic_ui_plan/ui-phases.md`, pending the
+> expert's call on the four unconfirmed reports.
+
+**The subsection headings below now show each report's *new*, post-remap key.**
+The dated "Verified live" notes further down were captured *before* the remap
+and describe the keys actually pressed at the time — read those as historical
+record, not current bindings.
+
+### Which reports are actually Col1's
+
+Cross-referencing the ten reports built before this session against the
+observed F-key menu: **confirmed matches** (right concept, previously the
+wrong key) — Colony↔Kolonieberater(F6), Naval↔Flotteninspektor(F7),
+Trade↔Wirtschaftsberater(F5), Religious↔Religionsberater(F2),
+Congress↔Kontinentalkongress(F3), Indian↔Indianerberater(F9). **No confirmed
+match in the expert's evidence:** Military, Production, Exploration, Cargo.
+Worse, "Military Garrison" is *not* a separate top-level report in the observed
+original — it is one of the two paged views *inside* the Colony Advisor (F6),
+which our Colony Advisor already, independently, correctly cycles through (see
+"Colony Advisor" below). So the standalone Military Advisor screen may be
+duplicating something the original folds into Colony's paging, rather than
+being its own report. **Not unilaterally reworked or removed** — recorded as
+Q6 in the plan for the user/expert to decide.
 
 ### The shared frame (`ClassicReportPanel`)
 
@@ -576,7 +628,7 @@ degrades to a log line. Reached by the reused report menu items, enabled by the
 same `updateActions()` wiring the Europe menu item needed. The remaining
 `showReport*Panel` seams still no-op.
 
-### Colony Advisor (`ClassicReportColonyPanel`, F3) — the paged report
+### Colony Advisor (`ClassicReportColonyPanel`, F6) — the paged report
 
 The "KOLONIEBERATER-BERICHT" over the sepia fort illustration (**`REPORT6.PIK`**).
 This is the one report that, as in the original, **pages through several column
@@ -594,7 +646,7 @@ with a **subtitle** naming the current page. The pages (the `Page` enum):
   colony shows its *Rathaus*/Town Hall), the bells per turn
   (`getNetProductionOf(liberty)`) as icon+amount, and one colonist figure per SoL
   member.
-- **Military Garrison** (`opening_014`, "Militärgarnision") — the offensive land
+- **Military Garrison** (`opening_014`, "Militärgarnison") — the offensive land
   units standing in the colony (`tile.getUnitList()` filtered by
   `isOffensiveUnit() && !isNaval()`) as sprites; none → "—".
 
@@ -603,10 +655,14 @@ with a **subtitle** naming the current page. The pages (the `Page` enum):
 > rows a row-pitch below the *subtitle* via its own `PAGE_ROW_Y0`, keeping the same
 > "a row's cell is drawn above its baseline" invariant).
 
-**Paging interaction is provisional:** the shots show the layouts, not the keys, so
-**Left**/**Right**/**Space** cycle the pages (wrapping) pending the expert's
-sign-off on how the original actually pages. Okay/Escape close as everywhere else.
-Rows that overflow are clipped (no scroll yet); empty → "No colonies yet."
+**Paging interaction — confirmed live (2026-07-24):** the expert's menu capture
+showed the original cycles pages by **pressing F6 again**, not arrow keys/Space
+(the earlier guess, now replaced). This is a *local* binding on the report's own
+`JFrame` — it never contends with the main frame's global F6 accelerator, since
+the report window is a separate top-level window. Okay/Escape close as
+everywhere else. Rows that overflow are clipped (no scroll yet — the *within-a-
+view* paging key for >9 colonies is still open, see Q2 in the plan); empty →
+"No colonies yet."
 
 ### Unit rosters — Military & Naval (`ClassicReportRosterPanel`)
 
@@ -619,17 +675,19 @@ then label** (the unit set is unordered, so this keeps the roster stable), and
 paints one row per group: sprite, the localized `Messages.getUnitLabel(...)`
 type/role label, and the count.
 
-- **Military Advisor** (`ClassicReportMilitaryPanel`, **F7**) — the standing army
+- **Military Advisor** (`ClassicReportMilitaryPanel`, **F7** — unchanged by the
+  remap; see "Which reports are actually Col1's" above) — the standing army
   over the fort illustration (**`REPORT6.PIK`** — the fortification is the garrison
   image; shared with the Colony Advisor, a framing the expert may re-assign once
   REPORT9 has a home). Reportable = FreeCol's `ReportMilitaryPanel` set:
   `!isNaval() && (hasAbility(EXPERT_SOLDIER) || isOffensiveUnit())`. Empty → "No
   military units."
-- **Naval Advisor** (`ClassicReportNavalPanel`, **F8**) — the fleet over the ship
+- **Naval Advisor** (`ClassicReportNavalPanel`, confirmed key **F7** — currently
+  collides with Military above, see Q6) — the fleet over the ship
   illustration (**`REPORT7.PIK`**). Reportable = `unit.isNaval()`. Empty → "No
   naval units."
 
-### Trade Advisor (`ClassicReportTradePanel`, F9)
+### Trade Advisor (`ClassicReportTradePanel`, F5)
 
 The goods ledger over the scales/candle/hourglass illustration (**`REPORT5.PIK`**).
 Every storable good (`spec.getStorableGoodsTypeList()`) as **icon | name | Net |
@@ -639,7 +697,7 @@ $**: `Net` is the empire-wide net production summed over all colonies
 the column origins are *within* a half, added to `col*HALF`) so the 21-good ledger
 fits the canvas.
 
-### Religious Advisor (`ClassicReportReligiousPanel`, F1)
+### Religious Advisor (`ClassicReportReligiousPanel`, F2)
 
 Crosses/immigration over the preacher-and-congregation illustration
 (**`REPORT2.PIK`**). A summary block at the top — accumulated immigration
@@ -658,7 +716,7 @@ lists **every** good a colony nets positively, as icon+amount along the row
 fills). Empty → "No colonies yet."; a producing-nothing colony → "—". Its
 per-colony row logic is shared with the (data-verified) Colony Advisor.
 
-### Continental Congress (`ClassicReportCongressPanel`, F6)
+### Continental Congress (`ClassicReportCongressPanel`, F3)
 
 The founding-father standing over the two-men-at-a-desk illustration
 (**`REPORT3.PIK`**). A summary block — who is currently being recruited
@@ -687,7 +745,7 @@ it holds (`getCompactGoodsList()`, icon+amount) and the units aboard
 (`getUnitList()`, sprites), clipped when the row fills. Nothing aboard → "(empty)";
 no carriers → "No carriers."
 
-### Indian Advisor (`ClassicReportIndianPanel`, F5)
+### Indian Advisor (`ClassicReportIndianPanel`, F9)
 
 The contacted native nations, over the native-scout illustration
 (**`REPORT1.PIK`**). One row per native nation the player has **contacted**
@@ -700,10 +758,11 @@ contacted yet."
 
 > Unlike FreeCol's panel this deliberately omits the tribe's *true* settlement
 > total: that comes from `igc().nationSummary()`, which a static paint must not
-> drive — see "The `nationSummary` trap" below (the same reason the Foreign
-> Affairs report is still unbuilt). The locally-known count is shown instead.
+> drive — see "The `nationSummary` trap" below (the same trap the Foreign
+> Affairs report below had to solve). The locally-known count is shown instead.
 
-**Verified live (2026-07-15):** at the `--fast` start (at sea, no colonies) all ten
+**Verified live (2026-07-15, pre-key-remap — see "Key scheme" above for the keys
+these reports answer to today):** at the `--fast` start (at sea, no colonies) all ten
 render framed over their correct backdrops with 0 SEVERE — **F3** "No colonies
 yet."; **F7** the starting `Soldat (Freier Kolonist) ×1`; **F8** the starting
 `Handelsschiff ×1`; **F9** the full 21-good two-column ledger with live sale prices;
@@ -745,25 +804,141 @@ So it must never be called from `paintComponent`: that is network I/O on the EDT
 on every repaint. Any report needing it has to fetch **once, off the EDT, when the
 screen opens**, stash the results, and paint from the stash — a different shape
 from every report shipped so far, all of which paint straight off the model. This
-is why the Indian Advisor shows the locally-known settlement count, and it is the
-main structural work in the unbuilt Foreign Affairs report.
+is why the Indian Advisor shows the locally-known settlement count, and it was
+the main structural work in building the Foreign Affairs report below.
+
+### Foreign Affairs Report (`ClassicReportForeignAffairPanel`, F8)
+
+The "AUSSENPOLITIK-BERICHT" — the last report the original actually has, and now
+built, closing the report set. Over the map-and-wax-seal illustration
+(**`REPORT8.PIK`**): confirmed pixel-for-pixel against the expert's capture, and
+in the process found to be **already double-booked** with the Exploration Report
+above, which had only guessed at that backdrop — a real correction the expert's
+shots surfaced (recorded as part of Q6, since it also means Exploration's own
+backdrop claim is now less certain, on top of Exploration having no confirmed
+Col1 counterpart at all).
+
+**Layout — one fixed-height block per European power**, met or not, alive or
+withdrawn, in game order, with the **viewer's own nation always last** (verified
+against the capture's own save). Read directly off pixel scans of the raw
+320×200 captures (not the point-scaled human-readable copies, which stretch to a
+4:3 CRT aspect and would give wrong constants): a `RULE`-coloured horizontal line
+opens each 45px block, then five 7px-pitch lines — name, colonies/avg size/
+population, military/naval/merchant strength, stance, rebels/loyalists. A
+withdrawn power's block instead shows just its name and a centred notice
+(`classic.report.foreignAffairs.withdrawn`).
+
+**Fields — deliberately not FreeCol's nine.** Matches the capture's own set:
+colonies, average colony size, population, military strength, naval strength,
+merchant-marine strength, stance (peace **yellow**, war **red** — colour-coded,
+confirmed from the capture's side-by-side peace/war comparison shot), and
+rebel/loyalist head counts. **Omits** gold, tax rate, Continental Congress
+membership and Sons-of-Liberty % — all of which FreeCol's own
+`ReportForeignAffairPanel` shows and this does not, the same
+information-availability call already made for the other reports. The viewer's
+own block instead lists its **stance toward every met rival**, one pair per
+slot (an unmet or withdrawn power gets no entry there, per the capture).
+
+**The two fields `NationSummary` didn't have — a small, additive model
+extension, not a rules change.** Merchant-marine strength and rebel/loyalist
+counts have no equivalent on `NationSummary` (the DTO `nationSummary()`'s server
+round trip returns), and a rival's true figures are only ever knowable through
+that DTO — the client's local copy of a rival `Player` is deliberately
+incomplete. So `NationSummary` gained two small additions:
+`mercantileMarine` (`NationSummary.computeMercantileMarine`, sum of
+`Unit.getCargoCapacity()` over a player's naval units) and `rebels`/`loyalists`
+(derived from population and `Player.getSoL()`). Both are **always computed**,
+unlike `soL`/`foundingFathers`/`tax` on the same class, which stay gated behind
+`Ability.BETTER_FOREIGN_AFFAIRS_REPORT` exactly as before — untouched, because
+the capture shows Col1 exposes the *new* fields to every rival unconditionally,
+but says nothing about the *existing* gated ones, so there was no evidence to
+justify loosening them. Purely additive: new fields with sensible defaults, no
+existing field, gate, or XML schema changed; `SwingGUI`'s own
+`ReportForeignAffairPanel` doesn't read them, so it is unaffected.
+
+**Fetched off the EDT, per the `nationSummary` trap above.**
+`ClassicGUI.showReportForeignAffairPanel` spawns a background thread that
+builds the full list of European powers (`game.getPlayers`, filtered to
+European/non-REF/not-self, **including dead ones** — the capture's withdrawn
+England stays on the list) and calls `nationSummary()` for each live one *before*
+building the panel; the finished stash is handed to
+`ClassicReportForeignAffairPanel` on the EDT via `SwingUtilities.invokeLater`,
+which only ever paints from it. The viewing player's own block is read directly
+off the local, always-authoritative `Player` instead — no round trip needed for
+your own data.
+
+**Verified live (2026-07-24, populated 4-nation save, 0 SEVERE):** all three
+rivals (France, England — withdrawn, Spain) plus the viewer's own nation
+rendered; colonies/population/military/naval/merchant figures and rebel/loyalist
+splits all matched the underlying model; England's withdrawn block showed the
+centred notice with no stats; the own-block stance line correctly showed no
+entries in an unmet-everyone save. War/peace colour-coding is coded per the
+capture but not yet live-tested against an actual war (the test save had none).
+
+### Labour Advisor (`ClassicReportLabourPanel`, F4)
+
+The "ARBEITSBERATER-BERICHT" — **a reversed decision**: previously filed as one
+of the four FreeCol-only reports (`optional-reports.md`), until the expert's
+capture (`F4_Arbeitsberater_Labor`) showed the original has this exact screen —
+a three-column census of every "person" unit type the player owns, portrait +
+localized name + count, **grouped exactly as the capture groups them**, not spec
+order and not an arbitrary three-way split of it: primary-good producers
+(farm/plantation/mine/trap/lumber) on the left, building/processing experts plus
+the fisherman and preacher in the middle, and the "special" civil/military/other
+roles on the right (`COLUMN_UNIT_IDS`, three hardcoded id lists). Over
+**`REPORT4.PIK`** (a new double-booking, shared with the Production Report — the
+dockside/warehouse scene matches both). A type with zero units still gets a row
+(the capture shows `Jesuitenmissionare 0`) — only types unavailable to the
+player's nation/ruleset are skipped.
+
+**Row geometry read directly off pixel scans of the raw capture** (not the
+point-scaled copy, same caveat as Foreign Affairs above): each entry is two
+stacked lines (name, then count) in an 18px pitch — noticeably tighter than the
+15px `ROW_H` every single-line report shares, since two lines have to fit where
+one normally does, so this panel defines its own `ENTRY_H`/`FIRST_Y`/`COUNT_DY`
+rather than reusing the base constants.
+
+> ⚠️ **Clipping-margin bug found and fixed during live verification.** The first
+> cut tested a row's fit against `y + ENTRY_H > BODY_BOTTOM` — the same shape as
+> every other report's clipping check — but that demands the *next* row's full
+> slot also fit, not just the current row's own content (which only reaches
+> `y + COUNT_DY`). It silently dropped the ninth row of both 9-entry columns
+> (`Mitreißender Prediger`, `Freie Siedler`) even though they visually fit with
+> room to spare. Fixed by checking against the row's own content extent instead.
+> The Foreign Affairs report above had the identical bug for the same reason (its
+> own block-height check demanded a full next-block's headroom) — it silently
+> dropped the **viewer's own nation** in a fully-populated 4-nation save, until
+> fixed the same way (`BLOCK_CONTENT_H`, not `BLOCK_H`). Both were only caught by
+> testing with data that actually filled every row/block — an idle/empty save
+> would never have shown either.
+
+**Deliberately not built: the capture's own "click to zoom" drill-down.** The
+subtitle "(Zum Zoomen Objekt anklicken)" promises a per-type detail view
+(FreeCol's `ReportLabourDetailPanel` equivalent) this slice does not build, so
+the subtitle itself is **not painted** — showing it would advertise an
+interaction that silently does nothing on click. The row geometry above already
+reserves the caption's vertical space, so adding the drill-down later is a
+self-contained follow-up, not a relayout. Education, History and Requirements
+are **unaffected** by any of this — the capture says nothing about them, and
+they remain deferred in `optional-reports.md`.
+
+**Verified live (2026-07-24, a save with a colony elsewhere on the map, 0
+SEVERE):** all three columns render over the correct backdrop; the visible unit
+(a Free Colonist standing alone) and units in an off-screen colony (a Master
+Carpenter) both counted correctly, confirming the census aggregates
+`player.getUnitSet()` empire-wide rather than just what's on screen.
 
 ### Follow-ups (later slices)
 
-**Foreign affairs** — the last report the original actually has, and the only
-unbuilt one with original art unaccounted for. Blocked on the expert's reference
-shots (which backdrop, layout, which per-nation fields, key, sub-states), and
-subject to the `nationSummary` trap above, which is its main structural work.
-
-**Labour / education / history / requirements are decided out** — Col1 has no
-screen for them, so they are deferred to
+The expert's sign-off on the Colony Advisor's **within-a-view** paging key for
+more than 9 colonies (the *between-views* key is now confirmed — see "Colony
+Advisor" above); row scrolling for many entities generally. (Captions are
+localized and colony rows are clickable now — see "Caption localization" and
+"Clickable colony rows" above.) Education, History and Requirements remain
+deferred to
 [`classic_ui_plan/optional-reports.md`](../../../../../../../classic_ui_plan/optional-reports.md)
-as possible later additions of our own, not missing work.
-
-Also: the expert's sign-off on the Colony Advisor's **paging keys** and whether it
-wants more pages (population / production were mentioned but are not in the two
-shots); row scrolling for many entities. (Captions are localized and colony rows
-are clickable now — see "Caption localization" and "Clickable colony rows" above.)
+as possible later additions of our own, not missing work. F10 (score breakdown,
+`showHighScoresPanel`) is newly-discovered scope, not yet built — see the plan.
 
 ## Popups (`ClassicDialog`) — and the dispatch seams that stranded them
 

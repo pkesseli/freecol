@@ -4,40 +4,39 @@
 to be built until the faithful surface is done. This chapter exists so they stop being counted as
 *missing* work in Phase 2.
 
+> **Labour moved out of this chapter (2026-07-24).** It was one of the original four, but the expert's
+> capture (`F4_Arbeitsberater_Labor`) showed the original genuinely has this screen at F4
+> ("Arbeitsberater") — falsifying the "no Col1 screen" premise for Labour specifically. Built as
+> `ClassicReportLabourPanel`; see [UI phases](ui-phases.md#remaining) and the package README. Education,
+> History and Requirements are **unaffected** — the capture says nothing about them, and remain here.
+
 ## Why these are here rather than in Phase 2
 
-Four `showReport*Panel` seams have **no original screen behind them**. The original ships nine report
-backdrops (`REPORT1`–`REPORT9`); the ten reports we already show cover eight, and `REPORT9` merely
-duplicates `REPORT1`'s native-scout art. Only **foreign affairs** — which Col1 does have — has
-original art unaccounted for, and it stays in [Phase 2](ui-phases.md#remaining) as real work.
+Three `showReport*Panel` seams have **no original screen behind them**. The original ships nine report
+backdrops (`REPORT1`–`REPORT9`); the twelve reports we now show (the original ten, plus Labour and
+Foreign Affairs) cover all nine, `REPORT9` merely duplicates `REPORT1`'s native-scout art, and
+`REPORT8` turned out to be double-booked between Exploration and Foreign Affairs (see the README).
+Foreign affairs — which Col1 does have — is built; see [Phase 2](ui-phases.md#remaining).
 
-But these four are **not FreeCol inventions**, which is why they are deferred rather than refused.
+But these three are **not FreeCol inventions**, which is why they are deferred rather than refused.
 Their concepts are all Col1: education is a core original mechanic (the classic ruleset ships
 schoolhouse/college/university and `allowStudentSelection`, listed Col1-faithful in
-[rules fidelity](rules-fidelity.md) table A); labour is a census of unit types you own; history logs
-events that are almost all original. The divergence is **informational, not conceptual** — aggregate
-views Col1 made you track by hand — so §C ("FreeCol additions to keep out") does not apply, and the
-rules axis is untouched.
+[rules fidelity](rules-fidelity.md) table A); history logs events that are almost all original. The
+divergence is **informational, not conceptual** — aggregate views Col1 made you track by hand — so §C
+("FreeCol additions to keep out") does not apply, and the rules axis is untouched.
 
 **The decision:** build them later as **genuine contributions of our own** — the reports Col1 might
 have had — in the same visual style as the rest of the game: the shared `ClassicReportPanel` frame,
 gold-on-black title bar, red Okay plate, the 320×200 virtual canvas up-scaled nearest-neighbour.
 An addition presented in the original's idiom, not a FreeCol panel bolted on.
 
-## The four
-
-### Labour — `showReportLabourPanel`, `showReportLabourDetailPanel(UnitType, …)`
-
-A census of every unit type the player owns and how many of each, with a drill-down per type
-(`ReportLabourPanel` / `ReportLabourDetailPanel`, and FreeCol's own `CompactLabourReport` variant).
-Two seams, so the detail view is a second screen. Every concept is Col1 — it is a count of what you
-already have.
+## The three
 
 ### Education — `showReportEducationPanel`
 
 Per colony, each teaching building (`building.canTeach()` — schoolhouse/college/university) with its
 teachers and which student each is training. Pure Col1 mechanic; the report only aggregates it.
-Closest in shape to our existing per-colony reports, so likely the cheapest of the four.
+Closest in shape to our existing per-colony reports, so likely the cheapest of the three.
 
 ### History — `showReportHistoryPanel`
 
@@ -65,9 +64,9 @@ not aggregate the original's information, it plays part of the original's game f
 ## What building any of these needs
 
 1. **Backdrop art — the real constraint.** These have no `REPORTn.PIK` of their own. Options: the
-   spare `REPORT9` (a `REPORT1` duplicate, so it reads as native-scout art — wrong for all four);
-   reuse a thematically close backdrop as `REPORT6`/`REPORT7` are already double-booked; or paint
-   nothing and let the dimmed frame carry it. Needs a look decision before code.
+   spare `REPORT9` (a `REPORT1` duplicate, so it reads as native-scout art — wrong for all three);
+   reuse a thematically close backdrop as `REPORT6`/`REPORT7`/`REPORT8` are already double-booked; or
+   paint nothing and let the dimmed frame carry it. Needs a look decision before code.
 2. **Gate them behind a client option.** A player who chose `--classic` for fidelity should be able
    to not have these. FreeCol already has per-report client options (e.g.
    `clientOptions.messages.labourReport.compact`), so there is precedent for the pattern.

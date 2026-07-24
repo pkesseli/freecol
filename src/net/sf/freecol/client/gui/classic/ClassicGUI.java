@@ -26,11 +26,14 @@ import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
@@ -38,12 +41,16 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
+import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
+import net.sf.freecol.client.gui.action.ActionManager;
+import net.sf.freecol.client.gui.action.FreeColAction;
 import net.sf.freecol.client.gui.DialogHandler;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
@@ -59,6 +66,7 @@ import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.IndianNationType;
 import net.sf.freecol.common.model.ModelMessage;
 import net.sf.freecol.common.model.Monarch.MonarchAction;
+import net.sf.freecol.common.model.NationSummary;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Tile;
@@ -265,6 +273,7 @@ public class ClassicGUI extends GUI {
                     final InGameMenuBar menuBar
                         = new InGameMenuBar(getFreeColClient(), null);
                     styleClassicMenuBar(menuBar);
+                    remapClassicReportAccelerators();
                     this.frame.setJMenuBar(menuBar);
                 } catch (Exception e) {
                     logger.log(Level.WARNING, "ClassicGUI: menu bar unavailable",
@@ -319,6 +328,57 @@ public class ClassicGUI extends GUI {
             menu.setOpaque(false);
             menu.setForeground(MENU_BAR_FG);
         }
+    }
+
+    /**
+     * Reassign the reused report actions' keyboard accelerators to match the
+     * <b>observed original 1994 game's F-key scheme</b> (the expert's capture
+     * {@code 00_BERICHTE-Menu_Tastenbelegung}: F1 terrain-info, F2 Religious,
+     * F3 Congress, F4 Labour, F5 Trade, F6 Colony, F7 Naval, F8 Foreign
+     * Affairs, F9 Indian, F10 score — no shift-F* layer at all) rather than
+     * FreeCol's own arbitrary layout in {@code FreeColMessages.properties}
+     * (e.g. that file's F1=Religious, F3=Colony, F4=Foreign Affairs, F2=Labour
+     * — a layout with nothing to do with Col1, just FreeCol's own history).
+     *
+     * <p><b>Runtime-only, never touches the properties file:</b> that file is
+     * shared with {@code SwingGUI}, so editing it would silently re-map the
+     * standard game's shortcuts too. {@link FreeColAction#setAccelerator} only
+     * mutates the live in-memory {@code Action} object, and {@code --classic}
+     * exclusively selects {@code ClassicGUI} for the whole process — see the
+     * GUI selector in {@code FreeColClient} — so a standard-UI session never
+     * shares a process (or these mutated action objects) with a classic one.
+     * Same trick as {@link #styleClassicMenuBar}: reuse the shared component,
+     * restyle only this process's copy.
+     *
+     * <p>Covers only the <b>six reports with a confirmed Col1 counterpart</b>
+     * (README "Report screens" / plan §6) plus the two newly-built ones
+     * (Labour, Foreign Affairs) — eight remaps. <b>Deliberately leaves
+     * Military / Production / Exploration / Cargo's keys untouched</b>: none
+     * of those four has a confirmed original counterpart, so reassigning them
+     * is not this fix's call to make (plan §6 — a decision for the user/expert).
+     *
+     * <p>⚠️ <b>Known collision, flagged rather than silently resolved:</b>
+     * Naval's confirmed key is F7 — already occupied by Military, left alone
+     * per the above. Until §6 is settled both menu items will display "F7" but
+     * only one actually responds when pressed (Swing's shared
+     * keystroke-to-action input map only keeps the most recently registered
+     * binding for a given keystroke).
+     */
+    private void remapClassicReportAccelerators() {
+        final ActionManager am = getFreeColClient().getActionManager();
+        remapAccelerator(am, "reportReligionAction", "F2");
+        remapAccelerator(am, "reportCongressAction", "F3");
+        remapAccelerator(am, "reportLabourAction", "F4");
+        remapAccelerator(am, "reportTradeAction", "F5");
+        remapAccelerator(am, "reportColonyAction", "F6");
+        remapAccelerator(am, "reportNavalAction", "F7");
+        remapAccelerator(am, "reportForeignAction", "F8");
+        remapAccelerator(am, "reportIndianAction", "F9");
+    }
+
+    private void remapAccelerator(ActionManager am, String actionId, String keyStroke) {
+        final FreeColAction action = am.getFreeColAction(actionId);
+        if (action != null) action.setAccelerator(KeyStroke.getKeyStroke(keyStroke));
     }
 
     // View mode / focus — delegated to the map viewer.
@@ -651,6 +711,66 @@ public class ClassicGUI extends GUI {
         return showReport("reportIndianAction.name",
             onClose -> new ClassicReportIndianPanel(getFreeColClient(),
                 this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Labour Advisor report</b> — a three-column census
+     * of every unit type the player owns (accelerator {@code F4} in the
+     * original; see the README's key-scheme note for why the classic UI does
+     * not yet claim that key).  See {@link ClassicReportLabourPanel}.
+     */
+    @Override
+    public FreeColPanel showReportLabourPanel() {
+        return showReport("reportLabourAction.name",
+            onClose -> new ClassicReportLabourPanel(getFreeColClient(),
+                this.imageLibrary, onClose));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>Foreign Affairs report</b> — the last report the
+     * original actually has, over the map-and-wax-seal illustration
+     * (accelerator {@code F4} in the original; see the README's key-scheme
+     * note for why the classic UI does not yet claim that key).  See
+     * {@link ClassicReportForeignAffairPanel}.
+     *
+     * <p><b>The {@code nationSummary} trap.</b> Every rival's
+     * {@link NationSummary} is a blocking server round trip, so it must not be
+     * fetched from {@code paintComponent}.  This override fetches them all on
+     * a background thread <em>before</em> the panel is built, then hands the
+     * finished stash to the panel on the EDT — the panel itself only ever
+     * paints from that stash, never calls {@code nationSummary} directly.
+     */
+    @Override
+    public FreeColPanel showReportForeignAffairPanel() {
+        final FreeColClient fcc = getFreeColClient();
+        new Thread(FreeCol.CLIENT_THREAD + "ForeignAffairs") {
+            @Override
+            public void run() {
+                final Player me = fcc.getMyPlayer();
+                final Game game = fcc.getGame();
+                if (me == null || game == null) return;
+                final List<Player> others = game.getPlayers(p ->
+                    p.isEuropean() && !p.isUnknownEnemy() && !p.isREF()
+                        && p != me).collect(Collectors.toList());
+                final Map<Player, NationSummary> summaries = new HashMap<>();
+                for (Player other : others) {
+                    if (other.isDead()) continue;
+                    final NationSummary ns
+                        = fcc.getInGameController().nationSummary(other);
+                    if (ns != null) summaries.put(other, ns);
+                }
+                SwingUtilities.invokeLater(() -> showReport(
+                    "reportForeignAction.name",
+                    onClose -> new ClassicReportForeignAffairPanel(fcc,
+                        ClassicGUI.this.imageLibrary, onClose, me, others,
+                        summaries)));
+            }
+        }.start();
+        return null;
     }
 
     /**

@@ -16,18 +16,27 @@ phase item linked; this list is just the queue to take to him.
 
 | # | Question | Blocks | Cost of guessing wrong |
 |---|---|---|---|
-| **Q1** | **Reference shots of Col1's Foreign Affairs report** — the last report the original has that we have not built. Needed: which **backdrop**, the **layout**, **which fields** per nation, the **key**, **sub-states**, and shots with **several rivals met** (see the phase item for why each). | [Phase 2 §1](#remaining) | Cannot start — every one of those is unguessable from the repo. |
-| **Q2** | **The Colony Advisor's paging keys**, and whether it wants pages beyond Sons of Liberty / Military Garrison (population / production were mentioned but are in neither shot). | [Phase 2 §1](#remaining) | Shipped and wrong: keys nobody would press. |
+| **Q2** | **The per-view Colony Advisor paging key for >9 colonies** — the *between-views* cycle is now confirmed (F6 again; see Resolved below), but the shots' two-page military view (9 colonies, then a 10th on its own page) doesn't show what pages *within* one view. Left un-implemented (rows past the ninth are just clipped) pending this. | [Colony Advisor](../src/net/sf/freecol/client/gui/classic/README.md#colony-advisor-classicreportcolonypanel-f6--the-paged-report) | Shipped and wrong: a key nobody would press, for a case only a long game hits. |
 | **Q3** | **The popup look** — `ClassicDialog`'s metrics and green-on-wood palette are read off screenshots by eye, not measured from the art. `WOODPAN2.PIK` is unused; should it be? | [Phase 3 §2](#remaining-1) | Every popup in the game inherits the error. |
 | **Q4** | **Reference shots for the choice-list and text-input popups**, whose original look we have never seen. | [Phase 3 §1](#remaining-1) | Cannot start; they stay Swing stopgaps. |
 | **Q5** | **The colony screen's fixed building ground-slots** — the original places buildings at set positions; we flow-layout them. | [Phase 2 §3](#remaining) | Rework of the biggest remaining slice. |
+| **Q6** | **Four shipped reports — Military, Production, Exploration, Cargo — have no confirmed Col1 counterpart** at all (see Resolved below); "Military Garrison" may just be the Colony Advisor's own paging, not a standalone report. **Concretely blocking now:** remapping Naval to its confirmed key F7 collides with Military, which already sits there and which this plan does not touch unilaterally — both menu items show "F7" today but only one responds (verified live). Should any of the four be reworked, re-keyed, or removed? | Key-scheme remap (`ClassicGUI.remapClassicReportAccelerators`); README "Report screens" | Guessing wrong either reworks a report the original never had, or leaves a live, user-visible key collision unresolved. |
 
-**Q1 and Q4 are the ones to ask first** — each is pure reference material (shots), cheap for him to
-answer, and each unblocks a seam that cannot be started without it. Q2/Q3/Q5 are sign-off on work
-that already runs, so they can wait for a review pass.
+**Q4 is the one to ask first** — pure reference material (shots), cheap for him to answer, and
+unblocks a seam that cannot be started without it. Q2/Q3/Q5/Q6 are sign-off on work that already runs
+(or a call on work already flagged), so they can wait for a review pass.
 
-*Resolved:* whether the four Col1-less reports belong in a faithful classic UI — **no**, deferred to
-[optional reports](optional-reports.md) as later additions of our own (2026-07-17).
+*Resolved* (detail in the README, not repeated here):
+- Whether Education/History/Requirements/Labour belong in a faithful classic UI — no for the first
+  three (deferred to [optional reports](optional-reports.md), 2026-07-17); **Labour reversed** —
+  the original does have it, at F4 (2026-07-24).
+- **Q1, Foreign Affairs** (2026-07-24) — key F8, backdrop `REPORT8.PIK` (also double-booked with
+  Exploration → feeds Q6), full field/layout spec, all powers listed regardless of contact, own
+  nation last, no sub-states. Built as `ClassicReportForeignAffairPanel`.
+- **Q2, the *between-views* Colony Advisor paging key** (2026-07-24) — confirmed **F6 again**, not
+  Left/Right/Space. The *within-a-view* key for >9 colonies remains open (table above).
+- **The observed F-key scheme** (2026-07-24) — remapped in `ClassicGUI` at runtime, in-memory only;
+  see README "Report screens".
 
 ## Phase 0 — scaffold & launch ✅
 
@@ -46,72 +55,47 @@ Rectangular 48px grid: `TERRAIN.SS` terrain, `PHYS0.SS` feature overlays + coast
 
 **Shipped:** map HUD (reused `InGameMenuBar` + `ClassicInfoPanel`); **colony screen**
 (`ClassicColonyPanel`, `COLONY.PIK`/`BUILDING.SS`/`WOODTILE.SS`); **Europe screen**
-(`ClassicEuropePanel`, `EUROPE.PIK`, recruit/purchase/train via the real controllers); **ten advisor
-reports** over a shared `ClassicReportPanel` frame (unit rosters share a further
-`ClassicReportRosterPanel`) — Colony (`REPORT6.PIK`, F3), Military (`REPORT6`, F7), Naval
-(`REPORT7`, F8), Trade (`REPORT5`, F9), Religious (`REPORT2`, F1), Production (`REPORT4`, shift F4),
-Congress (`REPORT3`, F6), Exploration (`REPORT8`, shift F2), Cargo (`REPORT7`, shift F1), Indian
-(`REPORT1`, F5); **order buttons** (reuse `FreeColAction` `BUTTON_IMAGE` art), **in-panel minimap**,
-**unit portrait**, **seam-free `WOODPANL.PIK` wood chrome**, Col1's light-on-dark menu bar, and
-localized report captions. (README "Phase 2 HUD" / "Colony screen" / "Europe screen" / "Report
-screens".)
+(`ClassicEuropePanel`, `EUROPE.PIK`, recruit/purchase/train via the real controllers); **all twelve
+advisor reports** — the original's ten plus Labour, a reversed decision (see "Remaining" below) — over
+a shared `ClassicReportPanel` frame (unit rosters share a further `ClassicReportRosterPanel`): Colony
+(`REPORT6.PIK`), Military (`REPORT6`), Naval (`REPORT7`), Trade (`REPORT5`), Religious (`REPORT2`),
+Production (`REPORT4`), Congress (`REPORT3`), Exploration (`REPORT8`), Cargo (`REPORT7`), Indian
+(`REPORT1`), **Labour** (`REPORT4`, new), **Foreign Affairs** (`REPORT8`, new — the last report the
+original actually has, finishing the set). Keys now follow the *observed* original F-key scheme
+(F2 Religious, F3 Congress, F4 Labour, F5 Trade, F6 Colony, F7 Naval, F8 Foreign Affairs, F9 Indian),
+remapped at runtime in `ClassicGUI` rather than FreeCol's own arbitrary layout — see
+["Report screens"](../src/net/sf/freecol/client/gui/classic/README.md#report-screens-classicreportpanel--concrete-reports)
+in the README for the mechanism and the one confirmed, still-open key collision (F7: Naval vs.
+Military — [Q6](#open-questions-for-the-expert)). Also: **order buttons** (reuse `FreeColAction`
+`BUTTON_IMAGE` art), **in-panel minimap**, **unit portrait**, **seam-free `WOODPANL.PIK` wood chrome**,
+Col1's light-on-dark menu bar, and localized report captions. (README "Phase 2 HUD" / "Colony screen" /
+"Europe screen" / "Report screens".)
 
 > **Key enabler:** `ClassicGUI.updateActions()` (called on `reconnectGUI` + every `changeView`)
 > refreshes the reused actions' enabled state — the classic HUD has no `Canvas`, so without it the
 > Europe/report menu items and the order buttons stay stuck disabled.
 
+The report set (Foreign Affairs, Labour, and the key-scheme remap) is now **done** — full detail lives
+in the README's "Report screens" section, not here. What's left:
+
 ### Remaining
 
-1. **Foreign affairs — the last report the original actually has.** ⬜ The other four unbuilt
-   `showReport*Panel` seams (labour / education / history / requirements) are **decided out of this
-   phase**: Col1 has no screen for them, so they are deferred to
-   [optional reports](optional-reports.md) as later additions of our own. Foreign affairs is the one
-   Col1 *does* have, and the only unbuilt report with original art unaccounted for — so it finishes
-   the report set. Blocked on reference shots ([Q1](#open-questions-for-the-expert)).
-   - **What it shows** (FreeCol's `ReportForeignAffairPanel`, per live European player): coat of
-     arms, country, **stance**, number of colonies, number of units, military strength, naval
-     strength, gold, continental congress, tax, Sons of Liberty. Which of those Col1 surfaces is a
-     question for the shots — showing *more* than the original is the same information-availability
-     call we just settled for the other four, so do not carry fields over unexamined.
-   - ⚠️ **The `nationSummary` trap — the main structural work here.** It is a *blocking server
-     round-trip*, not the async callback this plan used to claim, so it cannot be driven from
-     `paintComponent` and must be fetched once off the EDT on open, then painted from a stash — a
-     different shape from every report so far. Full note in the README, "The `nationSummary` trap".
-   - **What we need from the expert before writing it** ([Q1](#open-questions-for-the-expert)) — all
-     of it unguessable from the repo:
-     1. **Which backdrop.** The spare `REPORT9` duplicates `REPORT1`'s native-scout art, which reads
-        wrong for a European-powers screen. So either foreign affairs owns one of the backdrops we
-        have **double-booked** — `REPORT6` (Colony + Military) or `REPORT7` (Naval + Cargo), meaning
-        one of those pairings is our mistake — or `REPORT9` really is it. One shot settles it, and it
-        may correct an existing assignment.
-     2. **The layout**, to read constants straight off into the 320×200 canvas: are nations a table
-        of rows, a panel each, or one nation per page? Where does the coat of arms sit?
-     3. **Which fields the original shows**, of FreeCol's stance / colonies / units / military /
-        naval / gold / congress / tax / SoL — plus their captions, for the isolated
-        `classic.report.*` block (EN + DE). Carrying all nine over unexamined would re-introduce the
-        very information-availability question the other four reports were just deferred over.
-     4. **The accelerator key.** Our mapping leaves **F2 and F4 unclaimed** (F1 Religious, F3 Colony,
-        F5 Indian, F6 Congress, F7 Military, F8 Naval, F9 Trade, shift-F1 Cargo, shift-F2
-        Exploration, shift-F4 Production), so foreign affairs plausibly owns one of them — worth
-        confirming rather than assuming.
-     5. **Sub-states, not just the idle screen** — does it page per nation, as the Colony Advisor
-        pages its column sets?
-     6. **Shots with several rivals met, at war and at peace.** The Congress and Indian row loops
-        have only ever run their empty-state branch (README verification caveat); populated shots
-        stop foreign affairs joining them.
-   - The Colony Advisor **pages** through its column sets as the original does (Sons of Liberty /
-     Military Garrison — the two the expert's shots document); the paging *keys* are a guess awaiting
-     sign-off.
-   - **Colony rows are clickable** — a click in the Colony/Production/Religious reports jumps to that
-     colony's screen (README "Clickable colony rows").
-   - The Congress and Indian row loops have only ever run their empty-state branch — see the README's
-     verification caveat.
-2. **HUD polish — otherwise done.** Remaining: only the colony/Europe screens' own few hard-coded
+1. **Colony Advisor: the within-a-view paging key for >9 colonies** — open, see
+   [Q2](#open-questions-for-the-expert). (The between-views cycle, F6-again, is done.) Colony rows
+   stay clickable (Colony/Production/Religious → jump to that colony's screen); the Congress and
+   Indian row loops still haven't been exercised with real data — see the README's verification
+   caveat.
+2. **F10 "Kolonisationspunkte" (score breakdown) — newly discovered scope, not yet built.** ⬜ FreeCol's
+   matching seam, `showHighScoresPanel(String, List<HighScore>)`, differs in shape from every other
+   report (takes its data as arguments) and has **no accelerator at all** in FreeCol's own scheme, so
+   F10 is uncontested. Lower priority; build when there's a natural opening.
+3. **HUD polish — otherwise done.** Remaining: only the colony/Europe screens' own few hard-coded
    captions. (The menu **dropdown popups** are still default Swing — folded into the Phase-3 reskin.)
-3. **Screen-interaction polish** — the bulk of what's left. *Colony:* validate the provisional
-   `BUILDING.SS` frame map, place buildings at the original fixed ground-slots (vs. our flow layout),
-   and add interaction (drag colonists between tiles/buildings, build queue, cargo). *Europe:*
-   drag-to-board / load-cargo / set-sail. *Both:* per-nation building/flag tints.
+4. **Screen-interaction polish** — the bulk of what's left, and now the only large item in this phase.
+   *Colony:* validate the provisional `BUILDING.SS` frame map, place buildings at the original fixed
+   ground-slots (vs. our flow layout), and add interaction (drag colonists between tiles/buildings,
+   build queue, cargo). *Europe:* drag-to-board / load-cargo / set-sail. *Both:* per-nation
+   building/flag tints.
 
 ## Phase 3 — dialogs & polish 🔨
 
