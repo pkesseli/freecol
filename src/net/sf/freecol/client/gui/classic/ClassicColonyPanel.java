@@ -109,6 +109,14 @@ final class ClassicColonyPanel extends JPanel {
     private static final int AREA_Y = TITLE_H;
     private static final int BUILD_W = 204;
 
+    /**
+     * The construction indicator — current build + progress, clickable to open
+     * the build-queue screen ({@link ClassicBuildQueuePanel}) — sits atop the
+     * buildings pane, mirroring FreeCol's own {@code ConstructionPanel} (whose
+     * click opens {@code GUI.showBuildQueuePanel} the same way).
+     */
+    private static final int CONSTR_H = 11;
+
     /** The {@code COLONY.PIK} chrome occupies the bottom 72 rows. */
     private static final int BAND_Y = 128;
 
@@ -214,6 +222,10 @@ final class ClassicColonyPanel extends JPanel {
         = new java.util.ArrayList<>();
     private final java.util.List<String> buildingNames = new java.util.ArrayList<>();
 
+    /** The construction indicator's clickable band, set on each paint. */
+    private final java.awt.Rectangle constructionBounds
+        = new java.awt.Rectangle(0, AREA_Y, BUILD_W, CONSTR_H);
+
     /** Index into {@link #buildingBounds} of the hovered building, or -1. */
     private int hovered = -1;
 
@@ -283,6 +295,10 @@ final class ClassicColonyPanel extends JPanel {
     private void onClick(MouseEvent e) {
         final int vx = (e.getX() - this.originX) / this.scale;
         final int vy = (e.getY() - this.originY) / this.scale;
+        if (this.constructionBounds.contains(vx, vy)) {
+            this.freeColClient.getGUI().showBuildQueuePanel(this.colony);
+            return;
+        }
         if (vx >= WARE_W && vy >= WARE_Y) close();
     }
 
@@ -308,6 +324,11 @@ final class ClassicColonyPanel extends JPanel {
         if (this.onClose != null) this.onClose.run();
     }
 
+    /** Repaint after a model change (a build-queue pick, production, gold). */
+    void refresh() {
+        repaint();
+    }
+
 
     // Painting
 
@@ -330,10 +351,43 @@ final class ClassicColonyPanel extends JPanel {
 
         paintTitle(g);
         paintBuildings(g);
+        paintConstruction(g);
         paintWorkTiles(g);
         paintBand(g);
         paintHover(g);
         g.dispose();
+    }
+
+    /**
+     * The construction indicator: the colony's current build target, an icon
+     * and its name, plus the goods still needed to finish it — clicking
+     * anywhere in the band opens the build-queue screen. Mirrors FreeCol's own
+     * {@code ConstructionPanel} (same click target, same seam), over its own
+     * dark plate atop the buildings pane so it reads regardless of what
+     * building sprite happens to be underneath.
+     */
+    private void paintConstruction(Graphics2D g) {
+        g.setColor(TAG_BG);
+        g.fillRect(0, AREA_Y, BUILD_W, CONSTR_H);
+        g.setColor(GOLD);
+        g.drawRect(0, AREA_Y, BUILD_W - 1, CONSTR_H - 1);
+
+        final net.sf.freecol.common.model.BuildableType current
+            = this.colony.getCurrentlyBuilding();
+        g.setFont(font(6f, Font.PLAIN));
+        if (current == null) {
+            g.setColor(TAG_FG);
+            g.drawString(Messages.message("classic.buildQueue.empty"),
+                         3, AREA_Y + CONSTR_H - 3);
+            return;
+        }
+        final BufferedImage icon = this.lib.getSmallBuildableTypeImageWithWithSize(
+            current, this.colony.getOwner(),
+            new Dimension(CONSTR_H - 2, CONSTR_H - 2));
+        if (icon != null) g.drawImage(icon, 1, AREA_Y + 1, null);
+        g.setColor(TAG_FG);
+        g.drawString(Messages.getName(current), CONSTR_H + 2,
+                     AREA_Y + CONSTR_H - 3);
     }
 
     /** The gold-on-black header: colony name, turn, treasury. */
@@ -371,7 +425,7 @@ final class ClassicColonyPanel extends JPanel {
         this.buildingBounds.clear();
         this.buildingNames.clear();
         int x = 4;
-        int y = AREA_Y + 6;
+        int y = AREA_Y + CONSTR_H + 5;
         int rowH = 0;
         for (Building b : this.colony.getBuildings()) {
             final Integer frame = BUILDING_FRAMES.get(shortId(b.getType().getId()));

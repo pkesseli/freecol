@@ -25,8 +25,10 @@ Europe screens ship, and the **report set is now complete**: all twelve (the ori
 Labour and Foreign Affairs — both reversed-in/built 2026-07-24), keyed to the *observed* original
 F-key scheme rather than FreeCol's own arbitrary one (in-memory remap only, see
 [Q6](classic_ui_plan/ui-phases.md#open-questions-for-the-expert) for the one live key collision this
-surfaced). Left: **screen interaction** (drag colonists, build queue, cargo, set-sail) — now the
-entire remainder of the phase.
+surfaced). **Screen interaction**: the two hard blockers — a colony **build queue** and **Europe
+boarding** — shipped 2026-07-24 (a colony can now be told what to build, and a colonist can board a
+ship without leaving and re-entering via the map); left in this slice: colony drag-interaction and
+fixed building ground-slots, Europe cargo/set-sail, and per-nation tints.
 **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog` ships, and with it the in-game message
 channel, which the classic UI had been discarding silently; left are the choice/input seams and the
 bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch stopgap keeps the game reachable, so this

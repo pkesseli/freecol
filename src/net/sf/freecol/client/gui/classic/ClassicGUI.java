@@ -99,6 +99,12 @@ public class ClassicGUI extends GUI {
     /** The colony screen's window, while one is open (see {@link #showColonyPanel}). */
     private JFrame colonyFrame;
 
+    /** The colony panel inside {@link #colonyFrame}, kept so it can be repainted. */
+    private ClassicColonyPanel colonyPanel;
+
+    /** The build-queue screen's window, while one is open (see {@link #showBuildQueuePanel}). */
+    private JFrame buildQueueFrame;
+
     /**
      * The original's menu bar is a dark strip with light labels (design ref:
      * {@code opening_008}), where FreeCol's reused bar is dark-on-parchment.
@@ -387,6 +393,7 @@ public class ClassicGUI extends GUI {
     private void repaintInfo() {
         if (this.infoPanel != null) this.infoPanel.repaint();
         if (this.europePanel != null) this.europePanel.refresh();
+        if (this.colonyPanel != null) this.colonyPanel.refresh();
     }
 
     /**
@@ -506,11 +513,14 @@ public class ClassicGUI extends GUI {
         SwingUtilities.invokeLater(() -> {
             try {
                 closeColonyPanel();
+                final ClassicColonyPanel panel = new ClassicColonyPanel(
+                    getFreeColClient(), this.imageLibrary, colony,
+                    this::closeColonyPanel);
                 final JFrame f = new JFrame(colony.getName());
                 this.colonyFrame = f;
+                this.colonyPanel = panel;
                 f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-                f.setContentPane(new ClassicColonyPanel(getFreeColClient(),
-                        this.imageLibrary, colony, this::closeColonyPanel));
+                f.setContentPane(panel);
                 f.pack();
                 f.setLocationRelativeTo(this.frame);
                 f.setVisible(true);
@@ -527,6 +537,60 @@ public class ClassicGUI extends GUI {
     private void closeColonyPanel() {
         final JFrame f = this.colonyFrame;
         this.colonyFrame = null;
+        this.colonyPanel = null;
+        if (f != null) f.dispose();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>build-queue</b> screen — {@link
+     * ClassicBuildQueuePanel}, a single-selection "what shall we build next"
+     * list mirroring the original 1994 game's build menu (not FreeCol's own
+     * drag-reorderable multi-item queue). Reached by clicking the colony
+     * screen's construction indicator ({@link ClassicColonyPanel}, top-left of
+     * the buildings pane).
+     *
+     * <p>Only one build-queue screen is open at a time; guarded so a failure
+     * degrades to a log line rather than breaking the colony screen behind it.
+     */
+    @Override
+    public FreeColPanel showBuildQueuePanel(Colony colony) {
+        if (colony == null) return null;
+        SwingUtilities.invokeLater(() -> {
+            try {
+                closeBuildQueuePanel();
+                final JFrame f = new JFrame(Messages.message(
+                    "classic.buildQueue.header"));
+                this.buildQueueFrame = f;
+                f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                // InGameController.setBuildQueue does not itself call
+                // GUI.refresh() (its updateGUI only refreshes the map controls
+                // and menu bar), so the colony screen behind this one would
+                // otherwise keep showing the old construction indicator after
+                // a pick; repaint it whenever this screen closes.
+                f.setContentPane(new ClassicBuildQueuePanel(getFreeColClient(),
+                        this.imageLibrary, colony, () -> {
+                            closeBuildQueuePanel();
+                            repaintInfo();
+                        }));
+                f.pack();
+                f.setLocationRelativeTo(this.colonyFrame != null
+                    ? this.colonyFrame : this.frame);
+                f.setVisible(true);
+                f.getContentPane().requestFocusInWindow();
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "ClassicGUI: could not show build "
+                    + "queue for " + colony.getId(), e);
+            }
+        });
+        return null;
+    }
+
+    /** Dismiss the build-queue screen if one is open. */
+    private void closeBuildQueuePanel() {
+        final JFrame f = this.buildQueueFrame;
+        this.buildQueueFrame = null;
         if (f != null) f.dispose();
     }
 

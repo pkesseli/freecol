@@ -124,6 +124,8 @@ final class ClassicEuropePanel extends JPanel {
     private static final Color TAG_FG = new Color(0xFF, 0xFF, 0xFF);
     private static final Color SKY = new Color(0x88, 0xA8, 0xD0);
     private static final Color SEA = new Color(0x28, 0x50, 0x98);
+    private static final Color SELECT = new Color(0x40, 0xE0, 0x40);
+    private static final Color BOARD_HINT = new Color(0xE8, 0xC8, 0x40);
 
     private final FreeColClient freeColClient;
     private final ImageLibrary lib;
@@ -139,6 +141,23 @@ final class ClassicEuropePanel extends JPanel {
 
     /** Index into {@link #buttonBounds} of the hovered button, or -1. */
     private int hovered = -1;
+
+    /**
+     * Boarding interaction: select a colonist on the dock, then click a ship
+     * in port to call {@link InGameController#boardShip}. Click-to-select,
+     * click-to-target — the same click-driven style as every other classic
+     * screen (order buttons, report rows), rather than introducing drag-and-drop
+     * as a new interaction paradigm.
+     */
+    private Unit selectedUnit;
+
+    /** Land units on the dock, rebuilt each paint: virtual-space bounds + unit. */
+    private final List<Rectangle> dockBounds = new ArrayList<>();
+    private final List<Unit> dockUnits = new ArrayList<>();
+
+    /** Ships in port, rebuilt each paint: virtual-space bounds + unit. */
+    private final List<Rectangle> portBounds = new ArrayList<>();
+    private final List<Unit> portUnits = new ArrayList<>();
 
     /** Device-space scale + origin of the virtual canvas, set on each paint. */
     private int scale = 1;
@@ -209,6 +228,36 @@ final class ClassicEuropePanel extends JPanel {
                 return;
             }
         }
+        for (int i = 0; i < this.portBounds.size(); i++) {
+            if (this.portBounds.get(i).contains(vx, vy)) {
+                boardSelected(this.portUnits.get(i));
+                return;
+            }
+        }
+        for (int i = 0; i < this.dockBounds.size(); i++) {
+            if (this.dockBounds.get(i).contains(vx, vy)) {
+                selectDockUnit(this.dockUnits.get(i));
+                return;
+            }
+        }
+    }
+
+    /** Select (or, on a second click, deselect) a colonist standing on the dock. */
+    private void selectDockUnit(Unit unit) {
+        this.selectedUnit = (this.selectedUnit == unit) ? null : unit;
+        repaint();
+    }
+
+    /**
+     * Board the selected colonist onto {@code ship} via the real controller —
+     * the same call {@code CargoPanel} makes in the standard UI. A click on a
+     * ship with nothing selected does nothing (there is no unit to board).
+     */
+    private void boardSelected(Unit ship) {
+        if (this.selectedUnit == null) return;
+        igc().boardShip(this.selectedUnit, ship);
+        this.selectedUnit = null;
+        refresh();
     }
 
     /** Track which button the pointer is over, and repaint if it changed. */
@@ -427,21 +476,38 @@ final class ClassicEuropePanel extends JPanel {
         }
     }
 
-    /** The ships waiting in port, floating on the water by the piers. */
+    /**
+     * The ships waiting in port, floating on the water by the piers — click
+     * targets for {@link #boardSelected}, highlighted while a dock unit is
+     * selected as a hint of where it can board.
+     */
     private void paintPort(Graphics2D g) {
+        this.portBounds.clear();
+        this.portUnits.clear();
         int x = 6;
         final int y = 122;
         for (Unit u : this.europe.getUnitList()) {
             if (!u.isNaval()) continue;
             final BufferedImage img = this.lib.getScaledUnitImage(u);
             if (img != null) drawFitted(g, img, x, y, 22);
+            this.portBounds.add(new Rectangle(x, y, 22, 22));
+            this.portUnits.add(u);
+            if (this.selectedUnit != null) {
+                g.setColor(BOARD_HINT);
+                g.drawRect(x, y, 21, 21);
+            }
             x += 24;
             if (x > 150) break;
         }
     }
 
-    /** The land units standing on the quay, ready to embark. */
+    /**
+     * The land units standing on the quay, ready to embark — click to select
+     * one, then click a ship above to board it ({@link #selectDockUnit}).
+     */
     private void paintDocks(Graphics2D g) {
+        this.dockBounds.clear();
+        this.dockUnits.clear();
         int x = 112;
         final int y = 150;
         int row = 0;
@@ -449,6 +515,12 @@ final class ClassicEuropePanel extends JPanel {
             if (u.isNaval()) continue;
             final BufferedImage img = this.lib.getScaledUnitImage(u);
             if (img != null) drawFitted(g, img, x, y + row * 16, 16);
+            this.dockBounds.add(new Rectangle(x, y + row * 16, 16, 16));
+            this.dockUnits.add(u);
+            if (u == this.selectedUnit) {
+                g.setColor(SELECT);
+                g.drawRect(x, y + row * 16, 15, 15);
+            }
             x += 13;
             if (x > VW - 16) {           // wrap onto a second rank
                 x = 112;

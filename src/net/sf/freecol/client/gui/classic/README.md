@@ -436,11 +436,64 @@ screen renders (buildings, the filled 3×3 grid with the colony centred, the
 `COLONY.PIK` band with SoL/port/production/warehouse), hover shows building names,
 Escape closes it. 0 SEVERE.
 
+### The build queue (`ClassicBuildQueuePanel`) — the first hard blocker, closed
+
+Until this slice, `GUI.showBuildQueuePanel(Colony)` returned `null` unconditionally (an unoverridden
+no-op): a colony could accumulate hammers/tools but the player had no way to ever tell it what to
+build — not "rough," a genuine dead end for actually playing a game to a finish.
+
+**The seam.** `ClassicGUI.showBuildQueuePanel` opens `ClassicBuildQueuePanel` in a window of its own
+(the same one-window-at-a-time, guarded-`SwingUtilities.invokeLater` convention as every other classic
+screen), positioned relative to the colony screen when one is open. **Reached by clicking the
+construction indicator** — a new dark, gold-bordered band at the top of the buildings pane (above the
+first building row, which shifted down `CONSTR_H` to make room) showing the colony's current build
+target's icon, name and the goods still needed, or a "nothing being built" caption — mirroring
+FreeCol's own `ConstructionPanel`, whose click likewise opens `showBuildQueuePanel` (same seam, same
+click target, just reused rather than invented). ⚠️ The construction band **must paint after**
+`paintBuildings`, not before: `paintBuildings` unconditionally re-fills the *entire* ground rectangle
+(`fillTiled` over `AREA_Y..BAND_Y`) as its first step, which silently erases anything drawn earlier in
+that region — this bit the first cut of this slice (the band was invisible) before the paint order was
+swapped in `paintComponent`.
+
+**The picker itself is deliberately not FreeCol's `BuildQueuePanel`.** That panel is a
+drag-reorderable multi-item queue (MigLayout lists, `TransferHandler` drag-and-drop) — a modern
+convenience the 1994 original never had. The original offered a simple list of what is *currently*
+buildable and you picked one thing at a time, so `ClassicBuildQueuePanel` mirrors that instead: every
+`BuildableType` (building or buildable unit — wagons/artillery/ships are buildable too) the colony can
+legally build **right now** — `Colony.canBuild(BuildableType)` alone is sufficient filtering, since it
+already excludes buildings already built/mid-upgrade, population/ability/limit shortfalls and
+non-coastal mismatches, the same checks FreeCol's own panel runs by hand — listed with its icon
+(`ImageLibrary.getSmallBuildableTypeImageWithWithSize`, the same lookup FreeCol's own row renderer
+uses), name and remaining required goods (`Colony.getRequiredGoods`, icon+amount tags, right-aligned).
+The colony's current pick is highlighted green; **clicking a row calls
+`InGameController.setBuildQueue(colony, List.of(picked))` — replacing the queue with that one item —
+and closes the screen**, exactly like choosing from the original's build menu. No reference screenshot
+of the original's actual build-selection screen has surfaced (checked `screenshots/`), so the plain
+list-over-a-dark-plate look is a considered placeholder in the same gold/green palette as the other
+screens, not a faithfulness claim — an open item for the expert, like the popup metrics.
+
+**The refresh gap this surfaced.** `InGameController.setBuildQueue`'s `updateGUI` only refreshes the
+map controls and menu bar (`gui.updateMapControls()` / `gui.updateMenuBar()`) — it never calls
+`GUI.refresh()`. Left alone, the colony screen behind the build-queue window would keep showing the
+*old* construction indicator after a pick until some unrelated event (ending the turn, reopening the
+screen) forced a repaint. So `showBuildQueuePanel`'s close callback also calls the same `repaintInfo()`
+every other model-change hook uses — and, since the colony screen was never wired into that hook at
+all before now (only the info panel and Europe screen were), this slice adds a `colonyPanel` field
+and a `refresh()` method to `ClassicColonyPanel`, mirroring the Europe screen's existing
+`europePanel.refresh()`, so the colony screen now also repaints on the general `refresh()`/
+`refreshTile()`/`changeView*` path, not just after a build pick.
+
+**Verified live (2026-07-24):** founded a colony, opened the build queue from the construction band —
+the list rendered real hammers/tools costs (`Schmiede 64🔨/20🔧`, `Lagerhaus 80🔨`, …) with **Anlegestelle**
+(Docks, the colony's real default pick) highlighted; picked **Lagerhaus** — the band updated to
+"Lagerhaus" immediately on close (confirming the refresh fix, not just the underlying `setBuildQueue`
+call); reopened and picked **Schmiede** — updated live again. 0 SEVERE throughout.
+
 **Follow-ups (later slices, need the expert's sign-off):** validate/correct the
 `BUILDING.SS` frame map; the original's fixed building ground-slots (vs. our
-flow layout); interaction — dragging colonists between tiles/buildings, the build
-queue, loading cargo; per-nation building/flag tints; localizing the few
-hard-coded captions.
+flow layout); drag-interaction — moving colonists between tiles/buildings; loading cargo;
+per-nation building/flag tints; localizing the few hard-coded captions; a reference shot for the
+build-selection screen's actual look (Q-worthy, see above).
 
 ## Europe screen (`ClassicEuropePanel`)
 
@@ -495,9 +548,37 @@ lists the recruitable (`Schuldknecht (200)`), Ausbilden the cheapest trainable
 (`Erfahrener Erzschürfer (600)`), Kaufen the cheapest purchasable
 (`Artillerie (500)`) — each calling the real controller; Escape closes. 0 SEVERE.
 
-**Follow-ups (later slices):** drag-to-board / load-cargo / set-sail interaction
-(the equivalent of the colony screen's drag/queue/cargo work); the wood-framed
-dialog reskin (shared Phase-3 component); refining the dock/pier sprite positions
+### Boarding — the second hard blocker, closed
+
+Until this slice, `ClassicEuropePanel` had click handling for its action buttons and the exit only:
+nothing put a recruited/trained/purchased colonist standing on the dock onto a waiting ship. Once a
+unit is already at sea or ashore, the *map's* ordinary movement already triggers real embark/disembark
+and the high-seas "sail?" confirm (`InGameController.moveEmbark`/`moveTowardEurope`, reached through
+`ClassicMapViewer`'s existing movement-key wiring) — it was specifically the Europe screen's own
+dock↔ship interaction that was unwired, and without it no new colonist could ever reach the New World.
+
+**Click-to-select, click-to-target — not drag-and-drop.** `InGameController.boardShip(Unit, Unit
+carrier)` already does exactly what is needed (validates the unit/carrier share a location, asks the
+server to embark, updates the GUI) and is directly callable — its Javadoc says "Called from
+CargoPanel, TilePopup" (standard-UI seams), but nothing about it is standard-UI-specific. So
+`ClassicEuropePanel` gained a `selectedUnit` field: clicking a unit on the dock selects it (a green
+box, a second click on the same unit deselects), and while one is selected every ship in port gets a
+gold hint border; clicking a ship then calls `boardShip(selectedUnit, ship)` and clears the selection.
+This fits the click-driven style every other classic screen already uses (order buttons, report rows,
+the build queue above) rather than introducing drag-and-drop as a new interaction paradigm this
+codebase doesn't otherwise have. `paintPort`/`paintDocks` now record each sprite's virtual-space bounds
++ unit (parallel `Rectangle`/`Unit` lists, rebuilt every paint) the same way the action buttons already
+did, rather than inventing a new hit-testing mechanism.
+
+**Verified live (2026-07-24):** advanced turns until a ship arrived in port (`Auf dem Weg nach Europa`
+→ docked) alongside a colonist already standing on the dock; clicked the colonist — a green selection
+box appeared and the ship gained a gold hint border; clicked the ship — the colonist vanished from the
+dock (boarded), the hint cleared. 0 SEVERE.
+
+**Follow-ups (later slices):** loading *cargo* (goods, not colonists) and initiating a return trip from
+the screen itself — a related but separate seam (probably `InGameController`'s goods-loading
+equivalent; not yet located — check `CargoPanel`'s goods-handling methods, the standard-UI reference);
+the wood-framed dialog reskin (shared Phase-3 component); refining the dock/pier sprite positions
 against the original; localizing the few captions.
 
 ## Report screens (`ClassicReportPanel` + concrete reports)
