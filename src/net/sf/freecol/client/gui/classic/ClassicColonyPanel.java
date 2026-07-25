@@ -24,11 +24,13 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,7 @@ import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.control.InGameController;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractGoods;
@@ -91,10 +94,14 @@ import net.sf.freecol.common.model.Unit;
  * and lets the expert correct {@link #BUILDING_FRAMES} from a screenshot.  Both
  * are noted as follow-ups in CLASSIC_UI_PLAN.md.
  *
- * <p>This is the first colony-screen slice: it <em>renders</em> the colony.
- * Interaction (dragging colonists between tiles and buildings, the build queue,
- * loading cargo) is a later slice; for now Escape or a click on the red exit
- * button closes the screen.
+ * <p>Interaction is click-to-select, click-to-target — the same style as every
+ * other classic screen (order buttons, report rows, the build queue, Europe
+ * boarding) rather than drag-and-drop: click a colonist (standing in the
+ * colony, already working a building, or already working a tile) to select
+ * it, then click a building or work tile to move it there via
+ * {@link net.sf.freecol.client.control.InGameController#work}. Loading cargo
+ * and per-nation tints remain later slices; for now Escape or a click on the
+ * red exit button closes the screen.
  */
 final class ClassicColonyPanel extends JPanel {
 
@@ -144,6 +151,8 @@ final class ClassicColonyPanel extends JPanel {
     private static final Color WOOD = new Color(0x49, 0x28, 0x1C);
     private static final Color FRAME = new Color(0x00, 0x00, 0x00);
     private static final Color SELECT = new Color(0x40, 0xE0, 0x40);
+    private static final Color PICKED = new Color(0xFF, 0xFF, 0x00);
+    private static final Color WORK_HINT = new Color(0xE8, 0xC8, 0x40);
 
     /**
      * FreeCol building-type id (minus the {@code model.building.} prefix) to
@@ -222,12 +231,36 @@ final class ClassicColonyPanel extends JPanel {
         = new java.util.ArrayList<>();
     private final java.util.List<String> buildingNames = new java.util.ArrayList<>();
 
+    /** The {@link Building}s parallel to {@link #buildingBounds}, as work targets. */
+    private final List<Building> buildingTargets = new ArrayList<>();
+
     /** The construction indicator's clickable band, set on each paint. */
     private final java.awt.Rectangle constructionBounds
         = new java.awt.Rectangle(0, AREA_Y, BUILD_W, CONSTR_H);
 
     /** Index into {@link #buildingBounds} of the hovered building, or -1. */
     private int hovered = -1;
+
+    /**
+     * Work-assignment interaction: select a colonist — standing in the colony,
+     * or already working a building/tile — then click a building or work tile
+     * to move it there via {@link InGameController#work}. Click-to-select,
+     * click-to-target — the same style as Europe boarding, rather than
+     * introducing drag-and-drop as a new interaction paradigm.
+     */
+    private Unit selectedUnit;
+
+    /**
+     * Every clickable colonist sprite on this screen (standing in the colony,
+     * working a building, or working a tile), rebuilt each paint: virtual-space
+     * bounds + unit.
+     */
+    private final List<Rectangle> unitBounds = new ArrayList<>();
+    private final List<Unit> unitTargets = new ArrayList<>();
+
+    /** The work-tile grid's clickable cells (excluding the centre), rebuilt each paint. */
+    private final List<Rectangle> tileBounds = new ArrayList<>();
+    private final List<ColonyTile> tileTargets = new ArrayList<>();
 
     /** Device-space scale + origin of the virtual canvas, set on each paint. */
     private int scale = 1;
@@ -291,6 +324,9 @@ final class ClassicColonyPanel extends JPanel {
     /**
      * The original's exit button is the red "E" at the bottom right of the
      * {@code COLONY.PIK} chrome; a click anywhere on it closes the screen.
+     * Otherwise: a click on a colonist selects it (see {@link #selectUnit}); a
+     * click on a building or work tile while one is selected moves it there
+     * (see {@link #assignWork}).
      */
     private void onClick(MouseEvent e) {
         final int vx = (e.getX() - this.originX) / this.scale;
@@ -299,7 +335,47 @@ final class ClassicColonyPanel extends JPanel {
             this.freeColClient.getGUI().showBuildQueuePanel(this.colony);
             return;
         }
-        if (vx >= WARE_W && vy >= WARE_Y) close();
+        if (vx >= WARE_W && vy >= WARE_Y) { close(); return; }
+
+        for (int i = 0; i < this.unitBounds.size(); i++) {
+            if (this.unitBounds.get(i).contains(vx, vy)) {
+                selectUnit(this.unitTargets.get(i));
+                return;
+            }
+        }
+        if (this.selectedUnit == null) return;
+        for (int i = 0; i < this.buildingBounds.size(); i++) {
+            if (this.buildingBounds.get(i).contains(vx, vy)) {
+                assignWork(this.buildingTargets.get(i));
+                return;
+            }
+        }
+        for (int i = 0; i < this.tileBounds.size(); i++) {
+            if (this.tileBounds.get(i).contains(vx, vy)) {
+                assignWork(this.tileTargets.get(i));
+                return;
+            }
+        }
+    }
+
+    /** Select (or, on a second click of the same unit, deselect) a colonist to move. */
+    private void selectUnit(Unit unit) {
+        this.selectedUnit = (this.selectedUnit == unit) ? null : unit;
+        repaint();
+    }
+
+    /**
+     * Move the selected colonist into {@code target} via the real controller —
+     * the same {@link InGameController#work} call {@code ColonyPanel}/
+     * {@code UnitLabel} make in the standard UI, for both a building and a work
+     * tile ({@code Building}/{@code ColonyTile} both implement
+     * {@code WorkLocation}). It already claims an unowned tile and confirms
+     * abandoning education when needed, so no extra guarding is required here.
+     */
+    private void assignWork(net.sf.freecol.common.model.WorkLocation target) {
+        igc().work(this.selectedUnit, target);
+        this.selectedUnit = null;
+        refresh();
     }
 
     /** Track which building the pointer is over, and repaint if it changed. */
@@ -322,6 +398,10 @@ final class ClassicColonyPanel extends JPanel {
 
     private void close() {
         if (this.onClose != null) this.onClose.run();
+    }
+
+    private InGameController igc() {
+        return this.freeColClient.getInGameController();
     }
 
     /** Repaint after a model change (a build-queue pick, production, gold). */
@@ -348,6 +428,12 @@ final class ClassicColonyPanel extends JPanel {
         g.translate(this.originX, this.originY);
         g.scale(this.scale, this.scale);
         g.clipRect(0, 0, VW, VH);
+
+        // Rebuilt across paintBuildings/paintWorkTiles/paintPopulation below,
+        // so cleared once here rather than per-method (unlike buildingBounds,
+        // which only one method populates).
+        this.unitBounds.clear();
+        this.unitTargets.clear();
 
         paintTitle(g);
         paintBuildings(g);
@@ -424,6 +510,7 @@ final class ClassicColonyPanel extends JPanel {
 
         this.buildingBounds.clear();
         this.buildingNames.clear();
+        this.buildingTargets.clear();
         int x = 4;
         int y = AREA_Y + CONSTR_H + 5;
         int rowH = 0;
@@ -450,6 +537,12 @@ final class ClassicColonyPanel extends JPanel {
             // as in the original — so record the target instead of drawing now.
             this.buildingBounds.add(new java.awt.Rectangle(x, y, w, h));
             this.buildingNames.add(Messages.getName(b.getType()));
+            this.buildingTargets.add(b);
+            // A colonist is selected: hint every building it could move into.
+            if (this.selectedUnit != null) {
+                g.setColor(WORK_HINT);
+                g.drawRect(x, y, w - 1, h - 1);
+            }
             rowH = Math.max(rowH, h);
             x += w + 6;
         }
@@ -476,6 +569,8 @@ final class ClassicColonyPanel extends JPanel {
         g.setColor(FRAME);
         g.drawRect(GRID_X - 1, GRID_Y - 1, GRID_CELL * 3 + 1, GRID_CELL * 3 + 1);
 
+        this.tileBounds.clear();
+        this.tileTargets.clear();
         final Tile centre = this.colony.getTile();
         for (ColonyTile ct : this.colony.getColonyTiles()) {
             final Tile t = ct.getWorkTile();
@@ -501,7 +596,14 @@ final class ClassicColonyPanel extends JPanel {
                 if (settlement != null) {
                     drawFitted(g, settlement, sx, sy, GRID_CELL);
                 }
-                continue;
+                continue;         // the centre tile works itself; not a target.
+            }
+            this.tileBounds.add(new Rectangle(sx, sy, GRID_CELL, GRID_CELL));
+            this.tileTargets.add(ct);
+            // A colonist is selected: hint every work tile it could move into.
+            if (this.selectedUnit != null) {
+                g.setColor(WORK_HINT);
+                g.drawRect(sx, sy, GRID_CELL - 1, GRID_CELL - 1);
             }
             final List<Unit> workers = ct.getUnitList();
             if (!workers.isEmpty()) {
@@ -567,6 +669,13 @@ final class ClassicColonyPanel extends JPanel {
             if (x > PANEL2_X - 16) break;
             final BufferedImage img = this.lib.getScaledUnitImage(u);
             if (img != null) drawFitted(g, img, x, PANEL_Y + 12, 16);
+            final Rectangle r = new Rectangle(x, PANEL_Y + 12, 16, 16);
+            if (u == this.selectedUnit) {
+                g.setColor(PICKED);
+                g.drawRect(r.x, r.y, r.width - 1, r.height - 1);
+            }
+            this.unitBounds.add(r);
+            this.unitTargets.add(u);
             x += 12;
         }
     }
@@ -646,6 +755,13 @@ final class ClassicColonyPanel extends JPanel {
         for (Unit u : units) {
             final BufferedImage img = this.lib.getScaledUnitImage(u);
             if (img != null) drawFitted(g, img, x, y - 14, 14);
+            final Rectangle r = new Rectangle(x, y - 14, 14, 14);
+            if (u == this.selectedUnit) {
+                g.setColor(PICKED);
+                g.drawRect(r.x, r.y, r.width - 1, r.height - 1);
+            }
+            this.unitBounds.add(r);
+            this.unitTargets.add(u);
             x += 10;
         }
     }

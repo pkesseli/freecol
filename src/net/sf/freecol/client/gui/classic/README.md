@@ -491,9 +491,55 @@ call); reopened and picked **Schmiede** — updated live again. 0 SEVERE through
 
 **Follow-ups (later slices, need the expert's sign-off):** validate/correct the
 `BUILDING.SS` frame map; the original's fixed building ground-slots (vs. our
-flow layout); drag-interaction — moving colonists between tiles/buildings; loading cargo;
-per-nation building/flag tints; localizing the few hard-coded captions; a reference shot for the
-build-selection screen's actual look (Q-worthy, see above).
+flow layout); loading cargo; per-nation building/flag tints; localizing the few
+hard-coded captions; a reference shot for the build-selection screen's actual
+look (Q-worthy, see above).
+
+### Work assignment (drag interaction) — the colony-screen blocker, closed
+
+Until this slice, a colonist could be *founded into* a colony (via `B` on the map) but never told
+*where* to work once inside: the colony screen only rendered the buildings/work-tile grid and let you
+pick a build target, so a newly arrived colonist had no path to a job without leaving the screen and
+finding some other, non-existent seam.
+
+**The seam.** `InGameController.work(Unit, WorkLocation)` — `Building` and `ColonyTile` both implement
+`WorkLocation`, so the one call handles moving a colonist into either. It already claims an unowned
+tile and confirms abandoning education when needed, so `ClassicColonyPanel` calls it directly with no
+extra guarding, the same way `boardShip` needed none for Europe boarding.
+
+**Click-to-select, click-to-target — not drag-and-drop**, continuing the pattern of every other
+classic screen (order buttons, report rows, the build queue, Europe boarding). `ClassicColonyPanel`
+gained a `selectedUnit` field: clicking any colonist sprite on the screen — standing idle in the
+colony (the population panel's own unit row, the very case that was previously a dead end), already
+working a building, or already working a tile — selects it (a second click on the same unit
+deselects); while one is selected, every building and every non-centre work-tile cell gets a gold hint
+border, mirroring Europe's `BOARD_HINT` treatment of ships during boarding. Clicking a building or
+tile then calls `InGameController.work(selectedUnit, target)` and clears the selection.
+`paintWorkers` (used by both the buildings pane and the work-tile grid) and `paintPopulation` now
+record each drawn colonist's virtual-space bounds + unit into shared `unitBounds`/`unitTargets` lists,
+rebuilt once per paint (unlike `buildingBounds`, which only one method populates, these three
+populating methods all run within a single `paintComponent` pass, so the lists are cleared once at
+its top rather than per-method). `paintBuildings`/`paintWorkTiles` separately record `buildingTargets`/
+`tileTargets` parallel to their existing bounds lists as the click-to-move targets.
+
+**The refresh gap, again.** `InGameController.work`'s `updateGUI` has the same shape as `setBuildQueue`
+and `boardShip` — it only refreshes map controls and the menu bar, never calls `GUI.refresh()` — so
+`assignWork` calls the panel's own `refresh()` after the controller call, unconditionally (matching
+`ClassicEuropePanel.boardSelected`), rather than leaving the screen showing the colonist in its old
+spot until an unrelated repaint.
+
+**Verified live (2026-07-25):** resumed the save with **Nieuw Amsterdam** (1 colonist, working the
+Town Hall, producing 4 bells); clicked the Town Hall's colonist — it gained a selection box and every
+building/work-tile gained a gold hint border; clicked the chapel — the real server call fired and was
+correctly *rejected* (`CAPACITY_EXCEEDED`, shown via the existing `showErrorPanel` popup — see Phase 3
+— not a bug, a legitimate validation failure); re-selected the same colonist and clicked the NW work
+tile instead — the colonist moved there live, the Town Hall's production tag dropped to 1 (base, no
+worker) and the tile gained a "3" grain production tag plus a matching net-production entry in the
+band, all without leaving or reopening the screen. 0 SEVERE throughout (only the pre-existing benign
+first-launch `options.xml` warning and the expected `CAPACITY_EXCEEDED` client warning).
+
+**Follow-ups:** the original's fixed building ground-slots remain a flow layout (Q5, unchanged by this
+slice); loading cargo and per-nation tints are still open, tracked above.
 
 ## Europe screen (`ClassicEuropePanel`)
 

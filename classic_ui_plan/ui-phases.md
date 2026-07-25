@@ -93,13 +93,15 @@ in the README's "Report screens" section, not here. What's left:
    captions. (The menu **dropdown popups** are still default Swing — folded into the Phase-3 reskin.)
 4. **Screen-interaction polish** — the two hard blockers (build queue, Europe boarding) are now
    **done**, live-verified 2026-07-24 — see the README's "Colony screen" / "Europe screen" sections.
-   Left: *Colony:* validate the provisional `BUILDING.SS` frame map, place buildings at the original
-   fixed ground-slots (vs. our flow layout — Q5), and drag-interaction (moving colonists between
-   tiles/buildings, as opposed to the click-to-pick build queue already shipped). *Europe:* loading
-   *cargo* (goods, not colonists) and setting sail from the screen itself (the high-seas confirm
-   already fires once a laden ship moves off-map, per the map's own movement wiring — it's specifically
-   *initiating* the trip from the Europe screen that's still open). *Both:* per-nation building/flag
-   tints.
+   **Colony drag-interaction (work assignment) is also now done**, live-verified 2026-07-25 — click a
+   colonist (idle in the colony, or already working a building/tile), then click a building or work
+   tile to move it there via the real `InGameController.work`; see the README's new "Work assignment
+   (drag interaction)" subsection. Left: *Colony:* validate the provisional `BUILDING.SS` frame map,
+   and place buildings at the original fixed ground-slots (vs. our flow layout — Q5). *Europe:*
+   loading *cargo* (goods, not colonists) and setting sail from the screen itself (the high-seas
+   confirm already fires once a laden ship moves off-map, per the map's own movement wiring — it's
+   specifically *initiating* the trip from the Europe screen that's still open). *Both:* per-nation
+   building/flag tints.
 
 ## Phase 3 — dialogs & polish 🔨
 
