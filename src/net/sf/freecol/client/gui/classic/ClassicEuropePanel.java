@@ -41,6 +41,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 
+import net.sf.freecol.client.ClientOptions;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.control.InGameController;
 import net.sf.freecol.client.gui.ImageLibrary;
@@ -48,12 +49,16 @@ import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.Europe;
 import net.sf.freecol.common.model.Game;
+import net.sf.freecol.common.model.Goods;
+import net.sf.freecol.common.model.GoodsContainer;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.HighSeas;
 import net.sf.freecol.common.model.Location;
+import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Market;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Specification;
+import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.UnitType;
 
@@ -73,11 +78,18 @@ import net.sf.freecol.common.model.UnitType;
  *
  * <ul>
  *   <li><b>Title bar</b> — the port name, turn, tax and treasury, gold on black.</li>
- *   <li><b>Recruit / Purchase / Train buttons</b> (top right) — the three golden
- *   buttons of the original (REKRUT / KAUFEN / AUSBILDEN).  Each opens a choice
- *   dialog and drives the real {@link InGameController} recruit/train path; the
- *   dialogs are plain Swing for now (Phase 3 reskins them to the wood-framed
- *   look with the colonist portrait, exactly like the colony-founding seams).</li>
+ *   <li><b>Action buttons</b> (top right) — the three golden buttons of the
+ *   original (REKRUT / KAUFEN / AUSBILDEN: recruit / purchase / train), plus a
+ *   fourth, <b>Set Sail</b>, for the selected-ship interaction below.  No
+ *   screenshot of the original's own set-sail affordance has surfaced, so this
+ *   mirrors the standard (non-classic) Europe screen's own button of the same
+ *   name and key rather than a confirmed original design — a placeholder in
+ *   the same vein as the build-queue picker, open for the expert.  Recruit/
+ *   purchase/train each open a choice dialog and drive the real
+ *   {@link InGameController} path (the dialogs are plain Swing for now, Phase 3
+ *   reskins them to the wood-framed look with the colonist portrait, exactly
+ *   like the colony-founding seams); Set Sail acts directly on the selected
+ *   ship.</li>
  *   <li><b>Ships in port</b> — the naval units waiting in Europe, floating on the
  *   water by the piers.</li>
  *   <li><b>Units on the docks</b> — the land units standing on the quay, ready to
@@ -88,11 +100,12 @@ import net.sf.freecol.common.model.UnitType;
  *   the bottom.</li>
  * </ul>
  *
- * <p>This first Europe slice <em>renders</em> the port and wires the
- * recruit/purchase/train actions.  Interaction by drag (boarding a ship, loading
- * cargo, setting sail) is a later slice — the equivalent follow-up to the colony
- * screen's drag/queue/cargo work; for now Escape or a click on the red exit
- * button closes the screen.
+ * <p>Interaction is click-to-select, click-to-target throughout, the same idiom
+ * as every other classic screen: select a colonist on the dock to board a ship
+ * ({@link #boardSelected}); select a ship in port to buy and load goods from
+ * the market ({@link #loadMarketGood}), sell goods already in its hold
+ * ({@link #sellCargo}), or set sail for the New World ({@link #setSail}).
+ * Escape or a click on the red exit button closes the screen.
  */
 final class ClassicEuropePanel extends JPanel {
 
@@ -112,6 +125,10 @@ final class ClassicEuropePanel extends JPanel {
     /** The market row along the very bottom. */
     private static final int MARKET_Y = 182;
     private static final int MARKET_H = VH - MARKET_Y;
+
+    /** The selected ship's cargo hold — a strip of goods icons above the piers. */
+    private static final int CARGO_Y = 90;
+    private static final int CARGO_H = 14;
 
     /** The exit "E" hot zone at the bottom right (part of the harbour art). */
     private static final int EXIT_X = VW - 14;
@@ -143,11 +160,15 @@ final class ClassicEuropePanel extends JPanel {
     private int hovered = -1;
 
     /**
-     * Boarding interaction: select a colonist on the dock, then click a ship
-     * in port to call {@link InGameController#boardShip}. Click-to-select,
-     * click-to-target — the same click-driven style as every other classic
-     * screen (order buttons, report rows), rather than introducing drag-and-drop
-     * as a new interaction paradigm.
+     * Click-to-select, click-to-target interaction, shared by every purpose
+     * this screen supports — the same click-driven style as every other
+     * classic screen (order buttons, report rows), rather than introducing
+     * drag-and-drop as a new interaction paradigm. Holds either a colonist on
+     * the dock, selected to board a ship ({@link #boardSelected} via
+     * {@link #selectPortUnit}), or a ship in port, selected to buy/load cargo
+     * ({@link #loadMarketGood}), sell cargo ({@link #sellCargo}), or set sail
+     * ({@link #setSail}) — disambiguated by {@link Unit#isNaval()}. A second
+     * click on the same unit deselects.
      */
     private Unit selectedUnit;
 
@@ -158,6 +179,21 @@ final class ClassicEuropePanel extends JPanel {
     /** Ships in port, rebuilt each paint: virtual-space bounds + unit. */
     private final List<Rectangle> portBounds = new ArrayList<>();
     private final List<Unit> portUnits = new ArrayList<>();
+
+    /**
+     * The selected ship's cargo hold, rebuilt each paint: virtual-space
+     * bounds + goods — click targets for {@link #sellCargo}. Empty unless
+     * {@link #selectedUnit} is currently a ship.
+     */
+    private final List<Rectangle> cargoBounds = new ArrayList<>();
+    private final List<Goods> cargoGoods = new ArrayList<>();
+
+    /**
+     * The market row, rebuilt each paint: virtual-space bounds + goods type —
+     * click targets for {@link #loadMarketGood} while a ship is selected.
+     */
+    private final List<Rectangle> marketBounds = new ArrayList<>();
+    private final List<GoodsType> marketTypes = new ArrayList<>();
 
     /** Device-space scale + origin of the virtual canvas, set on each paint. */
     private int scale = 1;
@@ -228,15 +264,27 @@ final class ClassicEuropePanel extends JPanel {
                 return;
             }
         }
+        for (int i = 0; i < this.cargoBounds.size(); i++) {
+            if (this.cargoBounds.get(i).contains(vx, vy)) {
+                sellCargo(this.cargoGoods.get(i));
+                return;
+            }
+        }
         for (int i = 0; i < this.portBounds.size(); i++) {
             if (this.portBounds.get(i).contains(vx, vy)) {
-                boardSelected(this.portUnits.get(i));
+                selectPortUnit(this.portUnits.get(i));
                 return;
             }
         }
         for (int i = 0; i < this.dockBounds.size(); i++) {
             if (this.dockBounds.get(i).contains(vx, vy)) {
                 selectDockUnit(this.dockUnits.get(i));
+                return;
+            }
+        }
+        for (int i = 0; i < this.marketBounds.size(); i++) {
+            if (this.marketBounds.get(i).contains(vx, vy)) {
+                loadMarketGood(this.marketTypes.get(i));
                 return;
             }
         }
@@ -249,13 +297,96 @@ final class ClassicEuropePanel extends JPanel {
     }
 
     /**
+     * Click a ship in port: boards the selected dock colonist onto it if one
+     * is selected ({@link #boardSelected}); otherwise selects (or, on a
+     * second click, deselects) the ship itself for the cargo/set-sail actions
+     * below — the same click-to-select, click-to-target idiom, just
+     * disambiguated by whether a land or naval unit is currently selected.
+     */
+    private void selectPortUnit(Unit ship) {
+        if (this.selectedUnit != null && !this.selectedUnit.isNaval()) {
+            boardSelected(ship);
+        } else {
+            this.selectedUnit = (this.selectedUnit == ship) ? null : ship;
+            repaint();
+        }
+    }
+
+    /**
      * Board the selected colonist onto {@code ship} via the real controller —
-     * the same call {@code CargoPanel} makes in the standard UI. A click on a
-     * ship with nothing selected does nothing (there is no unit to board).
+     * the same call {@code CargoPanel} makes in the standard UI.
      */
     private void boardSelected(Unit ship) {
-        if (this.selectedUnit == null) return;
         igc().boardShip(this.selectedUnit, ship);
+        this.selectedUnit = null;
+        refresh();
+    }
+
+    /**
+     * Sell one type of cargo off the selected ship via
+     * {@link InGameController#unloadCargo} — which, since the ship is in
+     * Europe, routes to {@code sellGoods} internally (the same call
+     * {@code GoodsLabel}/{@code MarketPanel} make when a cargo icon is
+     * dragged off a carrier in the standard UI). The ship stays selected so
+     * several goods types can be sold in one visit.
+     */
+    private void sellCargo(Goods goods) {
+        igc().unloadCargo(goods, false);
+        refresh();
+    }
+
+    /**
+     * Buy and load a full hold's worth of {@code type} onto the selected ship
+     * via {@link InGameController#buyGoods} — the same call {@code
+     * MarketLabel} makes when dragged onto the cargo panel in the standard
+     * UI. ({@link InGameController#loadCargo}'s own Europe branch looks like
+     * the equivalent seam, but it builds a {@code Goods} located at {@code
+     * Europe} first, and {@code Europe} has no {@code GoodsContainer} —
+     * {@link Goods}'s constructor rejects that with a live
+     * "Can not store goods at: Europe" {@code RuntimeException}, caught while
+     * live-testing this slice; {@code buyGoods} needs no such object.)
+     * Capped at one cargo hold ({@link GoodsContainer#CARGO_SIZE}) per click,
+     * mirroring that drag; the ship stays selected so several goods types can
+     * be bought in one visit.
+     */
+    private void loadMarketGood(GoodsType type) {
+        if (this.selectedUnit == null || !this.selectedUnit.isNaval()) return;
+        final Unit ship = this.selectedUnit;
+        int loadable = ship.getLoadableAmount(type);
+        if (loadable <= 0) return;
+        if (loadable > GoodsContainer.CARGO_SIZE) loadable = GoodsContainer.CARGO_SIZE;
+        igc().buyGoods(type, loadable, ship);
+        refresh();
+    }
+
+    /**
+     * Set sail for the New World with the selected ship via
+     * {@link InGameController#moveTo} — the literal "set sail" seam
+     * (Javadoc: "Called from EuropePanel.DestinationPanel"), mirroring the
+     * standard Europe screen's own Set Sail button ({@code
+     * EuropePanel#sailAction}, which drops the selected ship onto its
+     * "sail to America" destination target). Mirrors that button's one
+     * safety check too: if a colonist is still waiting on the dock and
+     * auto-load-emigrants is off, confirm before leaving them behind (the
+     * same {@code europePanel.leaveColonists} template, through the classic
+     * UI's own wired {@code modalConfirmDialog}).
+     */
+    private void setSail() {
+        if (this.selectedUnit == null || !this.selectedUnit.isNaval()) return;
+        final Unit ship = this.selectedUnit;
+        final Map map = this.freeColClient.getGame().getMap();
+        if (!this.freeColClient.getClientOptions()
+                .getBoolean(ClientOptions.AUTOLOAD_EMIGRANTS)
+            && !this.dockUnits.isEmpty()
+            && ship.hasSpaceLeft()) {
+            final StringTemplate locName
+                = map.getLocationLabelFor(this.freeColClient.getMyPlayer());
+            if (!this.freeColClient.getGUI().modalConfirmDialog(null,
+                    StringTemplate.template("europePanel.leaveColonists")
+                        .addStringTemplate("%newWorld%", locName),
+                    ship, "ok", "cancel", true)) return;
+        }
+        igc().moveTo(ship, map);
         this.selectedUnit = null;
         refresh();
     }
@@ -305,7 +436,7 @@ final class ClassicEuropePanel extends JPanel {
             options[i] = Messages.message(recruitables.get(i).getSingleLabel())
                 + "  (" + price + ")";
         }
-        final String prompt = Messages.message(net.sf.freecol.common.model.StringTemplate
+        final String prompt = Messages.message(StringTemplate
             .template("recruitPanel.clickOn")
             .addAmount("%money%", price)
             .addAmount("%number%", 0));
@@ -399,6 +530,7 @@ final class ClassicEuropePanel extends JPanel {
         paintBackground(g);
         paintTitle(g);
         paintSailing(g);
+        paintCargo(g);
         paintPort(g);
         paintDocks(g);
         paintMarket(g);
@@ -478,8 +610,9 @@ final class ClassicEuropePanel extends JPanel {
 
     /**
      * The ships waiting in port, floating on the water by the piers — click
-     * targets for {@link #boardSelected}, highlighted while a dock unit is
-     * selected as a hint of where it can board.
+     * targets for {@link #selectPortUnit}. Highlighted gold while a dock unit
+     * is selected (a hint of where it can board), or green if the ship itself
+     * is the current selection (the cargo/set-sail target).
      */
     private void paintPort(Graphics2D g) {
         this.portBounds.clear();
@@ -492,12 +625,40 @@ final class ClassicEuropePanel extends JPanel {
             if (img != null) drawFitted(g, img, x, y, 22);
             this.portBounds.add(new Rectangle(x, y, 22, 22));
             this.portUnits.add(u);
-            if (this.selectedUnit != null) {
+            if (u == this.selectedUnit) {
+                g.setColor(SELECT);
+                g.drawRect(x, y, 21, 21);
+            } else if (this.selectedUnit != null && !this.selectedUnit.isNaval()) {
                 g.setColor(BOARD_HINT);
                 g.drawRect(x, y, 21, 21);
             }
             x += 24;
             if (x > 150) break;
+        }
+    }
+
+    /**
+     * The selected ship's cargo hold — goods icons in a strip just above the
+     * piers, click targets for {@link #sellCargo}. Empty (nothing drawn)
+     * unless a ship is currently selected, since there is nothing to sell/
+     * click otherwise.
+     */
+    private void paintCargo(Graphics2D g) {
+        this.cargoBounds.clear();
+        this.cargoGoods.clear();
+        if (this.selectedUnit == null || !this.selectedUnit.isNaval()) return;
+        int x = 3;
+        g.setFont(font(6f, Font.PLAIN));
+        for (Goods good : this.selectedUnit.getCompactGoodsList()) {
+            final BufferedImage img = this.lib.getScaledGoodsTypeImage(good.getType());
+            if (img != null) drawFitted(g, img, x, CARGO_Y, CARGO_H);
+            this.cargoBounds.add(new Rectangle(x, CARGO_Y, CARGO_H, CARGO_H));
+            this.cargoGoods.add(good);
+            final String s = String.valueOf(good.getAmount());
+            g.setColor(TAG_FG);
+            g.drawString(s, x, CARGO_Y + CARGO_H + 6);
+            x += CARGO_H + 2;
+            if (x > VW - CARGO_H) break;
         }
     }
 
@@ -530,8 +691,14 @@ final class ClassicEuropePanel extends JPanel {
         }
     }
 
-    /** The market row: every storable good with its current sale price. */
+    /**
+     * The market row: every storable good with its current sale price — click
+     * targets for {@link #loadMarketGood} while a ship is selected (hinted
+     * gold, the same {@link #BOARD_HINT} treatment as the boarding targets).
+     */
     private void paintMarket(Graphics2D g) {
+        this.marketBounds.clear();
+        this.marketTypes.clear();
         final Player player = this.freeColClient.getMyPlayer();
         final Market market = (player == null) ? null : player.getMarket();
         final List<GoodsType> goods
@@ -541,6 +708,8 @@ final class ClassicEuropePanel extends JPanel {
         g.setColor(TAG_BG);
         g.fillRect(0, MARKET_Y, VW, MARKET_H);
 
+        final boolean shipSelected
+            = this.selectedUnit != null && this.selectedUnit.isNaval();
         final int cw = (VW - 14) / goods.size();      // leave room for the exit "E"
         g.setFont(font(6f, Font.PLAIN));
         for (int i = 0; i < goods.size(); i++) {
@@ -554,13 +723,20 @@ final class ClassicEuropePanel extends JPanel {
                 g.drawString(s, x + (cw - g.getFontMetrics().stringWidth(s)) / 2,
                              MARKET_Y + MARKET_H - 2);
             }
+            final Rectangle r = new Rectangle(x, MARKET_Y, cw, MARKET_H);
+            this.marketBounds.add(r);
+            this.marketTypes.add(gt);
+            if (shipSelected) {
+                g.setColor(BOARD_HINT);
+                g.drawRect(r.x, r.y, r.width - 1, r.height - 1);
+            }
         }
     }
 
     /**
-     * The three golden action buttons at the top right — recruit, purchase and
-     * train.  Their bounds and actions are recorded here so {@link #onClick}
-     * and {@link #onHover} can drive them.
+     * The four golden action buttons at the top right — recruit, purchase,
+     * train and set sail.  Their bounds and actions are recorded here so
+     * {@link #onClick} and {@link #onHover} can drive them.
      */
     private void paintButtons(Graphics2D g) {
         this.buttonBounds.clear();
@@ -569,6 +745,7 @@ final class ClassicEuropePanel extends JPanel {
         addButton(Messages.message("recruit"), this::recruit);
         addButton(Messages.message("purchase"), this::purchase);
         addButton(Messages.message("train"), this::train);
+        addButton(Messages.message("setSail"), this::setSail);
 
         g.setFont(font(7f, Font.BOLD));
         for (int i = 0; i < this.buttonBounds.size(); i++) {
@@ -626,7 +803,7 @@ final class ClassicEuropePanel extends JPanel {
         }
     }
 
-    private static String msg(net.sf.freecol.common.model.StringTemplate t) {
+    private static String msg(StringTemplate t) {
         try {
             return (t == null) ? "" : Messages.message(t);
         } catch (RuntimeException e) {

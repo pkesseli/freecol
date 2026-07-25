@@ -28,9 +28,10 @@ F-key scheme rather than FreeCol's own arbitrary one (in-memory remap only, see
 surfaced). **Screen interaction**: the two hard blockers — a colony **build queue** and **Europe
 boarding** — shipped 2026-07-24 (a colony can now be told what to build, and a colonist can board a
 ship without leaving and re-entering via the map); **colony drag-interaction** (click-to-select,
-click-to-target work assignment) shipped 2026-07-25, closing the last playability gap on the colony
-screen; left in this slice: the colony's fixed building ground-slots, Europe cargo/set-sail, and
-per-nation tints.
+click-to-target work assignment) and **Europe cargo/set-sail** (buy/load and sell goods on a selected
+ship, plus a "Segel setzen" button to send it back to the New World) both shipped 2026-07-25, closing
+the last playability gaps on the colony and Europe screens; left in this slice: the colony's fixed
+building ground-slots and per-nation tints.
 **Phase 3 dialogs 🔨** — the shared wood-framed `ClassicDialog` ships, and with it the in-game message
 channel, which the classic UI had been discarding silently; left are the choice/input seams and the
 bespoke prompts. Phase 4 pre-game/setup ⬜ (the auto-launch stopgap keeps the game reachable, so this

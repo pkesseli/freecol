@@ -38,6 +38,41 @@ unblocks a seam that cannot be started without it. Q2/Q3/Q5/Q6 are sign-off on w
 - **The observed F-key scheme** (2026-07-24) — remapped in `ClassicGUI` at runtime, in-memory only;
   see README "Report screens".
 
+## Milestone: ready for the expert's first playtest (as of 2026-07-25)
+
+Everything above has been built and screenshot-checked solo; no one has actually *played* a session on
+the real build yet. That changes now: with Europe cargo/set-sail closed, **the core early-game loop has
+no remaining dead end** — every step a first session would take is click-driven, real-controller-backed,
+and error/message-surfaced, not a guess or a Swing fallback silently swallowing input:
+
+found/grow a colony → work colonists onto buildings or tiles → queue a build → sail a ship to Europe →
+recruit/purchase/train → load or sell cargo → set sail back → respond to whatever the server throws at
+you (a rejected order, a king's demand, first contact, a native tribute demand) — all of it now goes
+through the shared `ClassicDialog`/message channel instead of vanishing.
+
+**This is the point to hand the build to the expert**, not later: everything still open past this
+milestone (the choice/list dialogs, the popup metrics, the colony ground-slots, the report accelerator
+collision) is either directly gated on his answer ([Q3](#open-questions-for-the-expert)–
+[Q6](#open-questions-for-the-expert)) or cheapest to get right *after* watching him hit it blind, rather
+than guessed at again from screenshots alone. Concretely, ask him to:
+
+1. **Play a real session**, not a click-through — found a colony, run it a few turns, take a ship to
+   Europe and back with cargo, let a random event or two fire — and note first impressions as he goes,
+   the same sub-states-matter bar this doc already holds work to (open menus, mid-drag, mid-dialog).
+2. **Bring [Q4](#open-questions-for-the-expert)'s reference shots** in the same sitting — it is pure
+   material only he has, blocks a seam outright, and is cheapest to ask for while he is already looking
+   at the game.
+3. **Sign off or correct** whatever [Q2](#open-questions-for-the-expert)/
+   [Q3](#open-questions-for-the-expert)/[Q6](#open-questions-for-the-expert) guesses he actually
+   encounters in play, rather than us re-guessing them from the shots in `screenshots/`.
+
+**What to tell him not to bother polishing feedback on yet**, so his first pass stays high-signal: the
+recruit/purchase/train/set-sail choice dialogs are plain `JOptionPane` stopgaps (Phase 3 §1, blocked on
+Q4); the colony's buildings are flow-laid-out, not at the original's fixed ground-slots
+([Q5](#open-questions-for-the-expert)); there are no per-nation building/flag tints yet; and the menu
+dropdowns are still default Swing. All flagged, all already tracked below — new instances of the same
+complaint don't need to be raised again.
+
 ## Phase 0 — scaffold & launch ✅
 
 `ClassicGUI extends GUI`, `--classic` flag, selector, auto-launch lobby stopgap.
@@ -96,12 +131,15 @@ in the README's "Report screens" section, not here. What's left:
    **Colony drag-interaction (work assignment) is also now done**, live-verified 2026-07-25 — click a
    colonist (idle in the colony, or already working a building/tile), then click a building or work
    tile to move it there via the real `InGameController.work`; see the README's new "Work assignment
-   (drag interaction)" subsection. Left: *Colony:* validate the provisional `BUILDING.SS` frame map,
-   and place buildings at the original fixed ground-slots (vs. our flow layout — Q5). *Europe:*
-   loading *cargo* (goods, not colonists) and setting sail from the screen itself (the high-seas
-   confirm already fires once a laden ship moves off-map, per the map's own movement wiring — it's
-   specifically *initiating* the trip from the Europe screen that's still open). *Both:* per-nation
-   building/flag tints.
+   (drag interaction)" subsection. **Europe cargo/set-sail is also now done**, live-verified
+   2026-07-25 — select a ship in port to buy/load goods from the market or sell cargo already aboard
+   (both one-line delegations to the real `InGameController.buyGoods`/`unloadCargo`), or click the new
+   "Segel setzen" button to send it back to the New World via `InGameController.moveTo`, mirroring the
+   standard Europe screen's own Set Sail button including its leave-colonists safety confirm; see the
+   README's new "Cargo & set sail" subsection (which also documents a real `Goods`-construction crash
+   caught live and fixed, not just a feature add). Left: *Colony:* validate the provisional
+   `BUILDING.SS` frame map, and place buildings at the original fixed ground-slots (vs. our flow
+   layout — Q5). *Both:* per-nation building/flag tints.
 
 ## Phase 3 — dialogs & polish 🔨
 

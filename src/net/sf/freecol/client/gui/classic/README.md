@@ -621,11 +621,73 @@ did, rather than inventing a new hit-testing mechanism.
 box appeared and the ship gained a gold hint border; clicked the ship — the colonist vanished from the
 dock (boarded), the hint cleared. 0 SEVERE.
 
-**Follow-ups (later slices):** loading *cargo* (goods, not colonists) and initiating a return trip from
-the screen itself — a related but separate seam (probably `InGameController`'s goods-loading
-equivalent; not yet located — check `CargoPanel`'s goods-handling methods, the standard-UI reference);
-the wood-framed dialog reskin (shared Phase-3 component); refining the dock/pier sprite positions
-against the original; localizing the few captions.
+**Follow-ups:** the wood-framed dialog reskin (shared Phase-3 component); refining the dock/pier sprite
+positions against the original; localizing the few captions. Cargo and set-sail, the two items this
+note used to flag as open, are closed — see below.
+
+### Cargo & set sail — the Europe screen's last blocker, closed
+
+Until this slice, `ClassicEuropePanel` had no way to move *goods* (as opposed to colonists) on or off a
+ship, or to send a docked ship back to the New World — a ship could arrive in Europe and sit there
+forever, since nothing in the screen itself could load it with cargo or start its return trip.
+
+**Selection now does double duty.** `selectedUnit` (the same field boarding already used) now holds
+either a dock colonist *or* a ship, disambiguated by `Unit.isNaval()`: clicking a ship in port calls the
+new `selectPortUnit`, which boards a selected colonist onto it if one is selected (the existing
+behaviour, unchanged) or otherwise selects/deselects the ship itself as the target for the actions
+below — switching selection between a colonist and a ship is just overwriting the one field, no extra
+state needed. While a ship is selected, every market-row good gets the same gold `BOARD_HINT` border
+the boarding ships got while a colonist was selected, and the ship's own cargo hold renders as a strip
+of goods icons (`paintCargo`, `Unit.getCompactGoodsList()`) in the gap above the piers — empty, and
+undrawn, unless a ship is currently selected.
+
+**Three click targets, three controller calls, all reusing established real seams:**
+- **A market-row good** → `loadMarketGood` → `InGameController.buyGoods(type, amount, ship)`, capped at
+  one `GoodsContainer.CARGO_SIZE` (100) per click — the same amount and the same call `MarketLabel`
+  makes when a market icon is dragged onto the standard UI's `CargoPanel`.
+- **A cargo icon on the selected ship** → `sellCargo` → `InGameController.unloadCargo(goods, false)`,
+  which (since the carrier is in Europe) routes to `sellGoods` internally — the same call `GoodsLabel`
+  makes when a cargo icon is dragged off a carrier.
+- **The new fourth action button, "Segel setzen" (Set Sail)** → `setSail` → `InGameController.moveTo(
+  ship, game.getMap())` — the literal "set sail" seam (Javadoc: "Called from
+  EuropePanel.DestinationPanel"). Mirrors the standard (non-classic) Europe screen's own Set Sail
+  button (`EuropePanel#sailAction`, key `S`) down to reusing its `setSail` i18n key, since no screenshot
+  of the original's own set-sail affordance has surfaced — a placeholder in the same vein as the
+  build-queue picker, open for the expert. It also mirrors that button's one safety check: if
+  auto-load-emigrants is off and a colonist is still waiting on the dock, it confirms first (the classic
+  UI's own wired `modalConfirmDialog`, same `europePanel.leaveColonists` template) before leaving them
+  behind. Loading and selling keep the ship selected, so several goods types can be bought or sold in
+  one visit — a deliberate difference from boarding/work-assignment's clear-after-one-click convention,
+  since cargo is inherently a multi-item action even in the standard UI's own drag interface.
+
+**A real bug caught live, not by inspection.** The first cut built the goods-to-load as
+`new Goods(game, europe, type, amount)` and called `InGameController.loadCargo`, mirroring that
+method's own doc comment ("branches on `goods.getLocation() instanceof Europe` → calls `buyGoods`
+internally"). Live testing threw immediately: `Goods`'s constructor rejects any location whose
+`getGoodsContainer()` is null, and `Europe` has no goods container — so a `Goods` located `Europe` can
+never legally exist, and `loadCargo`'s Europe branch is (at least via this path) unreachable in
+practice. Every real caller that buys goods in Europe (`MarketLabel`, `QuickActionMenu`) in fact calls
+`buyGoods` directly rather than going through `loadCargo` — `loadMarketGood` now does the same, and the
+crash is gone. Left as a loose thread for whoever next touches `InGameController`: `loadCargo`'s Europe
+branch may be genuinely dead code.
+
+**Verified live (2026-07-25):** opened Amsterdam with a ship in port and a colonist on the dock; clicked
+the ship — green selection box, every market good gained a gold hint border; clicked a market good
+(before the `buyGoods` fix, this threw the `Goods`-construction `RuntimeException` above — confirmed
+gone after the fix, buyGoods correctly rejected the purchase for insufficient gold with no crash and no
+stray hint left behind); clicked **Segel setzen** — the wood-framed confirm fired for real ("Sollen wir
+die Segel nach Neuholland setzen und die Kolonisten zurücklassen?", ship portrait, `europePanel.
+leaveColonists`, the first live trigger of this specific event-confirm dialog); confirmed — the ship
+left port and reappeared correctly in the "Auf dem Weg nach Amerika" sailing row, the market hints
+cleared, the colonist stayed behind on the dock as warned. Re-selected the dock colonist afterward (no
+ship left in port) to confirm the dual-purpose selection still boards/selects correctly with an empty
+port list. 0 SEVERE throughout except the pre-existing benign first-launch `options.xml` warning.
+
+**Follow-ups:** selling/loading were only exercised on the reject path (the test save had 0 gold) — the
+success path is un-exercised beyond code review, though it is a one-line delegation to the same
+`unloadCargo`/`buyGoods` calls already proven elsewhere. The `loadCargo`-is-Europe-dead-code loose
+thread above; the wood-framed dialog reskin (shared Phase-3 component, same as boarding); per-nation
+tints.
 
 ## Report screens (`ClassicReportPanel` + concrete reports)
 
