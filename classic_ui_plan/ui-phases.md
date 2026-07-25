@@ -22,9 +22,9 @@ phase item linked; this list is just the queue to take to him.
 | **Q5** | **The colony screen's fixed building ground-slots** — the original places buildings at set positions; we flow-layout them. | [Phase 2 §3](#remaining) | Rework of the biggest remaining slice. |
 | **Q6** | **Four shipped reports — Military, Production, Exploration, Cargo — have no confirmed Col1 counterpart** at all (see Resolved below); "Military Garrison" may just be the Colony Advisor's own paging, not a standalone report. **Concretely blocking now:** remapping Naval to its confirmed key F7 collides with Military, which already sits there and which this plan does not touch unilaterally — both menu items show "F7" today but only one responds (verified live). Should any of the four be reworked, re-keyed, or removed? | Key-scheme remap (`ClassicGUI.remapClassicReportAccelerators`); README "Report screens" | Guessing wrong either reworks a report the original never had, or leaves a live, user-visible key collision unresolved. |
 
-**Q4 is the one to ask first** — pure reference material (shots), cheap for him to answer, and
-unblocks a seam that cannot be started without it. Q2/Q3/Q5/Q6 are sign-off on work that already runs
-(or a call on work already flagged), so they can wait for a review pass.
+**All five go to him together, in one sitting** — see the
+[milestone note](#milestone-ready-for-the-experts-first-playtest) below for why this is now a bundled
+hand-off (build + every open question at once) rather than asking Q4 separately/early.
 
 *Resolved* (detail in the README, not repeated here):
 - Whether Education/History/Requirements/Labour belong in a faithful classic UI — no for the first
@@ -38,40 +38,51 @@ unblocks a seam that cannot be started without it. Q2/Q3/Q5/Q6 are sign-off on w
 - **The observed F-key scheme** (2026-07-24) — remapped in `ClassicGUI` at runtime, in-memory only;
   see README "Report screens".
 
-## Milestone: ready for the expert's first playtest (as of 2026-07-25)
+## Milestone: ready for the expert's first playtest
 
-Everything above has been built and screenshot-checked solo; no one has actually *played* a session on
-the real build yet. That changes now: with Europe cargo/set-sail closed, **the core early-game loop has
-no remaining dead end** — every step a first session would take is click-driven, real-controller-backed,
-and error/message-surfaced, not a guess or a Swing fallback silently swallowing input:
+**Order of operations, decided 2026-07-25: finish everything *not* blocked on the expert first, then do
+one bundled hand-off** — the finished build plus all five open questions, together, in a single sitting
+— rather than trickling questions to him early or sharing an intermediate build. Nothing here is gated
+on his answers, so there's no reason to wait on him to get it done, and it means his first look at the
+build is the most finished one we can give him.
 
-found/grow a colony → work colonists onto buildings or tiles → queue a build → sail a ship to Europe →
-recruit/purchase/train → load or sell cargo → set sail back → respond to whatever the server throws at
-you (a rejected order, a king's demand, first contact, a native tribute demand) — all of it now goes
-through the shared `ClassicDialog`/message channel instead of vanishing.
+### Before sharing — the unblocked queue
 
-**This is the point to hand the build to the expert**, not later: everything still open past this
-milestone (the choice/list dialogs, the popup metrics, the colony ground-slots, the report accelerator
-collision) is either directly gated on his answer ([Q3](#open-questions-for-the-expert)–
-[Q6](#open-questions-for-the-expert)) or cheapest to get right *after* watching him hit it blind, rather
-than guessed at again from screenshots alone. Concretely, ask him to:
+None of these need an answer from the expert to build; they're just not done yet. Doing them first
+means the questions we do ask are the real remaining unknowns, not things we simply hadn't gotten to:
 
-1. **Play a real session**, not a click-through — found a colony, run it a few turns, take a ship to
-   Europe and back with cargo, let a random event or two fire — and note first impressions as he goes,
-   the same sub-states-matter bar this doc already holds work to (open menus, mid-drag, mid-dialog).
-2. **Bring [Q4](#open-questions-for-the-expert)'s reference shots** in the same sitting — it is pure
-   material only he has, blocks a seam outright, and is cheapest to ask for while he is already looking
-   at the game.
-3. **Sign off or correct** whatever [Q2](#open-questions-for-the-expert)/
-   [Q3](#open-questions-for-the-expert)/[Q6](#open-questions-for-the-expert) guesses he actually
-   encounters in play, rather than us re-guessing them from the shots in `screenshots/`.
+1. **F10 "Kolonisationspunkte" (score breakdown)** — [Phase 2 §2](#remaining). FreeCol's own
+   `showHighScoresPanel` seam, uncontested key, no reference material needed.
+2. **HUD caption localization** — [Phase 2 §3](#remaining). The colony/Europe screens' remaining
+   hard-coded captions.
+3. **Menu dropdowns, wood-framed** — [Phase 3 §3](#remaining-1). Reuses `ClassicDialog`'s existing
+   metrics/palette — the same guess Q3 asks him to sign off on, already shipped elsewhere in the game,
+   so building more of it now doesn't add new risk, it just extends what he'll be reviewing anyway.
+4. **Per-nation building/flag tints** — Phase 2/Europe follow-ups. Not one of Q2–Q6; just unbuilt.
+5. **Phase 4 pre-game/setup screens** — nation select (`NATIONS.PIK`), difficulty (`DIFFICUL.PIK`),
+   customise (`CUSTOMIZ.PIK`); all art already extracted, none of it blocked. Replacing the auto-launch
+   stopgap here means his first playtest can start a *new* game through the classic UI instead of
+   resuming a save — closer to how he'd actually experience the real thing.
 
-**What to tell him not to bother polishing feedback on yet**, so his first pass stays high-signal: the
-recruit/purchase/train/set-sail choice dialogs are plain `JOptionPane` stopgaps (Phase 3 §1, blocked on
-Q4); the colony's buildings are flow-laid-out, not at the original's fixed ground-slots
-([Q5](#open-questions-for-the-expert)); there are no per-nation building/flag tints yet; and the menu
-dropdowns are still default Swing. All flagged, all already tracked below — new instances of the same
-complaint don't need to be raised again.
+### Then — one hand-off: the build, and all five questions together
+
+Once the queue above is clear, give him the build and ask him to:
+
+1. **Play a real session**, not a click-through — start a new game (now reachable, per item 5 above),
+   found a colony, run it a few turns, take a ship to Europe and back with cargo, let a random event or
+   two fire — noting first impressions as he goes, the same sub-states-matter bar this doc already holds
+   work to (open menus, mid-drag, mid-dialog).
+2. **Answer Q2–Q6 in the same sitting** — Q4 (the choice/text-input popup shots) no longer jumps the
+   queue; by this point the build is as finished as it can get without his input, so every question goes
+   over at once instead of in a separate earlier ask.
+
+**What stays open no matter how much of the queue above gets done** — genuinely blocked on him, not
+just unstarted: the recruit/purchase/train/set-sail choice dialogs stay plain `JOptionPane` stopgaps
+until [Q4](#open-questions-for-the-expert) lands (Phase 3 §1); the colony's buildings stay flow-laid-out
+rather than at the original's fixed ground-slots until [Q5](#open-questions-for-the-expert); the Colony
+Advisor's >9-colony paging ([Q2](#open-questions-for-the-expert)) and the Military/Naval F7 key collision
+([Q6](#open-questions-for-the-expert)) stay as they are. These are exactly what the bundled hand-off is
+for — no point guessing at them again solo.
 
 ## Phase 0 — scaffold & launch ✅
 
