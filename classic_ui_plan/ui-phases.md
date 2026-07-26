@@ -53,8 +53,9 @@ means the questions we do ask are the real remaining unknowns, not things we sim
 
 1. **F10 "Kolonisationspunkte" (score breakdown)** — [Phase 2 §2](#remaining). FreeCol's own
    `showHighScoresPanel` seam, uncontested key, no reference material needed.
-2. **HUD caption localization** — [Phase 2 §3](#remaining). The colony/Europe screens' remaining
-   hard-coded captions.
+2. **HUD caption localization** ✅ — [Phase 2 §3](#remaining). The colony/Europe screens turned out to
+   already be fully localized; the one real hard-coded literal was `ClassicMapViewer`'s transient
+   "waiting for map" fallback, now moved to `classic.mapViewer.waitingForMap`.
 3. **Menu dropdowns, wood-framed** — [Phase 3 §3](#remaining-1). Reuses `ClassicDialog`'s existing
    metrics/palette — the same guess Q3 asks him to sign off on, already shipped elsewhere in the game,
    so building more of it now doesn't add new risk, it just extends what he'll be reviewing anyway.
@@ -135,8 +136,10 @@ in the README's "Report screens" section, not here. What's left:
    matching seam, `showHighScoresPanel(String, List<HighScore>)`, differs in shape from every other
    report (takes its data as arguments) and has **no accelerator at all** in FreeCol's own scheme, so
    F10 is uncontested. Lower priority; build when there's a natural opening.
-3. **HUD polish — otherwise done.** Remaining: only the colony/Europe screens' own few hard-coded
-   captions. (The menu **dropdown popups** are still default Swing — folded into the Phase-3 reskin.)
+3. **HUD polish — otherwise done.** ✅ Caption localization is complete: the colony/Europe screens
+   were already fully localized, and the one real hard-coded literal (`ClassicMapViewer`'s transient
+   "waiting for map" fallback) is now `classic.mapViewer.waitingForMap`. (The menu **dropdown popups**
+   are still default Swing — folded into the Phase-3 reskin.)
 4. **Screen-interaction polish** — the two hard blockers (build queue, Europe boarding) are now
    **done**, live-verified 2026-07-24 — see the README's "Colony screen" / "Europe screen" sections.
    **Colony drag-interaction (work assignment) is also now done**, live-verified 2026-07-25 — click a

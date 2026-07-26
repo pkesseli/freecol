@@ -491,9 +491,10 @@ call); reopened and picked **Schmiede** — updated live again. 0 SEVERE through
 
 **Follow-ups (later slices, need the expert's sign-off):** validate/correct the
 `BUILDING.SS` frame map; the original's fixed building ground-slots (vs. our
-flow layout); loading cargo; per-nation building/flag tints; localizing the few
-hard-coded captions; a reference shot for the build-selection screen's actual
-look (Q-worthy, see above).
+flow layout); per-nation building/flag tints; a reference shot for the
+build-selection screen's actual look (Q-worthy, see above). Loading cargo and
+caption localization are both closed — see "Cargo & set sail" and "Caption
+localization" below.
 
 ### Work assignment (drag interaction) — the colony-screen blocker, closed
 
@@ -622,8 +623,8 @@ box appeared and the ship gained a gold hint border; clicked the ship — the co
 dock (boarded), the hint cleared. 0 SEVERE.
 
 **Follow-ups:** the wood-framed dialog reskin (shared Phase-3 component); refining the dock/pier sprite
-positions against the original; localizing the few captions. Cargo and set-sail, the two items this
-note used to flag as open, are closed — see below.
+positions against the original. Cargo and set-sail, the two items this note used to flag as open, are
+closed — see below. Caption localization is also closed — see below.
 
 ### Cargo & set sail — the Europe screen's last blocker, closed
 
@@ -791,6 +792,20 @@ the info-panel hints "Enter: Zug beenden / Space: Überspringen / W: Warten/Näc
 Einheit"; and the Colony Advisor pages between the two original captions —
 **"Söhne der Freiheit"** and **"Militärgarnision"** — over "Noch keine Kolonien.".
 Umlauts render correctly throughout.
+
+**The colony/Europe screens turned out to already be fully localized** — an exhaustive literal-string
+sweep of `ClassicColonyPanel`, `ClassicEuropePanel`, `ClassicBuildQueuePanel`, `ClassicReportPanel` and
+every concrete report subclass (2026-07-26) found every paint-time string already routing through
+`Messages.message(...)`, `Messages.getName(...)`, or `cap(tail)`. The one genuine hard-coded literal
+outside those screens was `ClassicMapViewer.paintWaiting`'s pre-map-ready fallback string, drawn only in
+the narrow `map == null || f == null` startup window before the map/focus are available. Fixed by adding
+`classic.mapViewer.waitingForMap` next to the `classic.buildQueue.*` block. Two literals were deliberately
+left alone: `ClassicInfoPanel`'s key-cap tokens (Enter/Space/W — our actual bindings, not translatable
+concepts, per the comment above that code) and `ClassicGUI`'s `JOptionPane` title fallback to the
+brand name "FreeCol" (a proper noun). Because `paintWaiting` fires only in a transient startup window,
+this fix was verified at the code level (key resolves, `ant compile` clean, 0 SEVERE and no missing-key
+warning in `FreeCol.log` at startup) rather than by live screenshot — the same standard already applied
+elsewhere in this doc when a state can't reliably be forced (e.g. the Colony Advisor's >9-colony paging).
 
 **Row geometry (the invariant to keep).** A row's cell spans `[y-ROW_H+3, y+3)`
 about its baseline `y`, and sprites are drawn from `y-ROW_H+4` — i.e. a row

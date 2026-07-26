@@ -45,6 +45,7 @@ import javax.swing.Timer;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Map;
@@ -869,6 +870,6 @@ final class ClassicMapViewer extends JPanel {
     private void paintWaiting(Graphics2D g) {
         g.setColor(Color.LIGHT_GRAY);
         g.setFont(g.getFont().deriveFont(Font.PLAIN, 18f));
-        g.drawString("Classic UI — waiting for map…", 24, 32);
+        g.drawString(Messages.message("classic.mapViewer.waitingForMap"), 24, 32);
     }
 }
