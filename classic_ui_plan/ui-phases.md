@@ -53,8 +53,8 @@ means the questions we do ask are the real remaining unknowns, not things we sim
 **Two items are already done** — HUD caption localization and the wood-framed menu dropdowns (detail
 in the README, not repeated here) — leaving:
 
-1. **F10 "Kolonisationspunkte" (score breakdown)** — [Phase 2 §2](#remaining). FreeCol's own
-   `showHighScoresPanel` seam, uncontested key, no reference material needed.
+1. ~~**F10 "Kolonisationspunkte" (score breakdown)**~~ — done 2026-07-26, see [Phase 2 §2](#remaining)
+   and the package README's "Report screens" section (`ClassicReportHighScoresPanel`).
 2. **Per-nation building/flag tints** — Phase 2/Europe follow-ups. Not one of Q2–Q6; just unbuilt.
 3. **Phase 4 pre-game/setup screens** — nation select (`NATIONS.PIK`), difficulty (`DIFFICUL.PIK`),
    customise (`CUSTOMIZ.PIK`); all art already extracted, none of it blocked. Replacing the auto-launch
@@ -128,10 +128,11 @@ in the README's "Report screens" section, not here. What's left:
    stay clickable (Colony/Production/Religious → jump to that colony's screen); the Congress and
    Indian row loops still haven't been exercised with real data — see the README's verification
    caveat.
-2. **F10 "Kolonisationspunkte" (score breakdown) — newly discovered scope, not yet built.** ⬜ FreeCol's
-   matching seam, `showHighScoresPanel(String, List<HighScore>)`, differs in shape from every other
-   report (takes its data as arguments) and has **no accelerator at all** in FreeCol's own scheme, so
-   F10 is uncontested. Lower priority; build when there's a natural opening.
+2. ~~**F10 "Kolonisationspunkte" (score breakdown)**~~ ✅ — done 2026-07-26. FreeCol's matching seam,
+   `showHighScoresPanel(String, List<HighScore>)`, differs in shape from every other report (takes its
+   data as arguments) and has **no accelerator at all** in FreeCol's own scheme, so F10 was uncontested.
+   Built as `ClassicReportHighScoresPanel`; see the package README's "Report screens" section for the
+   layout and the open backdrop/field-set guesses.
 3. **Screen-interaction leftovers.** The build queue, Europe boarding, colony drag-interaction (work
    assignment), and Europe cargo/set-sail are all done — see the README's "Colony screen" / "Europe
    screen" / "Work assignment (drag interaction)" / "Cargo & set sail" sections. Left: *Colony:*

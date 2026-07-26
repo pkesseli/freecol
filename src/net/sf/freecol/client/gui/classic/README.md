@@ -1176,6 +1176,65 @@ SEVERE):** all three columns render over the correct backdrop; the visible unit
 Carpenter) both counted correctly, confirming the census aggregates
 `player.getUnitSet()` empire-wide rather than just what's on screen.
 
+### High Scores (`ClassicReportHighScoresPanel`, F10 — no accelerator in either scheme)
+
+The score breakdown — "Kolonisationspunkte" in the German menu — over the
+records-at-a-desk illustration reused from the Continental Congress
+(**`REPORT3.PIK`**, a guess; see below). Reached by the already-live **Spiel →
+Punktzahlrekorde** menu item (`ReportHighScoresAction` → `InGameController.
+highScore(null)` → a server round trip → `highScoresHandler(key, scores)` →
+`getGUI().showHighScoresPanel(key, scores)`, already dispatched via
+`invokeLater`), not by any of the F-key report shortcuts — FreeCol's own scheme
+has no accelerator for this seam at all, so unlike every other report there was
+no key-remap question to resolve.
+
+**Differs in shape from every other report.** `GUI.showHighScoresPanel(String
+messageId, List<HighScore> scores)` takes its data as arguments rather than
+reading the live model from `paintBody` — the caller has already made the
+server round trip before the classic override is ever invoked, so (unlike the
+Foreign Affairs report's `nationSummary` trap) there is nothing to fetch off
+the EDT here; `ClassicGUI.showHighScoresPanel` builds
+`ClassicReportHighScoresPanel` synchronously and routes it through the same
+`showReport` helper every other report uses.
+
+**One row per `HighScore`, in the order given** (already best-first, per
+`HighScore.tidyScores`): rank, score, the same localized governor/president-
+of-nation headline the standard `ReportHighScoresPanel` shows (`report.
+highScores.governor`/`.president`, reusing its exact `%name%`/`%nation%`
+template), the retirement turn, and colony/unit counts. The standard panel's
+other fields — difficulty, independence turn, the original/final nation name
+and type, the retirement date — are read directly off `HighScore` too (see its
+full accessor set), but are **not shown**: a single 320×200 screen has no room
+for that panel's full nine-field-per-entry stacked layout, the same
+information-availability call already made for the other reports (e.g.
+Foreign Affairs' own deliberate omissions, see above). `messageId` (the
+"highscores.yes"/"highscores.no" result of a just-finished game, when present)
+prints as a line above the table; the space for it is always reserved so the
+table's position does not shift between the two cases. An empty list (e.g. a
+fresh profile's just-created, empty `HighScores.xml`) shows the same "no
+scores yet" empty-state treatment every other report uses.
+
+**Open, unconfirmed guesses (flagged, not settled):** no `REPORTn.PIK` backdrop
+is confirmed for this screen at all — `REPORT3.PIK` (otherwise single-booked by
+the Continental Congress) was picked as the closest thematic fit among the free
+single-use backdrops (`REPORT1`/`2`/`3`/`5`), not because any capture confirms
+it; the extracted-but-unused closing-sequence art (`CLOS-BKG`/`CCBKGD`) was
+considered and passed over as riskier to reuse sight-unseen. The five-column
+row layout and the choice of which `HighScore` fields to show at all are
+likewise placeholders in the same vein as the build-queue picker's look —
+open for the expert.
+
+**Verified live (2026-07-26, `--fast` start, 0 SEVERE):** Spiel → Punktzahlrekorde
+opens the panel over the sepia `REPORT3.PIK` backdrop with the localized title
+"Punktzahlrekorde"; a fresh profile's empty `HighScores.xml` (created on first
+read, logged at INFO) renders "Noch keine Punktzahlrekorde." per the empty-state
+path; Okay closes it cleanly back to the map. **The populated-row path (the
+table header and a real row) was only verified at the code level, not live** —
+forcing an actual finished/retired game wasn't practical in this session, the
+same documented fallback this doc already uses for other hard-to-force states
+(e.g. the Colony Advisor's >9-colony paging, "The colony/Europe screens turned
+out to already be fully localized" above).
+
 ### Follow-ups (later slices)
 
 The expert's sign-off on the Colony Advisor's **within-a-view** paging key for
@@ -1185,8 +1244,9 @@ localized and colony rows are clickable now — see "Caption localization" and
 "Clickable colony rows" above.) Education, History and Requirements remain
 deferred to
 [`classic_ui_plan/optional-reports.md`](../../../../../../../classic_ui_plan/optional-reports.md)
-as possible later additions of our own, not missing work. F10 (score breakdown,
-`showHighScoresPanel`) is newly-discovered scope, not yet built — see the plan.
+as possible later additions of our own, not missing work. The High Scores
+screen's backdrop and row/field choices are open guesses — see "High Scores"
+above.
 
 ## Popups (`ClassicDialog`) — and the dispatch seams that stranded them
 

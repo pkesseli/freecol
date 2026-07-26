@@ -67,6 +67,7 @@ import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.GoodsType;
+import net.sf.freecol.common.model.HighScore;
 import net.sf.freecol.common.model.IndianNationType;
 import net.sf.freecol.common.model.ModelMessage;
 import net.sf.freecol.common.model.Monarch.MonarchAction;
@@ -860,6 +861,27 @@ public class ClassicGUI extends GUI {
             }
         }.start();
         return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Phase 2: the classic <b>score breakdown</b> — "Kolonisationspunkte" /
+     * High Scores, {@code F10} in neither key scheme (uncontested; see the
+     * README's key-scheme note).  See {@link ClassicReportHighScoresPanel}.
+     *
+     * <p>Unlike every other {@code showReport*Panel} override, the data is
+     * already in hand (the caller, {@code InGameController.highScoresHandler},
+     * has already made the server round trip), so this builds the panel
+     * synchronously rather than needing the Foreign Affairs report's
+     * background-thread {@code nationSummary} dance.
+     */
+    @Override
+    public FreeColPanel showHighScoresPanel(String messageId,
+                                            List<HighScore> scores) {
+        return showReport("reportHighScoresAction.name",
+            onClose -> new ClassicReportHighScoresPanel(getFreeColClient(),
+                this.imageLibrary, onClose, messageId, scores));
     }
 
     /**
