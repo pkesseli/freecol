@@ -116,16 +116,21 @@ final class ClassicDialog extends JPanel {
     private static final int BTN_PAD = 6;
     private static final int BTN_TOP_GAP = 8;
 
-    private static final Color WOOD_FALLBACK = new Color(0x5A, 0x3A, 0x1E);
+    /**
+     * Package-visible (not {@code private}): {@link ClassicGUI}'s menu-dropdown
+     * reskin reuses this palette rather than inventing a second one — see
+     * {@code ClassicGUI.installClassicMenuDropdownDefaults}.
+     */
+    static final Color WOOD_FALLBACK = new Color(0x5A, 0x3A, 0x1E);
     /** The original's popup text: a light green over the wood. */
-    private static final Color TEXT_FG = new Color(0x78, 0xC8, 0x60);
-    private static final Color BORDER_HI = new Color(0x9A, 0x72, 0x40);
-    private static final Color BORDER_LO = new Color(0x2A, 0x1A, 0x0C);
-    private static final Color BTN_BG = new Color(0x3A, 0x24, 0x12);
-    private static final Color BTN_FG = new Color(0xF0, 0xD8, 0x8C);
+    static final Color TEXT_FG = new Color(0x78, 0xC8, 0x60);
+    static final Color BORDER_HI = new Color(0x9A, 0x72, 0x40);
+    static final Color BORDER_LO = new Color(0x2A, 0x1A, 0x0C);
+    static final Color BTN_BG = new Color(0x3A, 0x24, 0x12);
+    static final Color BTN_FG = new Color(0xF0, 0xD8, 0x8C);
     private static final Color BTN_HOT = new Color(0x5A, 0x3A, 0x1E);
     private static final Color ICON_BG = new Color(0x14, 0x10, 0x0A);
-    private static final Color COUNT_FG = new Color(0xB0, 0x98, 0x60);
+    static final Color COUNT_FG = new Color(0xB0, 0x98, 0x60);
 
     private final List<Page> pages;
     private final String[] options;

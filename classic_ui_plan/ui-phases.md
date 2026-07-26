@@ -49,18 +49,14 @@ build is the most finished one we can give him.
 ### Before sharing — the unblocked queue
 
 None of these need an answer from the expert to build; they're just not done yet. Doing them first
-means the questions we do ask are the real remaining unknowns, not things we simply hadn't gotten to:
+means the questions we do ask are the real remaining unknowns, not things we simply hadn't gotten to.
+**Two items are already done** — HUD caption localization and the wood-framed menu dropdowns (detail
+in the README, not repeated here) — leaving:
 
 1. **F10 "Kolonisationspunkte" (score breakdown)** — [Phase 2 §2](#remaining). FreeCol's own
    `showHighScoresPanel` seam, uncontested key, no reference material needed.
-2. **HUD caption localization** ✅ — [Phase 2 §3](#remaining). The colony/Europe screens turned out to
-   already be fully localized; the one real hard-coded literal was `ClassicMapViewer`'s transient
-   "waiting for map" fallback, now moved to `classic.mapViewer.waitingForMap`.
-3. **Menu dropdowns, wood-framed** — [Phase 3 §3](#remaining-1). Reuses `ClassicDialog`'s existing
-   metrics/palette — the same guess Q3 asks him to sign off on, already shipped elsewhere in the game,
-   so building more of it now doesn't add new risk, it just extends what he'll be reviewing anyway.
-4. **Per-nation building/flag tints** — Phase 2/Europe follow-ups. Not one of Q2–Q6; just unbuilt.
-5. **Phase 4 pre-game/setup screens** — nation select (`NATIONS.PIK`), difficulty (`DIFFICUL.PIK`),
+2. **Per-nation building/flag tints** — Phase 2/Europe follow-ups. Not one of Q2–Q6; just unbuilt.
+3. **Phase 4 pre-game/setup screens** — nation select (`NATIONS.PIK`), difficulty (`DIFFICUL.PIK`),
    customise (`CUSTOMIZ.PIK`); all art already extracted, none of it blocked. Replacing the auto-launch
    stopgap here means his first playtest can start a *new* game through the classic UI instead of
    resuming a save — closer to how he'd actually experience the real thing.
@@ -69,7 +65,7 @@ means the questions we do ask are the real remaining unknowns, not things we sim
 
 Once the queue above is clear, give him the build and ask him to:
 
-1. **Play a real session**, not a click-through — start a new game (now reachable, per item 5 above),
+1. **Play a real session**, not a click-through — start a new game (now reachable, per item 3 above),
    found a colony, run it a few turns, take a ship to Europe and back with cargo, let a random event or
    two fire — noting first impressions as he goes, the same sub-states-matter bar this doc already holds
    work to (open menus, mid-drag, mid-dialog).
@@ -136,24 +132,12 @@ in the README's "Report screens" section, not here. What's left:
    matching seam, `showHighScoresPanel(String, List<HighScore>)`, differs in shape from every other
    report (takes its data as arguments) and has **no accelerator at all** in FreeCol's own scheme, so
    F10 is uncontested. Lower priority; build when there's a natural opening.
-3. **HUD polish — otherwise done.** ✅ Caption localization is complete: the colony/Europe screens
-   were already fully localized, and the one real hard-coded literal (`ClassicMapViewer`'s transient
-   "waiting for map" fallback) is now `classic.mapViewer.waitingForMap`. (The menu **dropdown popups**
-   are still default Swing — folded into the Phase-3 reskin.)
-4. **Screen-interaction polish** — the two hard blockers (build queue, Europe boarding) are now
-   **done**, live-verified 2026-07-24 — see the README's "Colony screen" / "Europe screen" sections.
-   **Colony drag-interaction (work assignment) is also now done**, live-verified 2026-07-25 — click a
-   colonist (idle in the colony, or already working a building/tile), then click a building or work
-   tile to move it there via the real `InGameController.work`; see the README's new "Work assignment
-   (drag interaction)" subsection. **Europe cargo/set-sail is also now done**, live-verified
-   2026-07-25 — select a ship in port to buy/load goods from the market or sell cargo already aboard
-   (both one-line delegations to the real `InGameController.buyGoods`/`unloadCargo`), or click the new
-   "Segel setzen" button to send it back to the New World via `InGameController.moveTo`, mirroring the
-   standard Europe screen's own Set Sail button including its leave-colonists safety confirm; see the
-   README's new "Cargo & set sail" subsection (which also documents a real `Goods`-construction crash
-   caught live and fixed, not just a feature add). Left: *Colony:* validate the provisional
-   `BUILDING.SS` frame map, and place buildings at the original fixed ground-slots (vs. our flow
-   layout — Q5). *Both:* per-nation building/flag tints.
+3. **Screen-interaction leftovers.** The build queue, Europe boarding, colony drag-interaction (work
+   assignment), and Europe cargo/set-sail are all done — see the README's "Colony screen" / "Europe
+   screen" / "Work assignment (drag interaction)" / "Cargo & set sail" sections. Left: *Colony:*
+   validate the provisional `BUILDING.SS` frame map, and place buildings at the original fixed
+   ground-slots (vs. our flow layout — [Q5](#open-questions-for-the-expert)). *Both:* per-nation
+   building/flag tints.
 
 ## Phase 3 — dialogs & polish 🔨
 
@@ -168,7 +152,7 @@ every popup routing through it. Live-verified 2026-07-17 (README "Popups"). Over
   The original has no batched turn report, so notices page one at a time rather than list.
 - **`modalConfirmDialog`** — off `JOptionPane` onto the shared frame. The `Unit`/`FreeColObject`
   overloads in `GUI` are `final` and delegate here, so every confirm in the game lands on it.
-- **`showErrorPanel`** — the no-op seam audit's find (item 4 below), same silent-loss class as the
+- **`showErrorPanel`** — the no-op seam audit's find (see "Done, not repeated here" below), same silent-loss class as the
   messages: all five overloads funnel into one non-final seam that no-op'd, so **every error
   vanished**, and errors carrying a `System.exit` callback left the app hung. Now routes through the
   shared popup and runs the callback on dismiss. Live-verified 2026-07-18 (README "Wired seams").
@@ -192,17 +176,13 @@ every popup routing through it. Live-verified 2026-07-17 (README "Popups"). Over
    larger bespoke ones.
 2. **The popup look is a guess — see [Q3](#open-questions-for-the-expert).** `ClassicDialog`'s
    metrics and green-on-wood palette are read off the original's screenshots by eye, not measured
-   from the art. Every popup inherits whatever is wrong, so this wants sign-off before the seams
-   above multiply it. `WOODPAN2.PIK` is not used yet.
-3. **The menu dropdowns** are still default Swing (deferred here from Phase 2's HUD polish).
-4. **Audit the other no-op seams — done 2026-07-18, four fixes total.** Cross-referenced every
-   `getGUI().X` call in `client/control/*` against `ClassicGUI`'s overrides. Fixed **`showErrorPanel`**
-   and, chasing the event-dialog sub-audit, the **three confirm-shaped event dialogs** (monarch /
-   first-contact / native-demand) — all silent-loss bugs (see Shipped above), all now confirm-popup
-   fixes needing no expert input. Reassuring otherwise: the combat/leave/stop confirms already
-   delegate to the overridden `modalConfirmDialog`. **What's left** are the two *non*-confirm event
-   dialogs — `showEmigrationDialog` (choice of 3 recruits) and `showNamingDialog` (text) — which need
-   the Q4 widgets, folded into item 1 below. Details in README "The no-op seam audit".
+   from the art (the menu dropdowns now share this same palette, see README "Menu dropdowns", so
+   this sign-off now covers both). Every popup inherits whatever is wrong, so this wants sign-off
+   before the seams above multiply it. `WOODPAN2.PIK` is not used yet.
+
+Done, not repeated here: the menu dropdowns (README "Menu dropdowns"), and the no-op seam audit that
+found `showErrorPanel` and the three confirm-shaped event dialogs (README "The no-op seam audit") —
+its only leftover, the two non-confirm event dialogs, is tracked in item 1 above.
 
 ## Phase 4 — pre-game & setup screens ⬜
 

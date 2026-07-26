@@ -49,13 +49,14 @@ fastest way to the in-game view. It starts at sea: the ship on an ocean patch.
   `FontLibrary`'s main font null — which NPEs once the reused `InGameMenuBar`
   paints its golden gold/tax/year status line via `FontLibrary.getMainFont()`.
   So the classic GUI overrides it to create the main font (and set the
-  image-border scale factor so the menu bar's wood border renders). It
+  image-border scale factor so the menu bar's wood border renders; and installs
+  the menu-dropdown `UIManager` defaults — see "Menu dropdowns" below). It
   deliberately does **not** install `FreeColLookAndFeel`: that L&F swaps in a
   `PanelUI` that paints the parchment texture behind every `JPanel`, which would
   override the classic map's black fog and the dark info panel. The menu bar
   paints its own parchment background + wood border regardless of the L&F, so the
-  top bar still reads classic; only the dropdown popups fall back to default
-  Swing styling.
+  top bar still reads classic; the dropdown popups get their own wood/green
+  reskin instead, targeted narrowly enough not to need the full L&F.
 - **Pre-game lobby stopgap.** There is no classic lobby yet, so
   `showStartGamePanel` auto-launches single-player games (`player.setReady(true)`
   + `requestLaunch`); otherwise a new game stalls at login because the base
@@ -331,9 +332,52 @@ excluded); it is functional, not yet pixel-faithful chrome.
   - Safe **after construction**: `InGameMenuBar.reset()` rebuilds (and would
     re-create) the menus, but it is only called from its own constructor and from
     `FreeColFrame`, which the classic UI does not use.
-  - **Still deferred:** the dropdown popups keep default Swing styling (light
-    background, dark text) — the Phase-3 reskin covers them. *Triggering* a few
-    items still reaches `GUI` methods the classic UI no-ops.
+  - **Dropdown reskin — done (Phase 3 §3).** The dropdown popups now get
+    `ClassicDialog`'s wood-framed, green-on-wood palette too — see "Menu dropdowns"
+    below. *Triggering* a few items still reaches `GUI` methods the classic UI
+    no-ops (unrelated to the look).
+- **Menu dropdowns — `ClassicGUI.installClassicMenuDropdownDefaults`.** Reuses
+  `ClassicDialog`'s palette (`WOOD_FALLBACK`/`TEXT_FG`/`BORDER_HI`/`BORDER_LO`/
+  `BTN_BG`/`BTN_FG`/`COUNT_FG`, now package-visible for this) rather than
+  restyling each `JMenuItem` after construction: the colours are installed as
+  `UIManager` *defaults* once, at start-up (from `installLookAndFeel`, well
+  before `reconnectGUI` ever builds the `InGameMenuBar`), so every
+  `JMenuItem`/`JCheckBoxMenuItem`/`JRadioButtonMenuItem`/`JPopupMenu` picks them
+  up as its own built-in look at construction — no component is touched
+  individually, and the real `FreeColAction`s/accelerators/`updateActions()`
+  wiring are untouched.
+  - **The idle/hover asymmetry (found live, not guessed).**
+    `FreeColMenuBar.getMenuItem()` (shared with `SwingGUI`, so not touched here)
+    leaves every item `setOpaque(false)`. Screenshotting an open dropdown at
+    rest and mid-hover showed what that actually does: Swing's
+    `BasicMenuItemUI.paintBackground` skips an item's *idle* background fill
+    when non-opaque (so idle items show no rectangle of their own and sit
+    directly on the popup's wood fill), but paints the *armed/hover* fill
+    unconditionally regardless of opaque — an asymmetry easy to get backwards
+    from reading the source alone. Left unaddressed, hover would have shown the
+    platform L&F's own default blue; `MenuItem.selectionBackground` (etc.) is
+    therefore set to `ClassicDialog`'s `BTN_BG` (its darker plate tone — not
+    `BTN_HOT`, which is numerically identical to `WOOD_FALLBACK` and so would
+    have been invisible against the popup).
+  - **Popup chrome.** `PopupMenu.background`/`.border` give the popup itself
+    `WOOD_FALLBACK` and a bevelled `BORDER_HI`/`BORDER_LO` border (`JPopupMenu`
+    is forced opaque by `BasicPopupMenuUI` regardless of the item quirk above).
+    Separators get both eras of the relevant `UIManager` key
+    (`Separator.*`/`PopupMenu.separator*Foreground/Background`, since which one
+    a given JDK's `JSeparator` UI delegate reads varies) plus a per-instance
+    fallback in `styleClassicMenuBar` for belt-and-suspenders.
+  - **Scope.** Only `MenuItem`/`CheckBoxMenuItem`/`RadioButtonMenuItem`/
+    `PopupMenu`/`Separator` `UIManager` keys are touched, safe process-wide for
+    the same reason as the F-key remap below: `--classic` is the only `GUI` this
+    process ever runs, and the still-Swing choice/input dialog stopgaps
+    (`JOptionPane`, Phase 3 §1) read different keys, so this cannot bleed into
+    them. Checkbox/radio glyphs themselves stay the platform default (out of
+    scope — only `FreeColLookAndFeel`, deliberately not installed, supplies
+    custom ones).
+  - **Verified live** (2026-07-26): all five menus (Game/View/Orders/Report/
+    Colopedia), open and mid-hover, screenshotted; the F-key remap below still
+    reads correctly through the reskin (including the confirmed Naval/Military
+    F7 collision); 0 SEVERE in `FreeCol.log`.
 - **`ClassicInfoPanel` — the right strip.** A fixed-width (240px) `Graphics2D`-
   painted panel echoing the original's right column, backed by the original's
   **`WOODPANL.PIK`** wood-panel texture (`paintWoodChrome`, washed slightly darker

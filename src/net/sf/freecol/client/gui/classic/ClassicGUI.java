@@ -21,6 +21,7 @@ package net.sf.freecol.client.gui.classic;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
@@ -35,15 +36,18 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
 import net.sf.freecol.FreeCol;
@@ -322,8 +326,9 @@ public class ClassicGUI extends GUI {
      * <p>Safe to do after construction: {@code InGameMenuBar.reset()} — which
      * rebuilds (and would re-create) the menus — is only called from its own
      * constructor and from {@code FreeColFrame}, which the classic UI does not use.
-     * The dropdown popups keep default Swing styling (the Phase-3 reskin covers
-     * them).
+     * The dropdown popups get their own wood/green reskin — see {@link
+     * #installClassicMenuDropdownDefaults}, installed earlier at start-up — plus
+     * one per-instance touch-up here for the separators (below).
      */
     private void styleClassicMenuBar(InGameMenuBar menuBar) {
         menuBar.setOpaque(true);
@@ -333,6 +338,26 @@ public class ClassicGUI extends GUI {
             if (menu == null) continue;   // separators/glue are null here
             menu.setOpaque(false);
             menu.setForeground(MENU_BAR_FG);
+            styleClassicDropdownSeparators(menu.getPopupMenu());
+        }
+    }
+
+    /**
+     * Colour one dropdown's separator lines to match its wood/green reskin.
+     *
+     * <p>Unlike the rest of {@link #installClassicMenuDropdownDefaults}'s
+     * {@code UIManager}-defaults approach, {@code JSeparator}'s bevel-line
+     * painter (at least on some JDK versions) reads the <em>component's own</em>
+     * foreground/background rather than a {@code UIManager} key, so a global
+     * default alone would leave it unstyled on those JDKs — this per-instance
+     * pass is the belt-and-suspenders fallback.
+     */
+    private void styleClassicDropdownSeparators(JPopupMenu popup) {
+        for (Component c : popup.getComponents()) {
+            if (c instanceof JPopupMenu.Separator) {
+                c.setForeground(ClassicDialog.BORDER_HI);
+                c.setBackground(ClassicDialog.BORDER_LO);
+            }
         }
     }
 
@@ -1281,9 +1306,10 @@ public class ClassicGUI extends GUI {
      * every {@code JPanel}, which would override the classic map's black fog and
      * the dark info panel.  The reused {@link InGameMenuBar} paints its own
      * parchment background + wood border regardless of the active L&F, so the top
-     * bar still reads classic; only the dropdown popups fall back to the default
-     * Swing styling (acceptable for this stopgap).  All guarded so a failure just
-     * leaves the default look rather than aborting startup.
+     * bar still reads classic; the dropdown popups get the Phase-3 wood/green
+     * reskin instead (see {@link #installClassicMenuDropdownDefaults}).  All
+     * guarded so a failure just leaves the default look rather than aborting
+     * startup.
      */
     @Override
     public void installLookAndFeel(String fontName) throws FreeColException {
@@ -1294,6 +1320,73 @@ public class ClassicGUI extends GUI {
                 + "failed.", e);
         }
         FontLibrary.createMainFont(fontName);
+        installClassicMenuDropdownDefaults();
+    }
+
+    /**
+     * Reskin the reused {@link InGameMenuBar}'s dropdown popups — still stock
+     * Swing look, per {@link #styleClassicMenuBar}'s Javadoc — to {@link
+     * ClassicDialog}'s wood-framed, green-on-wood palette (the same guess its
+     * Javadoc already flags for the expert's Q3 sign-off; extending it here adds
+     * no new risk).
+     *
+     * <p>Installed as {@code UIManager} <em>defaults</em>, once, here — before
+     * {@link #reconnectGUI} ever builds the {@code InGameMenuBar} — rather than
+     * restyling the {@code JMenuItem}s after the fact: every item/popup then picks
+     * these up as its own built-in colours at construction, Swing's normal
+     * hover/disabled painting comes along for free, and the real
+     * {@code FreeColAction}s, accelerators and {@code updateActions()} wiring
+     * stay untouched (nothing here replaces the menu structure).
+     *
+     * <p>{@code FreeColMenuBar.getMenuItem()} (shared with {@code SwingGUI}, so
+     * not ours to change) leaves every item {@code setOpaque(false)}. Live-testing
+     * (screenshotting each open dropdown) showed what that actually buys: Swing's
+     * {@code BasicMenuItemUI.paintBackground} skips its own-background fill for
+     * the *idle* state when non-opaque — so idle items show no separate
+     * rectangle at all and sit directly on the popup's wood fill underneath — but
+     * still unconditionally paints the *armed/hover* fill regardless of opaque
+     * (an asymmetry easy to get backwards from reading the source alone, which
+     * is why this was checked live rather than left as a guess). So
+     * {@code selectionBackground} is not dead weight the way idle
+     * {@code background} would be: without overriding it, hovering paints the
+     * platform L&F's own default (a jarring blue), which is why it is set below
+     * to {@link ClassicDialog}'s {@code BTN_BG} — deliberately its darker plate
+     * tone, not {@code BTN_HOT} (identical to {@code WOOD_FALLBACK} and so
+     * invisible against the popup's own fill). The popup itself is unaffected by
+     * any of this — {@code BasicPopupMenuUI} forces {@code JPopupMenu} opaque
+     * regardless — so its wood fill and bevelled border always render.
+     *
+     * <p>Safe process-wide for the same reason as
+     * {@link #remapClassicReportAccelerators}: {@code --classic} selects
+     * {@code ClassicGUI} for the whole process, and only the
+     * {@code MenuItem}/{@code CheckBoxMenuItem}/{@code RadioButtonMenuItem}/
+     * {@code PopupMenu}/{@code Separator} keys are touched — the still-Swing
+     * choice/input dialog stopgaps ({@code JOptionPane}, Phase 3 §1) read
+     * different keys, so this cannot bleed into them.
+     */
+    private void installClassicMenuDropdownDefaults() {
+        for (String prefix : new String[]
+                { "MenuItem", "CheckBoxMenuItem", "RadioButtonMenuItem" }) {
+            UIManager.put(prefix + ".foreground", ClassicDialog.TEXT_FG);
+            UIManager.put(prefix + ".selectionForeground", ClassicDialog.BTN_FG);
+            UIManager.put(prefix + ".selectionBackground", ClassicDialog.BTN_BG);
+            UIManager.put(prefix + ".disabledForeground", ClassicDialog.COUNT_FG);
+            UIManager.put(prefix + ".acceleratorForeground", ClassicDialog.TEXT_FG);
+            UIManager.put(prefix + ".acceleratorSelectionForeground",
+                          ClassicDialog.BTN_FG);
+        }
+        UIManager.put("PopupMenu.background", ClassicDialog.WOOD_FALLBACK);
+        UIManager.put("PopupMenu.border", BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ClassicDialog.BORDER_HI, 2),
+            BorderFactory.createLineBorder(ClassicDialog.BORDER_LO, 1)));
+        // Both eras of the separator-colour key: which one a JSeparator's UI
+        // delegate actually reads varies by JDK version, and the per-instance
+        // fallback in styleClassicMenuBar covers whichever this turns out not
+        // to be.
+        UIManager.put("Separator.foreground", ClassicDialog.BORDER_HI);
+        UIManager.put("Separator.background", ClassicDialog.BORDER_LO);
+        UIManager.put("PopupMenu.separatorForeground", ClassicDialog.BORDER_HI);
+        UIManager.put("PopupMenu.separatorBackground", ClassicDialog.BORDER_LO);
     }
 
     // Image libraries
