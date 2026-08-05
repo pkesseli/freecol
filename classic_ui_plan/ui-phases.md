@@ -21,6 +21,7 @@ phase item linked; this list is just the queue to take to him.
 | **Q4** | **Reference shots for the choice-list and text-input popups**, whose original look we have never seen. | [Phase 3 §1](#remaining-1) | Cannot start; they stay Swing stopgaps. |
 | **Q5** | **The colony screen's fixed building ground-slots** — the original places buildings at set positions; we flow-layout them. | [Phase 2 §3](#remaining) | Rework of the biggest remaining slice. |
 | **Q6** | **Four shipped reports — Military, Production, Exploration, Cargo — have no confirmed Col1 counterpart** at all (see Resolved below); "Military Garrison" may just be the Colony Advisor's own paging, not a standalone report. **Concretely blocking now:** remapping Naval to its confirmed key F7 collides with Military, which already sits there and which this plan does not touch unilaterally — both menu items show "F7" today but only one responds (verified live). Should any of the four be reworked, re-keyed, or removed? | Key-scheme remap (`ClassicGUI.remapClassicReportAccelerators`); README "Report screens" | Guessing wrong either reworks a report the original never had, or leaves a live, user-visible key collision unresolved. |
+| **Q7** | **Land-land tile borders render as flat, unblended rectangles.** `ClassicTileArt`/`ClassicMapViewer` only feather the ocean↔land coast (`paintCoast`, `PHYS0.SS` 108–139); two adjacent land tiles of different `TileType` get zero blending, so a bare tile (e.g. Prairie, no forest/hill overlay) is a perfectly flat, hard-edged square against its neighbours — live-confirmed by clicking through `--classic` (`screenshots/ui-square-tiles-bug.png`), not explained by forest connectivity/sparse-canopy (a red herring chased first — see the README's "Known gap" note). No original reference shot (`opening_007.png`, `opening_008.png`, …) ever shows this. Every extracted `.SS` archive was checked for a land-land border/transition sheet analogous to the coast quarter-tiles — none exists — so if the original genuinely blends land-land edges, it isn't via sprite lookup and the mechanism is unconfirmed. | [Phase 1](#phase-1--the-map-) | Guessing wrong either ships a large feature (procedural cross-fade, or new border art) the original may never have needed, or leaves visibly wrong terrain the expert will immediately flag. |
 
 **All five go to him together, in one sitting** — see the
 [milestone note](#milestone-ready-for-the-experts-first-playtest) below for why this is now a bundled
@@ -86,13 +87,15 @@ for — no point guessing at them again solo.
 `ClassicGUI extends GUI`, `--classic` flag, selector, auto-launch lobby stopgap.
 (README "What this is".)
 
-## Phase 1 — the map ✅
+## Phase 1 — the map ✅ (land-land tile-border blending open — Q7)
 
 Rectangular 48px grid: `TERRAIN.SS` terrain, `PHYS0.SS` feature overlays + coast/beach feathering,
 `ICONS.SS` unit/goods/settlement sprites, edge-pan, minimap, clicks/keys driving the real
 `InGameController`, and **turn controls** (Enter/Space/W/B, the 1994 key scheme).
 (README "`ClassicMapViewer`".) Frame maps + RE writeups live in `ClassicTileArt`,
-`aliases.properties`, and the README.
+`aliases.properties`, and the README. **Gap found 2026-07-27:** coast feathering blends
+ocean↔land, but two adjacent land tiles of different type never blend — see
+[Q7](#open-questions-for-the-expert) and the README's "Known gap" note.
 
 ## Phase 2 — HUD & core screens 🔨
 
