@@ -20,8 +20,9 @@ Two independent axes (keep them separate):
 
 ### [UI phases](classic_ui_plan/ui-phases.md) — our `ClassicGUI` build-out, phase by phase
 
-Phase 0 scaffold ✅ · Phase 1 map ✅ (land-land tile-border blending open, see
-[Q7](classic_ui_plan/ui-phases.md#open-questions-for-the-expert)) · **Phase 2 HUD & core screens 🔨** — the map HUD, colony and
+Phase 0 scaffold ✅ · Phase 1 map ✅ (land-land tile-border blending open — **highest
+priority, see [land-tile-borders.md](classic_ui_plan/land-tile-borders.md) for the
+bug + recommended fix + acceptance criteria**) · **Phase 2 HUD & core screens 🔨** — the map HUD, colony and
 Europe screens ship, and the **report set is now complete**: all twelve (the original ten, plus
 Labour and Foreign Affairs — both reversed-in/built 2026-07-24), keyed to the *observed* original
 F-key scheme rather than FreeCol's own arbitrary one (in-memory remap only, see
