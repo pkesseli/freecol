@@ -340,10 +340,39 @@ without repeating tile-to-tile like the matrix did) against `BORDER_DENSITY`
 (`0.45`, tapering to 0 over `BORDER_BAND` rows), roughly halving the blended-pixel
 count versus the matrix version and breaking up the regular grid look. Only a land
 tile's own cached terrain image copy is touched (`copyImage`); `paintCoast` and the
-overlay compositing are untouched. Verified live against
-`screenshots/ui-square-tiles-fixed.png`/`-crop.png` at the same map location as the
-original bug capture, with coastline feathering, forest/hill overlays and the
-composited tree canopy all rendering unchanged on top of the blended base. See
+overlay compositing are untouched.
+
+**Extended to the land side of coastlines too.** The expert also flagged that a
+coastline still looked wrong even after the above: `paintCoast`'s quarter-tiles
+feather the *water* tile with a fixed beach/foam sprite regardless of which land
+type it borders, but the **land** tile's own edge got no treatment at all (it was
+explicitly excluded — `blendLandBorders` originally required the neighbour to be
+land), so it still ended in a hard square against the water. `blendLandBorders` now
+blends against *any* differently-typed neighbour, water included, so the land tile's
+edge also softens toward the water's colour — complementary to, not a replacement
+for, `paintCoast`'s existing water-side feathering.
+
+That surfaced a real, previously-latent bug: `ditherEdge` indexed the neighbour
+image using the *tile's own* width/height, silently assuming every neighbour sprite
+comes back the size requested. `ImageLibrary.getTerrainImage` only honours that
+request when the source sprite's aspect ratio already matches it —
+`ImageUtils.wildcardDimension` otherwise preserves the *source's* aspect ratio to
+avoid distorting it — which every square `TERRAIN.SS` land frame happens to satisfy,
+but water's source art does not, so a water neighbour's returned image is a
+different (non-16×16) shape. Reading it with the land tile's own indices threw
+`ArrayIndexOutOfBoundsException` on every repaint once a land tile was next to
+water (i.e. immediately, on any coastal tile) — caught by
+`FreeColClient`'s uncaught-exception handler, so the process didn't crash outright,
+but the map view never advanced past its "waiting for the game" placeholder text.
+Caught live (`FreeCol.log`), not by inspection. Fixed by having `ditherEdge` read
+`neighbour`'s own width/height: the along-edge axis is scaled proportionally into
+the neighbour's span and the depth axis clamped into it, so a differently-shaped
+neighbour degrades to a coarser sample instead of an out-of-bounds read.
+
+Verified live against `screenshots/ui-square-tiles-fixed.png`/`-crop.png`/`-coast.png`
+at the same map location as the original bug capture, with coastline feathering,
+forest/hill overlays and the composited tree canopy all rendering unchanged on top
+of the blended base, and 0 uncaught exceptions in `FreeCol.log` for the session. See
 [land-tile-borders.md](../../../../../../../classic_ui_plan/land-tile-borders.md) for
 the original bug writeup and
 [Q7, Resolved](../../../../../../../classic_ui_plan/ui-phases.md#open-questions-for-the-expert).

@@ -780,13 +780,16 @@ final class ClassicMapViewer extends JPanel {
 
     /**
      * Blend a {@link #BORDER_BAND}-pixel-wide dithered band into {@code terrain}
-     * along each raw-grid edge that faces a land neighbour of a <em>different</em>
-     * {@link net.sf.freecol.common.model.TileType}, so a land-land boundary reads
-     * as organic dithering rather than the flat rectangular edge two differently-
-     * coloured base textures otherwise produce (see
-     * {@code classic_ui_plan/land-tile-borders.md}, Q7). Ocean&harr;land coasts are
-     * unaffected -- those are already feathered by
-     * {@link ClassicTileArt#paintOverlays}.
+     * along each raw-grid edge that faces a neighbour of a <em>different</em>
+     * {@link net.sf.freecol.common.model.TileType} -- land or water -- so a
+     * land-land boundary reads as organic dithering rather than the flat
+     * rectangular edge two differently-coloured base textures otherwise
+     * produce (see {@code classic_ui_plan/land-tile-borders.md}, Q7), and so
+     * the land side of a coastline softens toward the water's own colour
+     * instead of ending in a hard square. This is independent of, and drawn
+     * before, {@link ClassicTileArt#paintOverlays}'s coast quarter-tiles
+     * (which feather the <em>water</em> side of the same boundary) -- the two
+     * are complementary, each softening their own side of the edge.
      *
      * @return {@code terrain} unchanged when {@code tile} is not land or no
      *     neighbour needs blending (the common case, kept cheap); otherwise a
@@ -799,8 +802,7 @@ final class ClassicMapViewer extends JPanel {
             final int nx = tile.getX() + edge[0];
             final int ny = tile.getY() + edge[1];
             final Tile neighbour = map.getTile(nx, ny);
-            if (neighbour == null || !neighbour.isLand()
-                || neighbour.getType() == tile.getType()) {
+            if (neighbour == null || neighbour.getType() == tile.getType()) {
                 continue;
             }
             final BufferedImage neighbourImg =
@@ -847,10 +849,22 @@ final class ClassicMapViewer extends JPanel {
      * seeded by the tile's world position {@code (tileX, tileY)} so adjacent
      * boundaries don't repeat the same pattern) with density falling off over
      * {@link #BORDER_BAND} native pixels from the shared edge.
+     *
+     * <p>{@code neighbour} is <em>not</em> assumed to share {@code img}'s
+     * dimensions: {@link ImageLibrary#getTerrainImage} only honours the
+     * requested size when the source sprite's aspect ratio already matches
+     * it ({@code ImageUtils.wildcardDimension} otherwise preserves the
+     * source's own aspect ratio to avoid distortion) -- true for every
+     * square {@code TERRAIN.SS} land frame, but not guaranteed for water,
+     * whose source art need not be square. The along-edge axis is scaled
+     * proportionally into {@code neighbour}'s own span and the depth axis is
+     * clamped into it, so an odd-shaped neighbour degrades to a coarser
+     * sample rather than an out-of-bounds read.
      */
     private static void ditherEdge(BufferedImage img, BufferedImage neighbour,
                                    int tileX, int tileY, int dx, int dy) {
         final int w = img.getWidth(), h = img.getHeight();
+        final int nw = neighbour.getWidth(), nh = neighbour.getHeight();
         final int span = (dx != 0) ? h : w;
         for (int row = 0; row < BORDER_BAND; row++) {
             final float density = BORDER_DENSITY * (BORDER_BAND - row) / BORDER_BAND;
@@ -858,14 +872,14 @@ final class ClassicMapViewer extends JPanel {
                 final int ox, oy, nxp, nyp;
                 if (dx != 0) {
                     oy = i;
-                    nyp = i;
-                    if (dx < 0) { ox = row;         nxp = w - 1 - row; }
-                    else        { ox = w - 1 - row; nxp = row;         }
+                    nyp = Math.min(nh - 1, i * nh / h);
+                    if (dx < 0) { ox = row;         nxp = Math.max(0, nw - 1 - row); }
+                    else        { ox = w - 1 - row; nxp = Math.min(nw - 1, row);      }
                 } else {
                     ox = i;
-                    nxp = i;
-                    if (dy < 0) { oy = row;         nyp = h - 1 - row; }
-                    else        { oy = h - 1 - row; nyp = row;         }
+                    nxp = Math.min(nw - 1, i * nw / w);
+                    if (dy < 0) { oy = row;         nyp = Math.max(0, nh - 1 - row); }
+                    else        { oy = h - 1 - row; nyp = Math.min(nh - 1, row);      }
                 }
                 final int gx = tileX * TILE_SRC + ox, gy = tileY * TILE_SRC + oy;
                 if (hashNoise(gx, gy) >= density) continue;
