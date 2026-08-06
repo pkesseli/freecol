@@ -216,13 +216,19 @@ round 4 — both unaffected. The "tan blob" visible near the coast in earlier sc
 a fish resource marker (matches the original's own jumping-fish sprite in `opening_007.png` almost
 exactly), not a related bug.
 
-### State at hand-off
+### State at hand-off — IMPROVED BUT NOT APPROVED, expert feedback pending
 
-Resolved and verified live. `screenshots/ui-square-tiles-fixed*.png` need a fresh capture with the foam
-fix (round 4's captures predate this change); the classic README's "Coastline (beach feathering)" and
-"Land/land tile borders" sections were rewritten to describe the removal and the new procedural water
-side. Open follow-up, not blocking: diagonal-only neighbours (a land tile touching water only at a
-corner) get no foam treatment from `blendWaterBorders`, which only checks the four cardinal offsets —
-the original's coast frames handled diagonal corners via `COAST_CORNERS`' config bit 2, so a concave
-coastline corner may still read as slightly under-treated on the water side. Not checked live this
-round; worth a screenshot of a concave corner before calling the water side fully done.
+**Do not mark this resolved.** Committed and pushed (`214a7e8ba`) with `screenshots/ui-square-tiles-
+fixed*.png` refreshed against the foam fix, and the classic README's "Coastline (beach feathering)" and
+"Land/land tile borders" sections rewritten to describe the removal and the new procedural water side.
+The expert's reaction to the live result: **"Looks better" — but explicitly "we are not done"**, with
+further feedback flagged as coming but not yet given in the session that made this fix. Whoever resumes
+should treat round 5 as a real improvement over the green-flecked frames, not as the end state, and
+should check in for that feedback (or read it above this section, if it was appended after this hand-off
+note was written) before doing further tuning from first principles.
+
+Known open follow-up, not blocking but also not yet checked, and a plausible source of further feedback:
+diagonal-only neighbours (a land tile touching water only at a corner) get no foam treatment from
+`blendWaterBorders`, which only checks the four cardinal offsets — the original's coast frames handled
+diagonal corners via `COAST_CORNERS`' config bit 2, so a concave coastline corner may still read as
+under-treated on the water side. Not checked live in round 5; worth a screenshot of a concave corner.
