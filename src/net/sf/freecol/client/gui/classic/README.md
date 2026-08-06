@@ -329,13 +329,20 @@ base terrain is fetched and before `ClassicTileArt.paintOverlays` composites the
 feature layer, checks each raw-grid cardinal neighbour for land of a *different*
 `TileType` and, where true, replaces a `BORDER_BAND`-pixel-wide band along that edge
 (in native 16×16 sprite space, before the ×3 `CLASSIC_SCALE` up-scale) with the
-mirrored pixel from the neighbour's own base texture, using a 2×2 Bayer ordered
-dither (`ditherEdge`) whose density falls off with distance from the edge — matching
-the existing `TERRAIN.SS` sprites' own 2-colour-dither pixel-art look rather than a
-smooth alpha gradient. Only a land tile's own cached terrain image copy is touched
-(`copyImage`); `paintCoast` and the overlay compositing are untouched. Verified live
-against `screenshots/ui-square-tiles-fixed.png`/`-crop.png` at the same map location
-as the original bug capture, with coastline feathering, forest/hill overlays and the
+mirrored pixel from the neighbour's own base texture. **Which pixels blend is
+noise-selected, not an ordered dither:** the first cut used a 2×2 Bayer matrix, but
+side-by-side comparison against the expert's reference shots showed the original's
+land borders as sparse, uneven speckling — a small repeating matrix instead read as
+a visibly regular checkerboard band, denser and more uniform than the reference.
+`ditherEdge` now gates each candidate pixel on `hashNoise` (a cheap integer hash of
+its *world* pixel coordinate, so the scatter is stable across repaints — no flicker —
+without repeating tile-to-tile like the matrix did) against `BORDER_DENSITY`
+(`0.45`, tapering to 0 over `BORDER_BAND` rows), roughly halving the blended-pixel
+count versus the matrix version and breaking up the regular grid look. Only a land
+tile's own cached terrain image copy is touched (`copyImage`); `paintCoast` and the
+overlay compositing are untouched. Verified live against
+`screenshots/ui-square-tiles-fixed.png`/`-crop.png` at the same map location as the
+original bug capture, with coastline feathering, forest/hill overlays and the
 composited tree canopy all rendering unchanged on top of the blended base. See
 [land-tile-borders.md](../../../../../../../classic_ui_plan/land-tile-borders.md) for
 the original bug writeup and

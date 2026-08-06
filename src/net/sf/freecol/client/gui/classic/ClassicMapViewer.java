@@ -103,15 +103,14 @@ final class ClassicMapViewer extends JPanel {
     private static final int BORDER_BAND = 3;
 
     /**
-     * 2&times;2 Bayer ordered-dither matrix, normalised to {@code [0,1)}.
-     * The terrain sprites are themselves flat 2-colour dithers, so an ordered
-     * dither -- rather than a smooth alpha gradient -- keeps a blended edge
-     * consistent with that pixel-art look.
+     * Probability a pixel right at the shared edge blends toward the
+     * neighbour, tapering linearly to 0 over {@link #BORDER_BAND} rows.
+     * Kept deliberately low -- the reference original renders land-land
+     * borders as sparse, uneven speckling, not a dense band -- see
+     * {@link #hashNoise} for why the pattern is per-pixel noise rather than
+     * a small repeating ordered-dither matrix.
      */
-    private static final float[][] BAYER2 = {
-        { 0f / 4f, 2f / 4f },
-        { 3f / 4f, 1f / 4f },
-    };
+    private static final float BORDER_DENSITY = 0.45f;
 
     /** Raw-grid cardinal offsets checked for a land-land border blend. */
     private static final int[][] BORDER_EDGES = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
@@ -808,7 +807,7 @@ final class ClassicMapViewer extends JPanel {
                 this.lib.getTerrainImage(neighbour.getType(), nx, ny, SRC_SIZE);
             if (neighbourImg == null) continue;
             if (blended == null) blended = copyImage(terrain);
-            ditherEdge(blended, neighbourImg, edge[0], edge[1]);
+            ditherEdge(blended, neighbourImg, tile.getX(), tile.getY(), edge[0], edge[1]);
         }
         return (blended != null) ? blended : terrain;
     }
@@ -824,18 +823,37 @@ final class ClassicMapViewer extends JPanel {
     }
 
     /**
-     * Replace an ordered-dither subset of the pixels along the edge of
+     * Deterministic pseudo-random value in {@code [0,1)} for the pixel at
+     * world-space native coordinate {@code (x, y)}. Stable across repaints
+     * (no flicker), but -- unlike a small repeating ordered-dither matrix
+     * such as a 2&times;2 Bayer pattern -- does not read as a regular grid,
+     * and is seeded per <em>world</em> pixel rather than per in-tile
+     * position, so different tile boundaries scatter differently instead of
+     * all looking stamped from the same template (see {@link #ditherEdge}).
+     */
+    private static float hashNoise(int x, int y) {
+        int h = x * 0x27d4eb2d ^ y * 0x165667b1;
+        h = (h ^ (h >>> 15)) * 0x85ebca6b;
+        h = (h ^ (h >>> 13)) * 0xc2b2ae35;
+        h ^= (h >>> 16);
+        return (h & 0x7fffffff) / (float) 0x7fffffff;
+    }
+
+    /**
+     * Replace a sparse, noise-selected subset of the pixels along the edge of
      * {@code img} facing raw-grid offset {@code (dx, dy)} with the mirrored
-     * pixel from {@code neighbour}, so the blend both reads as the neighbour's
-     * actual (dithered) texture and its density falls off with distance from
-     * the shared edge over {@link #BORDER_BAND} native pixels.
+     * pixel from {@code neighbour}, so the blend reads as the neighbour's
+     * actual (dithered) texture, scattered unevenly (via {@link #hashNoise},
+     * seeded by the tile's world position {@code (tileX, tileY)} so adjacent
+     * boundaries don't repeat the same pattern) with density falling off over
+     * {@link #BORDER_BAND} native pixels from the shared edge.
      */
     private static void ditherEdge(BufferedImage img, BufferedImage neighbour,
-                                   int dx, int dy) {
+                                   int tileX, int tileY, int dx, int dy) {
         final int w = img.getWidth(), h = img.getHeight();
         final int span = (dx != 0) ? h : w;
         for (int row = 0; row < BORDER_BAND; row++) {
-            final float density = (BORDER_BAND - row) / (float) (BORDER_BAND + 1);
+            final float density = BORDER_DENSITY * (BORDER_BAND - row) / BORDER_BAND;
             for (int i = 0; i < span; i++) {
                 final int ox, oy, nxp, nyp;
                 if (dx != 0) {
@@ -849,7 +867,8 @@ final class ClassicMapViewer extends JPanel {
                     if (dy < 0) { oy = row;         nyp = h - 1 - row; }
                     else        { oy = h - 1 - row; nyp = row;         }
                 }
-                if (BAYER2[oy & 1][ox & 1] >= density) continue;
+                final int gx = tileX * TILE_SRC + ox, gy = tileY * TILE_SRC + oy;
+                if (hashNoise(gx, gy) >= density) continue;
                 img.setRGB(ox, oy, neighbour.getRGB(nxp, nyp));
             }
         }
