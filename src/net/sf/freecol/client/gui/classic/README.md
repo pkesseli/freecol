@@ -279,32 +279,30 @@ map-fidelity slice, and its crux was **asset shape, not code**:
   via a reconnect the classic UI does not fully reload), so inland features are
   reached by sailing rather than revealed.
 
-**Coastline (beach feathering).** On top of the base ocean, `paintOverlays`
-also feathers the land/water border for every **water** cell (`!tile.isLand()`)
-with the original `PHYS0.SS` coast quarter-tiles, so borders blend like Col1
-instead of showing a hard edge. The crux was again asset RE:
+**Coastline (beach feathering) — replaced with a procedural foam blend
+(2026-08-06), no longer sprite-based.** The water side of the coastline was
+originally fed by the original game's own `PHYS0.SS` coast quarter-tiles (32
+8×8 sprites, `4 corners × 8 configs`, one drawn per cell quadrant based on
+which raw-grid neighbours were land — see git history prior to this change for
+the full decode: frame layout, the black colour-key transparency quirk, the
+`COAST_CORNERS` per-corner offset table). That reverse-engineering was real,
+but a live side-by-side comparison against the actual reference screenshots
+(`screenshots/initial/opening_007.png`) found the *extracted* frames render a
+scattered green fleck along the wave crest that the original never shows — it
+draws a clean, fairly desaturated grey/white foam fringe hugging the coast
+instead. That's a likely palette/extraction fidelity issue in the asset pack
+rather than a bug in the compositing code (confirmed live: short-circuiting
+the land-side blend entirely left the green fleck pixel-for-pixel unchanged,
+proving it wasn't coming from this package's own blending logic).
 
-- **32 8×8 quarter-tiles, frames `108..139`** — `4 corners × 8 configs` laid out
-  `frame = 108 + config*4 + corner`, corner clockwise `NW=0, NE=1, SE=2, SW=3`.
-  One sub-tile is drawn per cell quadrant; for a given corner the two orthogonal
-  neighbours bounding it and the diagonal neighbour select the config:
-  `config = (ccwEdgeLand?1) | (diagLand?2) | (cwEdgeLand?4)` (verified
-  rotationally consistent across all four corners — config 1 = the
-  counter-clockwise edge neighbour is land, 4 = the clockwise edge, 2 = a
-  diagonal-only neighbour draws a light coastal-water wedge, 0 = open ocean draws
-  nothing). The per-corner neighbour offsets live in `COAST_CORNERS`.
-- **Two decode quirks masked the scheme in earlier recon:** (i) these frames
-  encode transparency as **opaque black** (a colour-key, index 0) rather than the
-  `0xFD` alpha the other sets use — so `108..111` ("empty") are config 0; (ii)
-  `116..119`'s "water but no land" are config 2, the diagonal-only coastal-water
-  wedges. The decoder leaves that colour-key black **opaque**, so
-  `ClassicTileArt.frame` keys pure black out to alpha 0 when it loads a coast
-  frame (`keyOutBlack`, cached) — otherwise plain `drawImage` would paint the
-  black regions as opaque wedges over the sea along every coastline. With the
-  black keyed out the base ocean shows through and `paintCoast` just draws the
-  8×8 sub-tile into its quadrant.
-- **Not yet wired:** the estuary/river-mouth pieces — `140..147` (ocean
-  corner-hints) and `150..153` (diagonal sand strips). Deferred (river mouths).
+Rather than ship a fringe that doesn't match the source material, `paintCoast`
+and its supporting `COAST_CORNERS`/`COAST_BASE`/`COAST_LAST`/`keyOutBlack`
+were removed from `ClassicTileArt`, and the water side of the coastline is now
+painted procedurally by `ClassicMapViewer.blendWaterBorders`/`foamEdge` — the
+same call Q7 already made for the land side once it turned out there was no
+faithful land-land border sprite to source either (see below). The
+estuary/river-mouth pieces (`140..147` ocean corner-hints, `150..153` diagonal
+sand strips) were never wired regardless of this change.
 
 **Land/land and land/water tile borders — dithered edge-blend (Q7, fixed
 2026-08-05, retuned through 2026-08-06).** `paintCoast` only ever ran for water
@@ -331,8 +329,10 @@ feature layer, checks each raw-grid cardinal neighbour for land of a *different*
 `TileType` (or water) and, where true, replaces up to a `BORDER_BAND`-pixel-wide band
 along that edge (in native 16×16 sprite space, before the ×3 `CLASSIC_SCALE`
 up-scale) with the mirrored pixel from the neighbour's own base texture. Only a land
-tile's own cached terrain image copy is touched (`copyImage`); `paintCoast` and the
-overlay compositing are untouched.
+tile's own cached terrain image copy is touched (`copyImage`); the overlay
+compositing is untouched (the water-side coastline mechanism this paragraph
+originally cross-referenced, `paintCoast`, no longer exists — see "Coastline
+(beach feathering)" above).
 
 **Two blend mechanisms, not one — split by how forgiving the colour contrast is.**
 `blendLandBorders` branches on `neighbour.isLand()`:
@@ -383,15 +383,38 @@ overlay compositing are untouched.
   clamps the depth axis into it, so an odd-shaped neighbour degrades to a coarser
   sample instead of an out-of-bounds read.
 
+**Water side — `blendWaterBorders`/`foamEdge` (2026-08-06).** Mirrors the land
+side's `blendLandBorders`, called from the same `paintTile` step for water
+tiles instead: for each raw-grid cardinal neighbour that is land,
+`foamEdge` blends the sampled foam colour (`FOAM_R`/`FOAM_G`/`FOAM_B`, `(150,
+155, 160)`, sampled directly from the coastline in
+`screenshots/initial/opening_007.png`) into the water tile's own edge pixels,
+peaking at `FOAM_MAX_ALPHA` (`0.6`) right at the shared edge and tapering to 0
+over `FOAM_BAND` (`2`) native pixels — narrower than the land side's
+`BORDER_BAND`, matching how thin the original's own fringe reads at native
+resolution. Unlike the land-side blends, this **alpha-blends over** the
+existing water pixel rather than replacing it outright: there is no neighbour
+art to stay faithful to (a water tile has no land-coloured pixels worth
+sampling), so lightening the existing water colour reads as a foam highlight
+sitting on top of it, the same way the original's fringe looks like
+whitecaps over water rather than a distinct layer. A per-pixel `hashNoise`
+factor varies the alpha (within `0.7×`–`1.0×` of the row's peak) so the line
+reads as an uneven natural highlight instead of a ruler-straight stripe;
+unlike `blendCoastEdge`'s land-side incursion, there's no "flooded" failure
+mode to guard against here — a lighter-than-usual water pixel never reads as
+an isolated hole — so `foamEdge` has no gap/depth machinery, just a
+continuous line of varying intensity.
+
 Verified live against `screenshots/ui-square-tiles-fixed.png`/`-crop.png`/`-coast.png`
 at the same map location as the original bug capture: coastline feathering,
 forest/hill overlays and the composited tree canopy all render unchanged on top of
 the blended base, land-land dithering still reads as the same sparse, approved
-speckling, the land/water boundary is a continuous line with no isolated pixels, and
+speckling, the land/water boundary is a continuous line with no isolated pixels, the
+water-side foam line reads clean with no green fleck, and
 0 uncaught exceptions in `FreeCol.log` for the session. See
 [land-tile-borders.md](../../../../../../../classic_ui_plan/land-tile-borders.md) for
 the full history (including the round-by-round expert feedback that produced the
-split-mechanism design) and
+split-mechanism design and the coast-frame removal) and
 [Q7, Resolved](../../../../../../../classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
 
 ## Phase 2 HUD (menu bar + info/orders panel)

@@ -65,26 +65,20 @@ import net.sf.freecol.common.resources.ResourceManager;
  *       resource markers {@code 89..102}.</li>
  * </ul>
  *
- * <h2>Coastline (frames {@code 108..139})</h2>
- * The 1994 game feathered the ocean&harr;land border with 32 small <b>8&times;8
- * quarter-tiles</b> composited onto the four quadrants of each <em>water</em>
- * cell — {@code 4 corners &times; 8 configs} laid out as
- * {@code frame = 108 + config*4 + corner}, with {@code corner} clockwise
- * {@code NW=0, NE=1, SE=2, SW=3}.  For a given corner the two orthogonal
- * neighbours bounding it and the diagonal neighbour select the sub-tile:
- * {@code config = (ccwEdgeLand?1) | (diagLand?2) | (cwEdgeLand?4)} — verified
- * rotationally consistent across all four corners (config&nbsp;1 = the
- * counter-clockwise edge neighbour is land, config&nbsp;4 = the clockwise edge,
- * config&nbsp;2 = a diagonal-only neighbour draws a light coastal-water wedge,
- * config&nbsp;5 = both edges land form an inlet, config&nbsp;0 = open ocean,
- * nothing drawn).  Unlike the directional sets (which mark transparency with the
- * {@code 0xFD} alpha index the decoder honours), this set encodes its transparent
- * regions as an <b>opaque-black colour-key</b> that the decoder leaves opaque, so
- * {@link #frame} keys that black out to alpha&nbsp;0 on load (see
- * {@link #keyOutBlack}); the base ocean tile then shows through and the
- * quarter-tiles composite cleanly.  The estuary/river-mouth pieces
- * ({@code 140..147} ocean corner-hints, {@code 150..153} diagonal sand strips)
- * are not yet wired.
+ * <h2>Coastline — no longer sourced from frames {@code 108..139}</h2>
+ * The 1994 game's own coast quarter-tiles were originally re-implemented here
+ * (32 small 8&times;8 sprites, {@code 4 corners &times; 8 configs}, composited
+ * onto the four quadrants of each water cell). Live comparison against the
+ * original reference screenshots (see {@code screenshots/initial/}) found the
+ * <em>extracted</em> frames render a scattered green fleck along the wave crest
+ * that the original never shows (a clean grey/white foam fringe instead) — a
+ * likely palette/extraction fidelity issue in the asset pack, not a rendering
+ * bug in this class. Rather than ship a fringe that doesn't match the source
+ * material, the water side of the coastline is now painted procedurally, the
+ * same call made for the land side after Q7 found no faithful land-land border
+ * sprite either — see {@code ClassicMapViewer.blendWaterBorders}. The estuary/
+ * river-mouth pieces ({@code 140..147} ocean corner-hints, {@code 150..153}
+ * diagonal sand strips) were never wired regardless.
  *
  * <h2>Connectivity on the classic grid</h2>
  * Connectivity is computed from <em>raw-grid</em> neighbours (the tiles drawn
@@ -112,28 +106,6 @@ final class ClassicTileArt {
 
     private static final int LOST_CITY = 103;
     private static final int PLOWED = 149;
-
-    /** Base and last frame of the 32 coast/beach quarter-tiles ({@code 108..139}). */
-    private static final int COAST_BASE = 108;
-    private static final int COAST_LAST = 139;
-
-    /**
-     * Per-cell-quadrant coast data, one row per corner (clockwise):
-     * {@code {cornerIndex, qx, qy, e1dx,e1dy, ddx,ddy, e4dx,e4dy}} — the
-     * quadrant position ({@code qx,qy} in {@code {0,1}}), then the raw-grid
-     * offsets of the counter-clockwise edge (config bit&nbsp;1), the diagonal
-     * (bit&nbsp;2) and the clockwise edge (bit&nbsp;4) neighbours.
-     */
-    private static final int[][] COAST_CORNERS = {
-        // NW quad(0,0): ccwEdge=W, diag=NW, cwEdge=N
-        { 0, 0, 0, -1,  0, -1, -1,  0, -1 },
-        // NE quad(1,0): ccwEdge=N, diag=NE, cwEdge=E
-        { 1, 1, 0,  0, -1,  1, -1,  1,  0 },
-        // SE quad(1,1): ccwEdge=E, diag=SE, cwEdge=S
-        { 2, 1, 1,  1,  0,  1,  1,  0,  1 },
-        // SW quad(0,1): ccwEdge=S, diag=SW, cwEdge=W
-        { 3, 0, 1,  0,  1, -1,  1, -1,  0 },
-    };
 
     /** Connectivity bits (see the class comment): the frame is their sum. */
     private static final int E = 1, W = 2, S = 4, N = 8;
@@ -174,39 +146,9 @@ final class ClassicTileArt {
     private BufferedImage frame(int n) {
         if (n < 0 || n >= PHYS0_FRAMES) return null;
         if (this.frames[n] == null) {
-            BufferedImage img = ImageLibrary.getUnscaledImage(phys0Key(n));
-            // The coast quarter-tiles (108..139) encode their transparent regions
-            // as an opaque-black colour-key (index 0), not the 0xFD alpha the other
-            // PHYS0.SS sets use, so the decoder leaves them opaque.  Key that black
-            // out to alpha 0 here (once, cached) so the base ocean shows through
-            // when the quarter-tile is composited -- otherwise plain drawImage
-            // paints black wedges over the sea along every coastline.
-            if (img != null && n >= COAST_BASE && n <= COAST_LAST) {
-                img = keyOutBlack(img);
-            }
-            this.frames[n] = img;
+            this.frames[n] = ImageLibrary.getUnscaledImage(phys0Key(n));
         }
         return this.frames[n];
-    }
-
-    /**
-     * Return a copy of {@code src} with every fully-opaque pure-black pixel made
-     * transparent.  Used to honour the coast set's black colour-key without
-     * mutating the shared image cached by {@link ImageLibrary}.
-     */
-    private static BufferedImage keyOutBlack(BufferedImage src) {
-        final int w = src.getWidth(), h = src.getHeight();
-        final BufferedImage out =
-            new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                final int argb = src.getRGB(x, y);
-                // Opaque (alpha 0xFF) and pure black (RGB 0) -> fully transparent.
-                out.setRGB(x, y,
-                    ((argb >>> 24) == 0xFF && (argb & 0xFFFFFF) == 0) ? 0 : argb);
-            }
-        }
-        return out;
     }
 
     /** Draw a {@code PHYS0.SS} frame scaled to fill the cell at {@code (sx, sy)}. */
@@ -236,11 +178,13 @@ final class ClassicTileArt {
         final int x = tile.getX();
         final int y = tile.getY();
 
-        // Coastline: feather the border of a water cell with the 8x8 beach
-        // quarter-tiles wherever a neighbour is land (open ocean draws nothing).
-        if (!tile.isLand()) {
-            paintCoast(g, map, tile, sx, sy, w, h);
-        }
+        // Coastline feathering used to be drawn here from the extracted 8x8 beach
+        // quarter-tiles (frames 108..139); that mechanism was removed after live
+        // comparison against the original reference screenshots showed the
+        // extracted frames render a green-flecked fringe the original never had
+        // (a likely palette/extraction fidelity issue, not a rendering bug in this
+        // class). The water-side coastline is now handled procedurally instead --
+        // see ClassicMapViewer.blendWaterBorders.
 
         // Terrain relief: forest trees, or the hill/mountain massif.  These are
         // area features, so connectivity is over the four cardinal neighbours.
@@ -304,36 +248,6 @@ final class ClassicTileArt {
             g.drawImage(this.lib.getRiverImage(river.getStyle().getString(), size),
                         sx, sy, w, h, null);
         }
-    }
-
-
-    /**
-     * Composite the coastline for a water cell: for each of the four quadrants,
-     * pick the beach quarter-tile from its three raw-grid neighbours and draw it
-     * into that quadrant (open-ocean quadrants — config 0 — draw nothing).
-     */
-    private void paintCoast(Graphics2D g, Map map, Tile tile, int sx, int sy,
-                            int w, int h) {
-        final int x = tile.getX(), y = tile.getY();
-        final int halfW = w / 2, halfH = h / 2;
-        for (int[] c : COAST_CORNERS) {
-            int config = 0;
-            if (isLand(map, x + c[3], y + c[4])) config |= 1;   // ccw edge
-            if (isLand(map, x + c[5], y + c[6])) config |= 2;   // diagonal
-            if (isLand(map, x + c[7], y + c[8])) config |= 4;   // cw edge
-            if (config == 0) continue;
-            final int qx = sx + (c[1] == 0 ? 0 : halfW);
-            final int qy = sy + (c[2] == 0 ? 0 : halfH);
-            final int qw = (c[1] == 0 ? halfW : w - halfW);
-            final int qh = (c[2] == 0 ? halfH : h - halfH);
-            drawFrame(g, COAST_BASE + config * 4 + c[0], qx, qy, qw, qh);
-        }
-    }
-
-    /** True if the raw cell {@code (x, y)} exists and is land (not water). */
-    private boolean isLand(Map map, int x, int y) {
-        final Tile t = map.getTile(x, y);
-        return t != null && t.isLand();
     }
 
 

@@ -128,6 +128,30 @@ final class ClassicMapViewer extends JPanel {
      */
     private static final float COAST_GAP_PROBABILITY = 0.5f;
 
+    /**
+     * Approximate colour of the original's coastal foam/wave-crest fringe --
+     * sampled directly from the shoreline in {@code screenshots/initial/
+     * opening_007.png} (a fairly desaturated light grey, not a saturated
+     * white or blue), used by {@link #foamEdge} in place of the sprite-based
+     * coast quarter-tiles removed from {@link ClassicTileArt} (their
+     * extracted colours didn't match this).
+     */
+    private static final int FOAM_R = 150, FOAM_G = 155, FOAM_B = 160;
+
+    /**
+     * Depth, in native pixels, of the procedural foam blend on the water side
+     * of a coastline (see {@link #foamEdge}). Narrower than the land-side
+     * {@link #BORDER_BAND} -- sampled against the reference screenshot, the
+     * original's own foam fringe reads as a thin highlight, not a wide band.
+     */
+    private static final int FOAM_BAND = 2;
+
+    /**
+     * Peak alpha (right at the shared edge) of the foam blend, tapering to 0
+     * over {@link #FOAM_BAND} rows.
+     */
+    private static final float FOAM_MAX_ALPHA = 0.6f;
+
     /** Raw-grid cardinal offsets checked for a land-land border blend. */
     private static final int[][] BORDER_EDGES = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
 
@@ -776,7 +800,10 @@ final class ClassicMapViewer extends JPanel {
         final BufferedImage terrain = this.lib.getTerrainImage(
             tile.getType(), tile.getX(), tile.getY(), SRC_SIZE);
         if (terrain != null) {
-            g.drawImage(blendLandBorders(map, tile, terrain), sx, sy, TILE_W, TILE_H, null);
+            final BufferedImage blended = tile.isLand()
+                ? blendLandBorders(map, tile, terrain)
+                : blendWaterBorders(map, tile, terrain);
+            g.drawImage(blended, sx, sy, TILE_W, TILE_H, null);
         }
 
         // Composite the physical-feature overlays on top of the base terrain.
@@ -803,8 +830,8 @@ final class ClassicMapViewer extends JPanel {
      * produce (see {@code classic_ui_plan/land-tile-borders.md}, Q7), and so
      * the land side of a coastline softens toward the water's own colour
      * instead of ending in a hard square. This is independent of, and drawn
-     * before, {@link ClassicTileArt#paintOverlays}'s coast quarter-tiles
-     * (which feather the <em>water</em> side of the same boundary) -- the two
+     * before, {@link #blendWaterBorders} (which feathers the <em>water</em>
+     * side of the same boundary with a procedural foam highlight) -- the two
      * are complementary, each softening their own side of the edge.
      *
      * @return {@code terrain} unchanged when {@code tile} is not land or no
@@ -830,6 +857,36 @@ final class ClassicMapViewer extends JPanel {
             } else {
                 blendCoastEdge(blended, neighbourImg, tile.getX(), tile.getY(), edge[0], edge[1]);
             }
+        }
+        return (blended != null) ? blended : terrain;
+    }
+
+    /**
+     * Blend a soft foam highlight into {@code terrain} along each raw-grid
+     * edge of a <em>water</em> tile that faces land. Replaces the sprite-
+     * based coast quarter-tiles removed from {@link ClassicTileArt} (see its
+     * class comment): those extracted frames rendered a scattered green fleck
+     * along the wave crest that the real 1994 game never shows (compared
+     * directly against {@code screenshots/initial/opening_007.png}, which
+     * shows a clean, fairly desaturated grey/white foam fringe hugging the
+     * coast). Rather than ship a fringe that doesn't match the source
+     * material, this paints that fringe procedurally instead -- the same call
+     * Q7 already made for the land side after it turned out there was no
+     * faithful land-land border sprite to source either.
+     *
+     * @return {@code terrain} unchanged when {@code tile} is not water or no
+     *     neighbour is land; otherwise a new image.
+     */
+    private BufferedImage blendWaterBorders(Map map, Tile tile, BufferedImage terrain) {
+        if (tile.isLand()) return terrain;
+        BufferedImage blended = null;
+        for (int[] edge : BORDER_EDGES) {
+            final int nx = tile.getX() + edge[0];
+            final int ny = tile.getY() + edge[1];
+            final Tile neighbour = map.getTile(nx, ny);
+            if (neighbour == null || !neighbour.isLand()) continue;
+            if (blended == null) blended = copyImage(terrain);
+            foamEdge(blended, tile.getX(), tile.getY(), edge[0], edge[1]);
         }
         return (blended != null) ? blended : terrain;
     }
@@ -964,6 +1021,43 @@ final class ClassicMapViewer extends JPanel {
             for (int row = 0; row < depth; row++) {
                 final int[] c = edgeCoords(w, h, nw, nh, dx, dy, row, i);
                 img.setRGB(c[0], c[1], neighbour.getRGB(c[2], c[3]));
+            }
+        }
+    }
+
+    /**
+     * Alpha-blend the foam colour ({@link #FOAM_R}/{@link #FOAM_G}/
+     * {@link #FOAM_B}) into the edge of {@code img} facing raw-grid offset
+     * {@code (dx, dy)}, peaking at {@link #FOAM_MAX_ALPHA} right at the
+     * shared edge and tapering to 0 over {@link #FOAM_BAND} rows. Blends
+     * (rather than replaces, unlike {@link #ditherEdge}/{@link
+     * #blendCoastEdge}) because there is no neighbour art to stay faithful to
+     * here -- the water tile has no land-coloured pixels to sample, only its
+     * own base ocean texture -- so lightening the existing water colour reads
+     * as a foam highlight sitting on top of it, the same way the original's
+     * own fringe looks like whitecaps over water rather than a separate
+     * layer. A per-pixel {@link #hashNoise} factor varies the alpha slightly
+     * so the line reads as an uneven natural highlight rather than a
+     * ruler-straight stripe, without gapping back to nothing anywhere along
+     * the edge -- unlike the land side, this has no "flooded" failure mode to
+     * guard against (a lighter-than-usual water pixel never reads as a hole),
+     * so there is no need for {@link #blendCoastEdge}'s gap/depth machinery.
+     */
+    private static void foamEdge(BufferedImage img, int tileX, int tileY, int dx, int dy) {
+        final int w = img.getWidth(), h = img.getHeight();
+        final int span = (dx != 0) ? h : w;
+        for (int row = 0; row < FOAM_BAND; row++) {
+            final float rowAlpha = FOAM_MAX_ALPHA * (FOAM_BAND - row) / FOAM_BAND;
+            for (int i = 0; i < span; i++) {
+                final int[] c = edgeCoords(w, h, w, h, dx, dy, row, i);
+                final int gx = tileX * TILE_SRC + c[0], gy = tileY * TILE_SRC + c[1];
+                final float alpha = rowAlpha * (0.7f + 0.3f * hashNoise(gx, gy));
+                final int argb = img.getRGB(c[0], c[1]);
+                final int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+                final int nr = Math.round(r * (1 - alpha) + FOAM_R * alpha);
+                final int ng = Math.round(g * (1 - alpha) + FOAM_G * alpha);
+                final int nb = Math.round(b * (1 - alpha) + FOAM_B * alpha);
+                img.setRGB(c[0], c[1], (argb & 0xFF000000) | (nr << 16) | (ng << 8) | nb);
             }
         }
     }

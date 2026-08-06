@@ -170,3 +170,59 @@ prairie/forest boundary, and 0 uncaught exceptions after the fix either.
 `screenshots/ui-square-tiles-fixed*.png` were refreshed from this session's captures, and the classic
 README's "Land/land tile borders" section was rewritten to describe the full split `ditherEdge`/
 `blendCoastEdge` design (rounds 1–4), not just the pre-round-4 single-mechanism version.
+
+## Round 5 (2026-08-06): the water side had its own bug — the coast quarter-tile frames themselves
+
+After round 4 shipped, the expert looked at a live screenshot of the same coastline and reported it
+still read as "swampy": *"there is still a green line past the blue zone, making it look like swamp."*
+Their hypothesis was that the land-land dithering algorithm had somehow been applied to sea tiles too.
+
+**Diagnosis.** It hadn't — but proving that took more than argument. Clicking the tile in question
+confirmed it was plain `Ocean` (not a hidden skerry), and `blendCoastEdge`/`ditherEdge` only ever touch
+a *land* tile's own image, sampling a water neighbour's plain base texture (never its coast decoration)
+and never reaching more than `BORDER_BAND` (3) native pixels from the edge — far short of the roughly
+one-third-of-a-tile offset where the green line actually sat. The clinching test: temporarily
+short-circuiting `blendLandBorders` to a no-op and rebuilding left the green line pixel-for-pixel
+unchanged in a live screenshot — proof the artifact had nothing to do with this package's land-side
+code. Pulling the actual extracted `PHYS0.SS` coast quarter-tile frames (`108..139`, the water-side
+"beach feathering" mechanism from an earlier phase, well before Q7) into a contact sheet showed the
+green fleck baked directly into the sprite art itself, on the outward edge of every non-empty
+config's wave-crest shape. Sampling the coastline in the actual reference screenshot
+(`screenshots/initial/opening_007.png`) confirmed the real game shows a clean, fairly desaturated
+grey/white foam fringe there instead (`RGB` roughly `120–150` across all three channels) — no green at
+all. Conclusion: the frame *extraction* (a palette/decode issue predating this session, not a rendering
+bug) doesn't match the source material.
+
+**Fix.** Rather than patch fidelity into art that's already wrong, `paintCoast` and its supporting
+`COAST_CORNERS`/`COAST_BASE`/`COAST_LAST`/`keyOutBlack` were removed from `ClassicTileArt` entirely, and
+the water side of the coastline is now painted procedurally — the same call Q7 already made for the
+land side once it turned out there was no faithful land-land border sprite to source either. New
+`ClassicMapViewer.blendWaterBorders`/`foamEdge`: for each cardinal neighbour that is land, alpha-blend
+the sampled foam colour (`FOAM_R/G/B = 150,155,160`) into the water tile's own edge, peaking at
+`FOAM_MAX_ALPHA` (0.6) right at the shared edge and tapering to 0 over `FOAM_BAND` (2) native pixels —
+narrower than the land side's `BORDER_BAND`, matching how thin the original's fringe reads at native
+resolution. This blends *over* the existing water pixel (alpha compositing) rather than replacing it
+outright, unlike the land-side mechanisms — there's no neighbour art to stay faithful to on the water
+side, so lightening the existing water colour reads as a highlight, matching how the original's own
+foam looks like whitecaps over water rather than a separate layer. A per-pixel `hashNoise` factor varies
+the alpha for an uneven, natural-looking line; there's no "flooded" failure mode to guard against here
+(a lighter-than-usual water pixel never reads as an isolated hole the way a land-coloured pixel does in
+water), so `foamEdge` needed none of `blendCoastEdge`'s gap/depth machinery.
+
+**Verification.** Rebuilt, relaunched, confirmed 0 uncaught exceptions in `FreeCol.log`. Re-screenshotted
+the exact same coastline crop used to diagnose the bug: the green fleck is gone, replaced by a clean
+thin grey-blue line hugging the shore. Re-checked a wider crop and the land-land dithering crop from
+round 4 — both unaffected. The "tan blob" visible near the coast in earlier screenshots turned out to be
+a fish resource marker (matches the original's own jumping-fish sprite in `opening_007.png` almost
+exactly), not a related bug.
+
+### State at hand-off
+
+Resolved and verified live. `screenshots/ui-square-tiles-fixed*.png` need a fresh capture with the foam
+fix (round 4's captures predate this change); the classic README's "Coastline (beach feathering)" and
+"Land/land tile borders" sections were rewritten to describe the removal and the new procedural water
+side. Open follow-up, not blocking: diagonal-only neighbours (a land tile touching water only at a
+corner) get no foam treatment from `blendWaterBorders`, which only checks the four cardinal offsets —
+the original's coast frames handled diagonal corners via `COAST_CORNERS`' config bit 2, so a concave
+coastline corner may still read as slightly under-treated on the water side. Not checked live this
+round; worth a screenshot of a concave corner before calling the water side fully done.
