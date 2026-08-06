@@ -114,14 +114,17 @@ final class ClassicMapViewer extends JPanel {
     private static final float BORDER_DENSITY = 0.45f;
 
     /**
-     * Probability a given lateral position along a land/water edge gets no
-     * water incursion at all (see {@link #blendCoastEdge}). Unlike
+     * Probability a given lateral position along a land/water edge gets only
+     * a single-pixel-deep water incursion, rather than a deeper reach of up
+     * to {@link #BORDER_BAND} rows (see {@link #blendCoastEdge}). Unlike
      * land-land ({@link #BORDER_DENSITY}), land/water pixels are not
      * independently scattered: water is such a high-contrast colour swap
      * from any land texture that isolated water pixels deep in solid land
      * read as unnatural "flooded" potholes rather than texture noise, so
-     * each lateral position instead gets either no incursion or one
-     * contiguous run from the edge -- a wavy but solid boundary line.
+     * each lateral position instead gets one contiguous run from the edge --
+     * a wavy but solid boundary line -- and row 0 (right at the shared edge)
+     * is never skipped, so the coastline never gaps back to a hard land/water
+     * step; only how far past row 0 it reaches varies.
      */
     private static final float COAST_GAP_PROBABILITY = 0.5f;
 
@@ -931,12 +934,17 @@ final class ClassicMapViewer extends JPanel {
      * flagged by the expert from a side-by-side screenshot comparison against
      * the reference art (see {@code classic_ui_plan/land-tile-borders.md}).
      * Instead, each lateral position {@code i} along the edge gets one
-     * noise-derived incursion depth in {@code [0, BORDER_BAND]} -- {@link
-     * #COAST_GAP_PROBABILITY} of the time zero, keeping the coastline itself
-     * jagged and sparse rather than a uniformly thick band -- and every
-     * pixel from the edge up to that depth is replaced, so the boundary
-     * itself is a wavy but <em>solid</em> line: strictly water beyond it,
-     * strictly land before it.
+     * noise-derived incursion depth in {@code [1, BORDER_BAND]} -- row 0 (the
+     * pixel right at the shared edge) is <em>always</em> replaced, so the
+     * coastline itself is a continuously-present line rather than gapping
+     * back to a hard land/water step at {@link #COAST_GAP_PROBABILITY} of all
+     * lateral positions; that probability instead only gates how much
+     * <em>further</em> a given position reaches inland (1 row the rest of the
+     * time, up to {@code BORDER_BAND} rows the other {@code 1 -
+     * COAST_GAP_PROBABILITY}), keeping the reach jagged and uneven without
+     * ever opening a gap. Every pixel from the edge up to the chosen depth is
+     * replaced, so the boundary itself is a wavy but <em>solid</em> line:
+     * strictly water beyond it, strictly land before it.
      */
     private static void blendCoastEdge(BufferedImage img, BufferedImage neighbour,
                                        int tileX, int tileY, int dx, int dy) {
@@ -946,9 +954,13 @@ final class ClassicMapViewer extends JPanel {
         for (int i = 0; i < span; i++) {
             final int worldPerp = (dx != 0) ? tileY * TILE_SRC + i : tileX * TILE_SRC + i;
             final float n = hashNoise(worldPerp, dx * 7 + dy * 13);
-            if (n < COAST_GAP_PROBABILITY) continue;
-            final float fraction = (n - COAST_GAP_PROBABILITY) / (1f - COAST_GAP_PROBABILITY);
-            final int depth = 1 + (int) (fraction * BORDER_BAND);
+            final int depth;
+            if (n < COAST_GAP_PROBABILITY) {
+                depth = 1;
+            } else {
+                final float fraction = (n - COAST_GAP_PROBABILITY) / (1f - COAST_GAP_PROBABILITY);
+                depth = Math.min(BORDER_BAND, 1 + (int) (fraction * BORDER_BAND));
+            }
             for (int row = 0; row < depth; row++) {
                 final int[] c = edgeCoords(w, h, nw, nh, dx, dy, row, i);
                 img.setRGB(c[0], c[1], neighbour.getRGB(c[2], c[3]));

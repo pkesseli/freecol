@@ -306,10 +306,11 @@ instead of showing a hard edge. The crux was again asset RE:
 - **Not yet wired:** the estuary/river-mouth pieces — `140..147` (ocean
   corner-hints) and `150..153` (diagonal sand strips). Deferred (river mouths).
 
-**Land/land tile borders — dithered edge-blend (Q7, fixed 2026-08-05).** `paintCoast`
-only ever ran for water cells; two adjacent **land** tiles of different `TileType` got
-no feathering at all, so a bare (non-forest/hill) tile like Prairie rendered as a
-perfectly flat, hard-edged 48px rectangle against its neighbours — see
+**Land/land and land/water tile borders — dithered edge-blend (Q7, fixed
+2026-08-05, retuned through 2026-08-06).** `paintCoast` only ever ran for water
+cells; two adjacent **land** tiles of different `TileType` got no feathering at
+all, so a bare (non-forest/hill) tile like Prairie rendered as a perfectly flat,
+hard-edged 48px rectangle against its neighbours — see
 `screenshots/ui-square-tiles-bug.png` for the original live capture (four adjacent
 tiles, each a flat unblended square) versus any original reference shot (e.g.
 `screenshots/initial/opening_007.png`), which never showed this. Live-clicking through
@@ -327,54 +328,70 @@ resources/coast and nothing else), so the fix is procedural rather than a sprite
 lookup: `ClassicMapViewer.blendLandBorders`, called from `paintTile` right after the
 base terrain is fetched and before `ClassicTileArt.paintOverlays` composites the
 feature layer, checks each raw-grid cardinal neighbour for land of a *different*
-`TileType` and, where true, replaces a `BORDER_BAND`-pixel-wide band along that edge
-(in native 16×16 sprite space, before the ×3 `CLASSIC_SCALE` up-scale) with the
-mirrored pixel from the neighbour's own base texture. **Which pixels blend is
-noise-selected, not an ordered dither:** the first cut used a 2×2 Bayer matrix, but
-side-by-side comparison against the expert's reference shots showed the original's
-land borders as sparse, uneven speckling — a small repeating matrix instead read as
-a visibly regular checkerboard band, denser and more uniform than the reference.
-`ditherEdge` now gates each candidate pixel on `hashNoise` (a cheap integer hash of
-its *world* pixel coordinate, so the scatter is stable across repaints — no flicker —
-without repeating tile-to-tile like the matrix did) against `BORDER_DENSITY`
-(`0.45`, tapering to 0 over `BORDER_BAND` rows), roughly halving the blended-pixel
-count versus the matrix version and breaking up the regular grid look. Only a land
+`TileType` (or water) and, where true, replaces up to a `BORDER_BAND`-pixel-wide band
+along that edge (in native 16×16 sprite space, before the ×3 `CLASSIC_SCALE`
+up-scale) with the mirrored pixel from the neighbour's own base texture. Only a land
 tile's own cached terrain image copy is touched (`copyImage`); `paintCoast` and the
 overlay compositing are untouched.
 
-**Extended to the land side of coastlines too.** The expert also flagged that a
-coastline still looked wrong even after the above: `paintCoast`'s quarter-tiles
-feather the *water* tile with a fixed beach/foam sprite regardless of which land
-type it borders, but the **land** tile's own edge got no treatment at all (it was
-explicitly excluded — `blendLandBorders` originally required the neighbour to be
-land), so it still ended in a hard square against the water. `blendLandBorders` now
-blends against *any* differently-typed neighbour, water included, so the land tile's
-edge also softens toward the water's colour — complementary to, not a replacement
-for, `paintCoast`'s existing water-side feathering.
+**Two blend mechanisms, not one — split by how forgiving the colour contrast is.**
+`blendLandBorders` branches on `neighbour.isLand()`:
 
-That surfaced a real, previously-latent bug: `ditherEdge` indexed the neighbour
-image using the *tile's own* width/height, silently assuming every neighbour sprite
-comes back the size requested. `ImageLibrary.getTerrainImage` only honours that
-request when the source sprite's aspect ratio already matches it —
-`ImageUtils.wildcardDimension` otherwise preserves the *source's* aspect ratio to
-avoid distorting it — which every square `TERRAIN.SS` land frame happens to satisfy,
-but water's source art does not, so a water neighbour's returned image is a
-different (non-16×16) shape. Reading it with the land tile's own indices threw
-`ArrayIndexOutOfBoundsException` on every repaint once a land tile was next to
-water (i.e. immediately, on any coastal tile) — caught by
-`FreeColClient`'s uncaught-exception handler, so the process didn't crash outright,
-but the map view never advanced past its "waiting for the game" placeholder text.
-Caught live (`FreeCol.log`), not by inspection. Fixed by having `ditherEdge` read
-`neighbour`'s own width/height: the along-edge axis is scaled proportionally into
-the neighbour's span and the depth axis clamped into it, so a differently-shaped
-neighbour degrades to a coarser sample instead of an out-of-bounds read.
+- **`ditherEdge` (land-land).** Each candidate pixel is gated independently on
+  `hashNoise` (a cheap integer hash of its *world* pixel coordinate, so the scatter
+  is stable across repaints — no flicker — without repeating tile-to-tile) against
+  `BORDER_DENSITY` (`0.45`, tapering to 0 over `BORDER_BAND` rows). The first cut
+  used a 2×2 Bayer matrix, but side-by-side comparison against the expert's
+  reference shots showed the original's land borders as sparse, uneven speckling —
+  a small repeating matrix instead read as a visibly regular checkerboard band,
+  denser and more uniform than the reference — hence the switch to per-pixel noise.
+  Independent per-pixel scatter reads as organic texture noise here because
+  neighbouring *land* textures are close enough in colour value that an isolated
+  swapped pixel still looks like part of the texture.
+- **`blendCoastEdge` (land-water).** The same independent-scatter approach, tried
+  first for water neighbours too, read badly: water is such a high-contrast colour
+  swap from any land tone that isolated swapped pixels showed up as "flooded"
+  potholes — scattered water-coloured pixels sitting alone inside solid land,
+  disconnected from the actual coastline, flagged by the expert from a
+  side-by-side screenshot against the original. So the land-water case gates *per
+  lateral position along the edge* instead of per pixel: each position gets one
+  noise-derived incursion depth in `[1, BORDER_BAND]`, filled solid from the edge
+  inward, so the result is a wavy but *contiguous* line — strictly water past it,
+  strictly land before it — never an isolated pixel. `COAST_GAP_PROBABILITY`
+  (`0.5`) controls how often a position gets only the minimal 1-pixel depth versus
+  reaching further inland; row 0 (the pixel right at the shared edge) is **never**
+  skipped, so the coastline can vary how far it reaches but never gaps back to a
+  hard land/water step — an early version gated row 0 on this probability too,
+  which left roughly half of all edge positions with a literal hard 1px step right
+  at the shore (confirmed both by a standalone reproduction of the algorithm
+  against synthetic tiles, and by a before/after pixel diff of a live coastline
+  screenshot showing the fix landing exactly on the edge row, nowhere else) before
+  being corrected to always touch row 0.
+- Both share `edgeCoords`, the row/lateral-position → own-pixel/neighbour-pixel
+  coordinate math, deduplicated out of the original single-mechanism `ditherEdge`.
+  It does **not** assume the neighbour's returned sprite shares the tile's own
+  width/height: `ImageLibrary.getTerrainImage` only honours the requested size when
+  the source sprite's aspect ratio already matches it — `ImageUtils.wildcardDimension`
+  otherwise preserves the *source's* own aspect ratio to avoid distortion, true for
+  every square `TERRAIN.SS` land frame but not guaranteed for water's source art.
+  Reading a differently-shaped neighbour with the tile's own indices threw
+  `ArrayIndexOutOfBoundsException` on every repaint of a coastal tile in an earlier
+  round — caught by `FreeColClient`'s uncaught-exception handler (so the process
+  didn't crash outright, but the map view never advanced past its loading
+  placeholder) and found live via `FreeCol.log`, not by inspection. `edgeCoords`
+  now scales the along-edge axis proportionally into the neighbour's own span and
+  clamps the depth axis into it, so an odd-shaped neighbour degrades to a coarser
+  sample instead of an out-of-bounds read.
 
 Verified live against `screenshots/ui-square-tiles-fixed.png`/`-crop.png`/`-coast.png`
-at the same map location as the original bug capture, with coastline feathering,
-forest/hill overlays and the composited tree canopy all rendering unchanged on top
-of the blended base, and 0 uncaught exceptions in `FreeCol.log` for the session. See
+at the same map location as the original bug capture: coastline feathering,
+forest/hill overlays and the composited tree canopy all render unchanged on top of
+the blended base, land-land dithering still reads as the same sparse, approved
+speckling, the land/water boundary is a continuous line with no isolated pixels, and
+0 uncaught exceptions in `FreeCol.log` for the session. See
 [land-tile-borders.md](../../../../../../../classic_ui_plan/land-tile-borders.md) for
-the original bug writeup and
+the full history (including the round-by-round expert feedback that produced the
+split-mechanism design) and
 [Q7, Resolved](../../../../../../../classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
 
 ## Phase 2 HUD (menu bar + info/orders panel)
