@@ -21,7 +21,6 @@ phase item linked; this list is just the queue to take to him.
 | **Q4** | **Reference shots for the choice-list and text-input popups**, whose original look we have never seen. | [Phase 3 §1](#remaining-1) | Cannot start; they stay Swing stopgaps. |
 | **Q5** | **The colony screen's fixed building ground-slots** — the original places buildings at set positions; we flow-layout them. | [Phase 2 §3](#remaining) | Rework of the biggest remaining slice. |
 | **Q6** | **Four shipped reports — Military, Production, Exploration, Cargo — have no confirmed Col1 counterpart** at all (see Resolved below); "Military Garrison" may just be the Colony Advisor's own paging, not a standalone report. **Concretely blocking now:** remapping Naval to its confirmed key F7 collides with Military, which already sits there and which this plan does not touch unilaterally — both menu items show "F7" today but only one responds (verified live). Should any of the four be reworked, re-keyed, or removed? | Key-scheme remap (`ClassicGUI.remapClassicReportAccelerators`); README "Report screens" | Guessing wrong either reworks a report the original never had, or leaves a live, user-visible key collision unresolved. |
-| **Q7** | **Land-land tile borders render as flat, unblended rectangles.** **Highest priority — ready to implement, not just a question:** see [land-tile-borders.md](land-tile-borders.md) for the full bug writeup, a recommended fix (procedural dithered edge-blend, no new art needed), and acceptance criteria. Live-confirmed by clicking through `--classic` (`screenshots/ui-square-tiles-bug.png`); not explained by forest connectivity/sparse-canopy (a red herring chased first). | [Phase 1](#phase-1--the-map-) | Leaves visibly wrong terrain (a defining visual of the whole classic UI effort) until fixed. |
 
 **All five go to him together, in one sitting** — see the
 [milestone note](#milestone-ready-for-the-experts-first-playtest) below for why this is now a bundled
@@ -38,6 +37,10 @@ hand-off (build + every open question at once) rather than asking Q4 separately/
   Left/Right/Space. The *within-a-view* key for >9 colonies remains open (table above).
 - **The observed F-key scheme** (2026-07-24) — remapped in `ClassicGUI` at runtime, in-memory only;
   see README "Report screens".
+- **Q7, land-land tile borders** (2026-08-05) — no border sprite sheet exists to source, so fixed with
+  a procedural dithered edge-blend at render time (`ClassicMapViewer.blendLandBorders`), not more asset
+  RE. Verified live against `screenshots/ui-square-tiles-bug.png`/`ui-square-tiles-fixed.png`; see
+  [land-tile-borders.md](land-tile-borders.md) and the README's "`ClassicMapViewer`" section.
 
 ## Milestone: ready for the expert's first playtest
 
@@ -87,17 +90,16 @@ for — no point guessing at them again solo.
 `ClassicGUI extends GUI`, `--classic` flag, selector, auto-launch lobby stopgap.
 (README "What this is".)
 
-## Phase 1 — the map ✅ (land-land tile-border blending open — Q7, highest priority)
+## Phase 1 — the map ✅
 
 Rectangular 48px grid: `TERRAIN.SS` terrain, `PHYS0.SS` feature overlays + coast/beach feathering,
 `ICONS.SS` unit/goods/settlement sprites, edge-pan, minimap, clicks/keys driving the real
 `InGameController`, and **turn controls** (Enter/Space/W/B, the 1994 key scheme).
 (README "`ClassicMapViewer`".) Frame maps + RE writeups live in `ClassicTileArt`,
-`aliases.properties`, and the README. **Gap found 2026-07-27:** coast feathering blends
-ocean↔land, but two adjacent land tiles of different type never blend — bug +
-recommended fix + acceptance criteria in
-[land-tile-borders.md](land-tile-borders.md) (see also [Q7](#open-questions-for-the-expert)
-and the README's "Known gap" note).
+`aliases.properties`, and the README. **Gap found 2026-07-27, fixed 2026-08-05:** coast
+feathering blends ocean↔land, but two adjacent land tiles of different type never blended —
+bug + fix + acceptance criteria in [land-tile-borders.md](land-tile-borders.md) (see also
+[Q7, Resolved](#open-questions-for-the-expert) and the README's "`ClassicMapViewer`" section).
 
 ## Phase 2 — HUD & core screens 🔨
 

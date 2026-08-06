@@ -97,6 +97,26 @@ final class ClassicMapViewer extends JPanel {
     private static final Dimension SRC_SIZE = new Dimension(TILE_SRC, TILE_SRC);
 
     /**
+     * Width, in native ({@link #TILE_SRC}-scale) pixels, of the dithered
+     * land-land border blend (see {@link #blendLandBorders}).
+     */
+    private static final int BORDER_BAND = 3;
+
+    /**
+     * 2&times;2 Bayer ordered-dither matrix, normalised to {@code [0,1)}.
+     * The terrain sprites are themselves flat 2-colour dithers, so an ordered
+     * dither -- rather than a smooth alpha gradient -- keeps a blended edge
+     * consistent with that pixel-art look.
+     */
+    private static final float[][] BAYER2 = {
+        { 0f / 4f, 2f / 4f },
+        { 3f / 4f, 1f / 4f },
+    };
+
+    /** Raw-grid cardinal offsets checked for a land-land border blend. */
+    private static final int[][] BORDER_EDGES = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
+
+    /**
      * Fraction of the cell an up-scaled classic unit/settlement sprite fills.
      * The original ICONS.SS sprites are ~16&times;16; drawn at a fraction just
      * under 1 they read clearly while leaving a small margin so they do not
@@ -741,7 +761,7 @@ final class ClassicMapViewer extends JPanel {
         final BufferedImage terrain = this.lib.getTerrainImage(
             tile.getType(), tile.getX(), tile.getY(), SRC_SIZE);
         if (terrain != null) {
-            g.drawImage(terrain, sx, sy, TILE_W, TILE_H, null);
+            g.drawImage(blendLandBorders(map, tile, terrain), sx, sy, TILE_W, TILE_H, null);
         }
 
         // Composite the physical-feature overlays on top of the base terrain.
@@ -755,6 +775,82 @@ final class ClassicMapViewer extends JPanel {
             final Unit unit = tile.getFirstUnit();
             if (unit != null) {
                 drawCentered(g, this.lib.getScaledUnitImage(unit), sx, sy);
+            }
+        }
+    }
+
+    /**
+     * Blend a {@link #BORDER_BAND}-pixel-wide dithered band into {@code terrain}
+     * along each raw-grid edge that faces a land neighbour of a <em>different</em>
+     * {@link net.sf.freecol.common.model.TileType}, so a land-land boundary reads
+     * as organic dithering rather than the flat rectangular edge two differently-
+     * coloured base textures otherwise produce (see
+     * {@code classic_ui_plan/land-tile-borders.md}, Q7). Ocean&harr;land coasts are
+     * unaffected -- those are already feathered by
+     * {@link ClassicTileArt#paintOverlays}.
+     *
+     * @return {@code terrain} unchanged when {@code tile} is not land or no
+     *     neighbour needs blending (the common case, kept cheap); otherwise a
+     *     new image, leaving the shared cached source untouched.
+     */
+    private BufferedImage blendLandBorders(Map map, Tile tile, BufferedImage terrain) {
+        if (!tile.isLand()) return terrain;
+        BufferedImage blended = null;
+        for (int[] edge : BORDER_EDGES) {
+            final int nx = tile.getX() + edge[0];
+            final int ny = tile.getY() + edge[1];
+            final Tile neighbour = map.getTile(nx, ny);
+            if (neighbour == null || !neighbour.isLand()
+                || neighbour.getType() == tile.getType()) {
+                continue;
+            }
+            final BufferedImage neighbourImg =
+                this.lib.getTerrainImage(neighbour.getType(), nx, ny, SRC_SIZE);
+            if (neighbourImg == null) continue;
+            if (blended == null) blended = copyImage(terrain);
+            ditherEdge(blended, neighbourImg, edge[0], edge[1]);
+        }
+        return (blended != null) ? blended : terrain;
+    }
+
+    /** Return a mutable {@code TYPE_INT_ARGB} copy of {@code src}. */
+    private static BufferedImage copyImage(BufferedImage src) {
+        final BufferedImage copy = new BufferedImage(
+            src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        final Graphics2D g = copy.createGraphics();
+        g.drawImage(src, 0, 0, null);
+        g.dispose();
+        return copy;
+    }
+
+    /**
+     * Replace an ordered-dither subset of the pixels along the edge of
+     * {@code img} facing raw-grid offset {@code (dx, dy)} with the mirrored
+     * pixel from {@code neighbour}, so the blend both reads as the neighbour's
+     * actual (dithered) texture and its density falls off with distance from
+     * the shared edge over {@link #BORDER_BAND} native pixels.
+     */
+    private static void ditherEdge(BufferedImage img, BufferedImage neighbour,
+                                   int dx, int dy) {
+        final int w = img.getWidth(), h = img.getHeight();
+        final int span = (dx != 0) ? h : w;
+        for (int row = 0; row < BORDER_BAND; row++) {
+            final float density = (BORDER_BAND - row) / (float) (BORDER_BAND + 1);
+            for (int i = 0; i < span; i++) {
+                final int ox, oy, nxp, nyp;
+                if (dx != 0) {
+                    oy = i;
+                    nyp = i;
+                    if (dx < 0) { ox = row;         nxp = w - 1 - row; }
+                    else        { ox = w - 1 - row; nxp = row;         }
+                } else {
+                    ox = i;
+                    nxp = i;
+                    if (dy < 0) { oy = row;         nyp = h - 1 - row; }
+                    else        { oy = h - 1 - row; nyp = row;         }
+                }
+                if (BAYER2[oy & 1][ox & 1] >= density) continue;
+                img.setRGB(ox, oy, neighbour.getRGB(nxp, nyp));
             }
         }
     }

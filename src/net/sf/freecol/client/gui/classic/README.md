@@ -306,25 +306,40 @@ instead of showing a hard edge. The crux was again asset RE:
 - **Not yet wired:** the estuary/river-mouth pieces — `140..147` (ocean
   corner-hints) and `150..153` (diagonal sand strips). Deferred (river mouths).
 
-**Known gap — land/land tile borders are unblended.** `paintCoast` only runs for
-water cells; two adjacent **land** tiles of different `TileType` get no
-feathering at all, so a bare (non-forest/hill) tile like Prairie renders as a
+**Land/land tile borders — dithered edge-blend (Q7, fixed 2026-08-05).** `paintCoast`
+only ever ran for water cells; two adjacent **land** tiles of different `TileType` got
+no feathering at all, so a bare (non-forest/hill) tile like Prairie rendered as a
 perfectly flat, hard-edged 48px rectangle against its neighbours — see
-`screenshots/ui-square-tiles-bug.png` for a live capture (four adjacent tiles,
-each a flat unblended square) versus any original reference shot (e.g.
-`screenshots/initial/opening_007.png`), which never shows this. Live-clicked
-through `--classic` to confirm root cause: a "Prärie" tile (zero overlay) sits
-next to a "Mischwald" tile whose substituted base texture
-(`image.tile.model.tile.mixedForest.center` → `TERRAIN.SS.002`, plains) is
-visually near-identical to Prairie's own (`TERRAIN.SS.003`) — so what reads as
-one large hard-edged block is actually two different `TileType`s with no
-blending between them, not a forest-connectivity issue. Checked every
-extracted `.SS` archive under `tools/classic_assets` output for a dedicated
-land-land border/transition sheet analogous to the coast quarter-tiles — none
-exists (`TERRAIN.SS` is 12 base frames only, `PHYS0.SS` covers forest/hills/
-mountains/rivers/roads/resources/coast and nothing else), so if the original
-truly blends land-land edges it is not via sprite lookup and the mechanism is
-unconfirmed. Tracked as [Q7](../../../../../../../classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
+`screenshots/ui-square-tiles-bug.png` for the original live capture (four adjacent
+tiles, each a flat unblended square) versus any original reference shot (e.g.
+`screenshots/initial/opening_007.png`), which never showed this. Live-clicking through
+`--classic` confirmed the root cause: a "Prärie" tile (zero overlay) sat next to a
+"Mischwald" tile whose substituted base texture
+(`image.tile.model.tile.mixedForest.center` → `TERRAIN.SS.002`, plains) is visually
+near-identical to Prairie's own (`TERRAIN.SS.003`) — so what read as one large
+hard-edged block was actually two different `TileType`s with no blending between
+them, not a forest-connectivity issue.
+
+No dedicated land-land border/transition sprite sheet exists to source (every
+extracted `.SS` archive under `tools/classic_assets` output was checked — `TERRAIN.SS`
+is 12 base frames only, `PHYS0.SS` covers forest/hills/mountains/rivers/roads/
+resources/coast and nothing else), so the fix is procedural rather than a sprite
+lookup: `ClassicMapViewer.blendLandBorders`, called from `paintTile` right after the
+base terrain is fetched and before `ClassicTileArt.paintOverlays` composites the
+feature layer, checks each raw-grid cardinal neighbour for land of a *different*
+`TileType` and, where true, replaces a `BORDER_BAND`-pixel-wide band along that edge
+(in native 16×16 sprite space, before the ×3 `CLASSIC_SCALE` up-scale) with the
+mirrored pixel from the neighbour's own base texture, using a 2×2 Bayer ordered
+dither (`ditherEdge`) whose density falls off with distance from the edge — matching
+the existing `TERRAIN.SS` sprites' own 2-colour-dither pixel-art look rather than a
+smooth alpha gradient. Only a land tile's own cached terrain image copy is touched
+(`copyImage`); `paintCoast` and the overlay compositing are untouched. Verified live
+against `screenshots/ui-square-tiles-fixed.png`/`-crop.png` at the same map location
+as the original bug capture, with coastline feathering, forest/hill overlays and the
+composited tree canopy all rendering unchanged on top of the blended base. See
+[land-tile-borders.md](../../../../../../../classic_ui_plan/land-tile-borders.md) for
+the original bug writeup and
+[Q7, Resolved](../../../../../../../classic_ui_plan/ui-phases.md#open-questions-for-the-expert).
 
 ## Phase 2 HUD (menu bar + info/orders panel)
 
