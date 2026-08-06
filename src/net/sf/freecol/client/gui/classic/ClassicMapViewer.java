@@ -108,9 +108,22 @@ final class ClassicMapViewer extends JPanel {
      * Kept deliberately low -- the reference original renders land-land
      * borders as sparse, uneven speckling, not a dense band -- see
      * {@link #hashNoise} for why the pattern is per-pixel noise rather than
-     * a small repeating ordered-dither matrix.
+     * a small repeating ordered-dither matrix. Land-land only: see
+     * {@link #COAST_GAP_PROBABILITY} for the land-water case.
      */
     private static final float BORDER_DENSITY = 0.45f;
+
+    /**
+     * Probability a given lateral position along a land/water edge gets no
+     * water incursion at all (see {@link #blendCoastEdge}). Unlike
+     * land-land ({@link #BORDER_DENSITY}), land/water pixels are not
+     * independently scattered: water is such a high-contrast colour swap
+     * from any land texture that isolated water pixels deep in solid land
+     * read as unnatural "flooded" potholes rather than texture noise, so
+     * each lateral position instead gets either no incursion or one
+     * contiguous run from the edge -- a wavy but solid boundary line.
+     */
+    private static final float COAST_GAP_PROBABILITY = 0.5f;
 
     /** Raw-grid cardinal offsets checked for a land-land border blend. */
     private static final int[][] BORDER_EDGES = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
@@ -809,7 +822,11 @@ final class ClassicMapViewer extends JPanel {
                 this.lib.getTerrainImage(neighbour.getType(), nx, ny, SRC_SIZE);
             if (neighbourImg == null) continue;
             if (blended == null) blended = copyImage(terrain);
-            ditherEdge(blended, neighbourImg, tile.getX(), tile.getY(), edge[0], edge[1]);
+            if (neighbour.isLand()) {
+                ditherEdge(blended, neighbourImg, tile.getX(), tile.getY(), edge[0], edge[1]);
+            } else {
+                blendCoastEdge(blended, neighbourImg, tile.getX(), tile.getY(), edge[0], edge[1]);
+            }
         }
         return (blended != null) ? blended : terrain;
     }
@@ -842,13 +859,11 @@ final class ClassicMapViewer extends JPanel {
     }
 
     /**
-     * Replace a sparse, noise-selected subset of the pixels along the edge of
-     * {@code img} facing raw-grid offset {@code (dx, dy)} with the mirrored
-     * pixel from {@code neighbour}, so the blend reads as the neighbour's
-     * actual (dithered) texture, scattered unevenly (via {@link #hashNoise},
-     * seeded by the tile's world position {@code (tileX, tileY)} so adjacent
-     * boundaries don't repeat the same pattern) with density falling off over
-     * {@link #BORDER_BAND} native pixels from the shared edge.
+     * Map band row {@code row} (0 = right at the shared edge) and lateral
+     * position {@code i} along a {@code (dx, dy)}-facing edge of a
+     * {@code w}&times;{@code h} image to {@code {ox, oy, nxp, nyp}}: the
+     * pixel to overwrite in the tile's own image, and the mirrored pixel to
+     * read from an {@code nw}&times;{@code nh} neighbour image.
      *
      * <p>{@code neighbour} is <em>not</em> assumed to share {@code img}'s
      * dimensions: {@link ImageLibrary#getTerrainImage} only honours the
@@ -857,9 +872,39 @@ final class ClassicMapViewer extends JPanel {
      * source's own aspect ratio to avoid distortion) -- true for every
      * square {@code TERRAIN.SS} land frame, but not guaranteed for water,
      * whose source art need not be square. The along-edge axis is scaled
-     * proportionally into {@code neighbour}'s own span and the depth axis is
+     * proportionally into the neighbour's own span and the depth axis is
      * clamped into it, so an odd-shaped neighbour degrades to a coarser
      * sample rather than an out-of-bounds read.
+     */
+    private static int[] edgeCoords(int w, int h, int nw, int nh, int dx, int dy,
+                                    int row, int i) {
+        final int ox, oy, nxp, nyp;
+        if (dx != 0) {
+            oy = i;
+            nyp = Math.min(nh - 1, i * nh / h);
+            if (dx < 0) { ox = row;         nxp = Math.max(0, nw - 1 - row); }
+            else        { ox = w - 1 - row; nxp = Math.min(nw - 1, row);      }
+        } else {
+            ox = i;
+            nxp = Math.min(nw - 1, i * nw / w);
+            if (dy < 0) { oy = row;         nyp = Math.max(0, nh - 1 - row); }
+            else        { oy = h - 1 - row; nyp = Math.min(nh - 1, row);      }
+        }
+        return new int[] { ox, oy, nxp, nyp };
+    }
+
+    /**
+     * Replace a sparse, noise-selected subset of the pixels along the edge of
+     * {@code img} facing raw-grid offset {@code (dx, dy)} with the mirrored
+     * pixel from a <em>land</em> {@code neighbour}, so the blend reads as the
+     * neighbour's actual (dithered) texture, scattered unevenly (via
+     * {@link #hashNoise}, seeded by the tile's world position
+     * {@code (tileX, tileY)} so adjacent boundaries don't repeat the same
+     * pattern) with density falling off over {@link #BORDER_BAND} native
+     * pixels from the shared edge. Independent per-pixel scatter reads fine
+     * here because neighbouring land textures are close enough in value that
+     * it looks like organic noise -- for the water case, see
+     * {@link #blendCoastEdge}, which needs a stricter, contiguous fill.
      */
     private static void ditherEdge(BufferedImage img, BufferedImage neighbour,
                                    int tileX, int tileY, int dx, int dy) {
@@ -869,21 +914,44 @@ final class ClassicMapViewer extends JPanel {
         for (int row = 0; row < BORDER_BAND; row++) {
             final float density = BORDER_DENSITY * (BORDER_BAND - row) / BORDER_BAND;
             for (int i = 0; i < span; i++) {
-                final int ox, oy, nxp, nyp;
-                if (dx != 0) {
-                    oy = i;
-                    nyp = Math.min(nh - 1, i * nh / h);
-                    if (dx < 0) { ox = row;         nxp = Math.max(0, nw - 1 - row); }
-                    else        { ox = w - 1 - row; nxp = Math.min(nw - 1, row);      }
-                } else {
-                    ox = i;
-                    nxp = Math.min(nw - 1, i * nw / w);
-                    if (dy < 0) { oy = row;         nyp = Math.max(0, nh - 1 - row); }
-                    else        { oy = h - 1 - row; nyp = Math.min(nh - 1, row);      }
-                }
-                final int gx = tileX * TILE_SRC + ox, gy = tileY * TILE_SRC + oy;
+                final int[] c = edgeCoords(w, h, nw, nh, dx, dy, row, i);
+                final int gx = tileX * TILE_SRC + c[0], gy = tileY * TILE_SRC + c[1];
                 if (hashNoise(gx, gy) >= density) continue;
-                img.setRGB(ox, oy, neighbour.getRGB(nxp, nyp));
+                img.setRGB(c[0], c[1], neighbour.getRGB(c[2], c[3]));
+            }
+        }
+    }
+
+    /**
+     * Blend the edge of {@code img} facing {@code (dx, dy)} toward a
+     * <em>water</em> {@code neighbour}. Unlike {@link #ditherEdge}'s
+     * independently-scattered pixels, water is such a high-contrast colour
+     * swap from any land texture that isolated water pixels deep in solid
+     * land read as unnatural "flooded" potholes rather than texture noise --
+     * flagged by the expert from a side-by-side screenshot comparison against
+     * the reference art (see {@code classic_ui_plan/land-tile-borders.md}).
+     * Instead, each lateral position {@code i} along the edge gets one
+     * noise-derived incursion depth in {@code [0, BORDER_BAND]} -- {@link
+     * #COAST_GAP_PROBABILITY} of the time zero, keeping the coastline itself
+     * jagged and sparse rather than a uniformly thick band -- and every
+     * pixel from the edge up to that depth is replaced, so the boundary
+     * itself is a wavy but <em>solid</em> line: strictly water beyond it,
+     * strictly land before it.
+     */
+    private static void blendCoastEdge(BufferedImage img, BufferedImage neighbour,
+                                       int tileX, int tileY, int dx, int dy) {
+        final int w = img.getWidth(), h = img.getHeight();
+        final int nw = neighbour.getWidth(), nh = neighbour.getHeight();
+        final int span = (dx != 0) ? h : w;
+        for (int i = 0; i < span; i++) {
+            final int worldPerp = (dx != 0) ? tileY * TILE_SRC + i : tileX * TILE_SRC + i;
+            final float n = hashNoise(worldPerp, dx * 7 + dy * 13);
+            if (n < COAST_GAP_PROBABILITY) continue;
+            final float fraction = (n - COAST_GAP_PROBABILITY) / (1f - COAST_GAP_PROBABILITY);
+            final int depth = 1 + (int) (fraction * BORDER_BAND);
+            for (int row = 0; row < depth; row++) {
+                final int[] c = edgeCoords(w, h, nw, nh, dx, dy, row, i);
+                img.setRGB(c[0], c[1], neighbour.getRGB(c[2], c[3]));
             }
         }
     }

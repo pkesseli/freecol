@@ -84,3 +84,104 @@ time** rather than waiting on more asset RE:
    "Resolved" list, matching how Q1/Q2 are recorded there) and update the
    classic-package README's "Known gap" note to describe the fix instead of the
    gap. Leave this file in place as the implementation record — don't delete it.
+
+## Follow-up (2026-08-06): land/water blend reads as "flooded" — IN PROGRESS, unverified
+
+Q7 shipped and was marked resolved (below), but the expert's live review found three more rounds of
+issues in the same blend, worked through in one session on `house-rules`. **The last of these (this
+section) was cut off mid-verification when the session was interrupted to switch machines** — the code
+compiles and the window loads, but it has *not* been screenshotted, log-checked, or compared against the
+acceptance criteria yet. Whoever resumes should start there, not assume it works.
+
+### The three rounds, in order
+
+1. **Commit `bab8236`** — the original Q7 fix: `ClassicMapViewer.blendLandBorders` + `ditherEdge`, a
+   2×2 Bayer ordered dither blending land-land edges only (water neighbours explicitly excluded).
+2. **Commit `e75c6b9`** — expert feedback: the Bayer matrix read as a visibly regular, dense checkerboard
+   band, denser/more uniform than the reference art's sparse, uneven speckling. Swapped the Bayer matrix
+   for `hashNoise` (a stable per-world-pixel integer hash, so no flicker but no repeating tile either) at
+   a lower `BORDER_DENSITY` (0.45, tapering over `BORDER_BAND` = 3 rows).
+3. **Commit `ee1d95f`** — expert feedback: the *land* tile's own edge was still a hard square against
+   water (only the water tile's fixed, unrelated-to-land-colour `paintCoast` sprite got any treatment).
+   Dropped `blendLandBorders`'s land-only restriction so it also blends toward water neighbours through
+   the same `ditherEdge`. That surfaced a real, previously-latent crash:
+   `ArrayIndexOutOfBoundsException` in `ditherEdge`, because it indexed the neighbour image using the
+   *tile's own* width/height, assuming every neighbour sprite comes back at the requested 16×16 —
+   true for every square `TERRAIN.SS` land frame, but not for water's source art, which
+   `ImageUtils.wildcardDimension` scales preserving its own (non-square) aspect ratio instead of
+   distorting it to fit. Caught live via `FreeCol.log` (uncaught-exception handler logged it every
+   repaint of any coastal tile; the map view just silently never advanced past its loading placeholder).
+   Fixed by having `ditherEdge` read the neighbour's own dimensions instead of assuming they match.
+
+### Round 4 (this section): "flooded" land tiles — the actual complaint
+
+With round 3 shipped, the expert sent a side-by-side screenshot (ours vs. the original 1994 game, not
+saved into `screenshots/` — ask for a fresh capture if it's needed again) showing land tiles near a
+coastline looking **flooded**: isolated water-coloured pixels scattered *inside* solid green/yellow land,
+disconnected from the actual water body, reading as unnatural potholes rather than a coastline. Their
+framing: *"the separation here should be probably more strict — these rugged edges are great, but as far
+as the water reaches, it should be all water, and vice-versa."* — i.e. the jagged, irregular *shape* of
+the boundary is right (and they explicitly liked the land-land case), but individual pixels flipping
+independently is wrong specifically for land/water.
+
+**Diagnosis.** `ditherEdge`'s per-pixel independent Bernoulli scatter (`hashNoise(x,y) < density`) reads
+as organic texture noise for **land-land** because neighbouring dithered land textures are close enough
+in colour value that an isolated swapped pixel still looks like part of the texture. Water is a much
+higher-contrast colour swap from any land tone, so the *same* scatter mechanism applied to a land/water
+edge reads as isolated "holes" instead.
+
+**Fix attempted (uncommitted code as of the interruption — now committed alongside this doc, per the
+user's instruction to hand off, but genuinely unverified).** Split the two cases:
+
+- `ditherEdge` — **unchanged** in behaviour, now only called for land-land neighbours (independent
+  per-pixel scatter, as rounds 1–3 left it).
+- `blendCoastEdge` — **new**, called only for water neighbours. Instead of gating each pixel
+  independently, it gates *per lateral position* along the edge: one `hashNoise` roll per position, with
+  probability `COAST_GAP_PROBABILITY` (0.5) of **zero** incursion at that position at all (keeping the
+  coastline sparse/jagged rather than a uniformly thick band), otherwise a **contiguous** incursion depth
+  in `[1, BORDER_BAND]` filled solid from the edge inward. The intent: the boundary is a wavy but solid
+  line — strictly water past it, strictly land before it — never an isolated pixel floating alone.
+- Both share a new `edgeCoords` helper (the row/lateral-position → own-pixel/neighbour-pixel coordinate
+  math factored out of the old `ditherEdge`, unchanged in behaviour, just deduplicated).
+- `blendLandBorders` now branches on `neighbour.isLand()` to pick which of the two to call.
+
+**Open design risk, not yet checked against a live screenshot:** because `COAST_GAP_PROBABILITY` gates
+*every* row including row 0 (the pixel immediately at the shared edge, not just the deeper rows), roughly
+half of all lateral positions get *no* blending even right at the tile boundary — not just a shorter
+incursion. Depending how that reads live, the coastline may look **too gapped immediately at the edge**
+(patches where the land/water line is still a hard 1px step) rather than the intended "always a coastal
+edge, varying only how far it reaches inland." If so, the likely fix is gating only rows `1..BORDER_BAND`
+on `COAST_GAP_PROBABILITY` and always lightly touching row 0, or simply lowering the gap probability.
+**Check this first when resuming.**
+
+### State at hand-off
+
+- Code: `src/net/sf/freecol/client/gui/classic/ClassicMapViewer.java` — `edgeCoords`, `ditherEdge`
+  (land-land), `blendCoastEdge` (land-water, new), `COAST_GAP_PROBABILITY` constant, and the
+  `neighbour.isLand()` branch in `blendLandBorders`. Compiles clean (`ant package`).
+- Live-tested exactly once: launched via the harness in the classic README ("Testing live"), the window
+  reached the actual map view (not stuck on the loading placeholder, unlike the round-3 crash) — but the
+  session was interrupted **before** checking `FreeCol.log` for exceptions, before screenshotting the
+  coastline, and before comparing against the acceptance criteria or the expert's "flooded" complaint.
+- `screenshots/ui-square-tiles-fixed*.png` in the repo still reflect **round 3** (the extended-but-still-
+  independently-scattered version) — stale with respect to round 4's code and known not to match the
+  expert's ask. Re-capture once round 4 is verified.
+- Machine note: this session ran on a machine where the user profile is `C:\Users\pkess`, **not**
+  `C:\Users\Pascal` as the top-level `CLAUDE.md` "stale Documents registry" workaround describes — that
+  path is specific to a different machine. Re-derive the correct `--user-data-directory` (or check
+  whether the registry issue even applies) on whichever machine resumes this.
+
+### Next steps to resume
+
+1. Rebuild (`ant package`) and launch per the classic README's "Testing live" section.
+2. Check `FreeCol.log` (path per-machine, see above) for 0 uncaught exceptions, especially around
+   `ditherEdge`/`blendCoastEdge`/`edgeCoords`.
+3. Screenshot a coastal area with a clear land/water edge (e.g. the same spot as
+   `screenshots/ui-square-tiles-bug.png`) and check: no isolated/disconnected water pixels deep in solid
+   land (the actual complaint), the boundary reads as a coherent jagged line, and — per the open design
+   risk above — that the line doesn't look artificially gapped right at the shore.
+4. Confirm land-land dithering is still visually unchanged from the round-2 look (already approved).
+5. Tune `COAST_GAP_PROBABILITY`/`BORDER_BAND` if needed; iterate.
+6. Once satisfied: refresh `screenshots/ui-square-tiles-fixed*.png`, rewrite the `README.md` "Land/land
+   tile borders" section (it currently only describes the pre-round-4 single-mechanism blend) to describe
+   the split `ditherEdge`/`blendCoastEdge` design, and commit.
